@@ -1885,26 +1885,22 @@ async function toggleSt(){
 
 function deleteSt(){
   const s=D.students.find(x=>x.id===selectedStudentId);if(!s)return;
-  confirmAct(
-    `Xóa học viên "${s.name}"?`,
-    'Học viên sẽ bị ẩn khỏi danh sách nhưng vẫn có thể khôi phục trong tab "Đã xóa".',
-    async()=>{
-      const ts=nowDT();
-      await sbPatch('students',{deleted_at:ts,status:'Đã xóa'},`?id=eq.${s.id}`);
-      s.deleted_at=ts; s.status='Đã xóa';
-      closeM('modal-student-detail');
-      renderStudents();renderDash();renderDeletedStudents();
-      notify('Đã ẩn: '+s.name+' — có thể khôi phục trong tab "Đã xóa"');
-      tgMsg(`🗑 *Học viên bị xóa (có thể khôi phục)*
-
-Tên: ${s.name}
-Khóa: ${s.course||''}
-🕐 ${ts}
-
-_Trương Dáng Hương Academy_`);
-      gsSend({sheet:'HocVien',rows:gsStudents(),time:ts});
-    }
-  );
+  closeM('modal-student-detail');
+  setTimeout(()=>{
+    confirmAct(
+      `Xóa học viên "${s.name}"?`,
+      'Học viên sẽ bị ẩn, có thể khôi phục trong tab "Đã xóa".',
+      async()=>{
+        const ts=nowDT();
+        await sbPatch('students',{deleted_at:ts,status:'Đã xóa'},`?id=eq.${s.id}`);
+        s.deleted_at=ts; s.status='Đã xóa';
+        renderStudents();renderDash();renderDeletedStudents();
+        notify('Đã ẩn: '+s.name+' — khôi phục trong tab "Đã xóa"');
+        tgMsg('🗑 Học viên bị xóa: '+s.name+' ('+nowDT()+')');
+        gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
+      }
+    );
+  }, 200);
 }
 
 async function restoreStudent(id){
