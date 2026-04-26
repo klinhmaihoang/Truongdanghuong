@@ -243,6 +243,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="tab active" onclick="stTab(this,'all')">Tất cả</div>
     <div class="tab" onclick="stTab(this,'online')">Online</div>
     <div class="tab" onclick="stTab(this,'offline')">Offline</div>
+    <div class="tab" onclick="stTab(this,'deleted')" style="color:var(--red)">🗑 Đã xóa</div>
     <div class="tab" onclick="stTab(this,'courses')">📚 Khóa học</div>
   </div>
 
@@ -278,6 +279,17 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <table><thead><tr><th>Tên khóa học</th><th>Loại</th><th>Học phí</th><th>Trạng thái</th><th></th></tr></thead>
       <tbody id="course-list"></tbody></table>
     </div>
+  </div>
+
+  <!-- Bảng học viên đã xóa (chỉ hiện khi tab Đã xóa) -->
+  <div class="card" id="deleted-students-card" style="display:none;border-color:rgba(192,57,43,.3)">
+    <div class="card-head">
+      <span class="card-title" style="color:var(--red)">🗑 Học viên đã xóa — có thể khôi phục</span>
+    </div>
+    <table>
+      <thead><tr><th>Họ tên</th><th>Khóa học</th><th>Học phí</th><th>Thời gian xóa</th><th></th></tr></thead>
+      <tbody id="deleted-student-list"></tbody>
+    </table>
   </div>
 </div>
 
@@ -1241,13 +1253,23 @@ function stTab(el,f){
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   el.classList.add('active');
   stFilter=f;
+  const panelSt=document.getElementById('panel-students');
+  const panelCo=document.getElementById('panel-courses');
+  const panelDel=document.getElementById('deleted-students-card');
   if(f==='courses'){
-    document.getElementById('panel-students').style.display='none';
-    document.getElementById('panel-courses').style.display='block';
+    if(panelSt) panelSt.style.display='none';
+    if(panelCo) panelCo.style.display='block';
+    if(panelDel) panelDel.style.display='none';
     renderCourses();
+  } else if(f==='deleted'){
+    if(panelSt) panelSt.style.display='none';
+    if(panelCo) panelCo.style.display='none';
+    if(panelDel) panelDel.style.display='block';
+    renderDeletedStudents();
   } else {
-    document.getElementById('panel-students').style.display='block';
-    document.getElementById('panel-courses').style.display='none';
+    if(panelSt) panelSt.style.display='block';
+    if(panelCo) panelCo.style.display='none';
+    if(panelDel) panelDel.style.display='none';
     renderStudents();
   }
 }
@@ -1409,7 +1431,7 @@ async function checkReminders(){
 // ══════════════════════════════════════════════════
 // RENDER
 // ══════════════════════════════════════════════════
-function render(){renderDash();renderStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();renderCourses();renderCustomers();fillMatSelects();}
+function render(){renderDash();renderStudents();renderDeletedStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();renderCourses();renderCustomers();fillMatSelects();}
 
 // ══════════════════════════════════════════════════
 // CUSTOMERS
@@ -1784,6 +1806,7 @@ function renderDash(){
 function renderStudents(){
   const q=(document.getElementById('student-search')?.value||'').toLowerCase().trim();
   const list=D.students.filter(s=>{
+    if(s.deleted_at) return false; // ẩn soft-deleted
     if(stFilter!=='all'&&stFilter!=='courses'&&s.type.toLowerCase()!==stFilter)return false;
     if(!q)return true;
     const course=D.courses.find(c=>c.id===s.course_id);
@@ -1862,12 +1885,74 @@ async function toggleSt(){
 
 function deleteSt(){
   const s=D.students.find(x=>x.id===selectedStudentId);if(!s)return;
-  confirmAct(`Xóa học viên "${s.name}"?`,'Hành động này không thể hoàn tác.',async()=>{
-    await sbDel('students',`?id=eq.${s.id}`);
-    D.students=D.students.filter(x=>x.id!==selectedStudentId);
-    closeM('modal-student-detail');renderStudents();renderDash();notify('Đã xóa: '+s.name);
-    tgMsg(`🗑 *Học viên bị xóa*\n\nTên: ${s.name}\nKhóa: ${s.course}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
-  });
+  confirmAct(
+    `Xóa học viên "${s.name}"?`,
+    'Học viên sẽ bị ẩn khỏi danh sách nhưng vẫn có thể khôi phục trong tab "Đã xóa".',
+    async()=>{
+      const ts=nowDT();
+      await sbPatch('students',{deleted_at:ts,status:'Đã xóa'},`?id=eq.${s.id}`);
+      s.deleted_at=ts; s.status='Đã xóa';
+      closeM('modal-student-detail');
+      renderStudents();renderDash();renderDeletedStudents();
+      notify('Đã ẩn: '+s.name+' — có thể khôi phục trong tab "Đã xóa"');
+      tgMsg(`🗑 *Học viên bị xóa (có thể khôi phục)*
+
+Tên: ${s.name}
+Khóa: ${s.course||''}
+🕐 ${ts}
+
+_Trương Dáng Hương Academy_`);
+      gsSend({sheet:'HocVien',rows:gsStudents(),time:ts});
+    }
+  );
+}
+
+async function restoreStudent(id){
+  const s=D.students.find(x=>x.id===id);if(!s)return;
+  await sbPatch('students',{deleted_at:null,status:'Đang học'},`?id=eq.${id}`);
+  s.deleted_at=null; s.status='Đang học';
+  renderStudents();renderDash();renderDeletedStudents();
+  notify('✅ Đã khôi phục: '+s.name);
+  tgMsg(`✅ *Khôi phục học viên!*
+
+Tên: ${s.name}
+Khóa: ${s.course||''}
+🕐 ${nowDT()}
+
+_Trương Dáng Hương Academy_`);
+}
+
+async function hardDeleteStudent(id){
+  const s=D.students.find(x=>x.id===id);if(!s)return;
+  confirmAct(
+    `Xóa vĩnh viễn "${s.name}"?`,
+    '⚠️ Không thể khôi phục sau thao tác này!',
+    async()=>{
+      await sbDel('students',`?id=eq.${id}`);
+      D.students=D.students.filter(x=>x.id!==id);
+      renderStudents();renderDash();renderDeletedStudents();
+      notify('Đã xóa vĩnh viễn: '+s.name);
+    }
+  );
+}
+
+function renderDeletedStudents(){
+  const el=document.getElementById('deleted-student-list');if(!el)return;
+  const deleted=D.students.filter(s=>s.deleted_at);
+  if(!deleted.length){
+    el.innerHTML='<tr><td colspan="5" style="text-align:center;padding:20px;color:var(--muted)">Không có học viên nào đã xóa</td></tr>';
+    return;
+  }
+  el.innerHTML=deleted.map(s=>`<tr>
+    <td><strong>${s.name}</strong><br><span style="font-size:11px;color:var(--muted)">${s.phone||''}</span></td>
+    <td style="font-size:12px">${s.course||''}</td>
+    <td style="color:var(--brand);font-weight:700">${fmt(s.fee||0)}</td>
+    <td style="font-size:11px;color:var(--muted)">${s.deleted_at||''}</td>
+    <td class="btn-group" style="gap:4px">
+      <button class="btn btn-green btn-sm" onclick="restoreStudent('${s.id}')">↩️ Khôi phục</button>
+      <button class="btn btn-red btn-sm" onclick="hardDeleteStudent('${s.id}')">🗑 Xóa vĩnh viễn</button>
+    </td>
+  </tr>`).join('');
 }
 
 async function addStudent(){
