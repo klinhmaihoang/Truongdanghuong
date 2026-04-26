@@ -827,6 +827,33 @@ function doPost(e) {
       sh.appendRow([data.time||'',data.name||'',data.type||'',data.qty||'',data.note||'']);
     }
 
+    else if (sheet === 'ThuChi' &amp;&amp; data.rows) {
+      const sh5 = ss.getSheetByName('ThuChi') || ss.insertSheet('ThuChi');
+      sh5.clearContents();
+      const h5 = ['ID','Loại','Danh mục','Số tiền','Ghi chú','Thời gian','Nguồn'];
+      sh5.getRange(1,1,1,h5.length).setValues([h5]).setFontWeight('bold');
+      if (data.rows.length > 0) {
+        const r5 = data.rows.map(t => [
+          t.id||'', t.type||'', t.category||'', t.amount||0,
+          t.note||'', t.time||'', t.auto||''
+        ]);
+        sh5.getRange(2,1,r5.length,h5.length).setValues(r5);
+        r5.forEach((r,i) => {
+          sh5.getRange(i+2,1,1,h5.length).setBackground(r[1]==='Thu'?'#f0fff4':'#fff0f0');
+        });
+        // Dòng tổng kết
+        const thuTotal = r5.filter(r=>r[1]==='Thu').reduce((a,r)=>a+(+r[3]||0),0);
+        const chiTotal = r5.filter(r=>r[1]==='Chi').reduce((a,r)=>a+(+r[3]||0),0);
+        const lastRow = r5.length + 2;
+        sh5.getRange(lastRow,1,1,h5.length).setBackground('#fff8e1');
+        sh5.getRange(lastRow,1).setValue('TỔNG KẾT').setFontWeight('bold');
+        sh5.getRange(lastRow,2).setValue('Thu: '+thuTotal.toLocaleString()+'đ').setFontWeight('bold').setFontColor('#1a7a1a');
+        sh5.getRange(lastRow,3).setValue('Chi: '+chiTotal.toLocaleString()+'đ').setFontWeight('bold').setFontColor('#cc0000');
+        sh5.getRange(lastRow,4).setValue(thuTotal-chiTotal).setFontWeight('bold').setFontColor(thuTotal>=chiTotal?'#1a7a1a':'#cc0000');
+        sh5.getRange(lastRow,5).setValue('Lợi nhuận').setFontWeight('bold');
+      }
+    }
+
     return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);
   } catch(err) {
     return ContentService.createTextOutput(JSON.stringify({ok:false,error:err.toString()})).setMimeType(ContentService.MimeType.JSON);
@@ -3510,8 +3537,25 @@ async function gsSyncAll(){
       await gsSend({sheet:'LichSuKho',...l});
       await new Promise(r=>setTimeout(r,200));
     }
+    // Sync Thu Chi
+    await gsSend({sheet:'ThuChi',rows:gsThuChi(),time:nowDT()});
     notify('✅ Đã sync toàn bộ lên Google Sheet!');
   }catch(e){notify('Lỗi sync: '+e.message,false);}
+}
+
+function gsThuChi(){
+  // Gộp manual transactions + auto từ đơn hàng
+  const autoTxs=buildAutoTxs('')||[];
+  const manualTxs=D.transactions||[];
+  return [...autoTxs,...manualTxs].sort((a,b)=>(b.time||'').localeCompare(a.time||'')).map(t=>({
+    id:t.id,
+    type:t.type==='thu'?'Thu':'Chi',
+    category:t.category||'—',
+    amount:t.amount||0,
+    note:t.note||'',
+    time:t.time||'',
+    auto:t._auto?'Tự động':'Thủ công'
+  }));
 }
 
 function gsStudents(){
@@ -4016,6 +4060,7 @@ async function addTransaction(type){
     renderFinance();
     notify('✓ Đã lưu phiếu '+(type==='thu'?'thu':'chi')+': '+fmt(amount));
     tgMsg((type==='thu'?'💚 *Phiếu thu*':'🔴 *Phiếu chi*')+'\n\n💰 '+fmt(amount)+'\n📂 '+cat+(note?'\n📝 '+note:'')+'\n🕐 '+nowDT()+'\n\n_Trương Dáng Hương Academy_');
+    gsSend({sheet:'ThuChi',rows:gsThuChi(),time:nowDT()});
   }catch(e){notify('Lỗi lưu: '+e.message,false);}
 }
 
@@ -4048,13 +4093,10 @@ function checkDailyRemind(){
 function printFeeReceipt(){
   const id=document.getElementById('cf-student-id').value;
   const s=D.students.find(x=>x.id===id);if(!s)return;
-  // Tìm đơn HP mới nhất của học viên
   const hpOrders=D.orders.filter(o=>o.id.startsWith('HP')&&o.customer===s.name&&o.status==='Đã thanh toán');
   if(!hpOrders.length){notify('Chưa có lần thu nào để in!',false);return;}
-  // In đơn mới nhất
-  const latest=hpOrders[hpOrders.length-1];
-  exportPDF(latest.id);
-  notify('Đang xuất PDF phiếu thu...');
+  printAllFeeReceipt(s, hpOrders);
+  notify('Đang xuất phiếu thu...');
 }
 
 
@@ -4062,8 +4104,8 @@ function printStudentFee(){
   const s=D.students.find(x=>x.id===selectedStudentId);if(!s)return;
   const hpOrders=D.orders.filter(o=>o.id.startsWith('HP')&&o.customer===s.name&&o.status==='Đã thanh toán');
   if(!hpOrders.length){notify('Học viên này chưa có lần thu nào!',false);return;}
-  // In tất cả phiếu hoặc chỉ phiếu cuối?
-  exportPDF(hpOrders[hpOrders.length-1].id);
+  // In phiếu tổng hợp tất cả đợt đã thu
+  printAllFeeReceipt(s, hpOrders);
 }
 
 
@@ -4135,6 +4177,133 @@ function printRetailPDF(order){
   <div class="footer">Trương Dáng Hương Academy — Phiếu xuất tự động từ hệ thống</div>
   </body></html>`;
   openPrintWindow(html, 'HoaDon_'+order.id);
+}
+
+function printAllFeeReceipt(s, hpOrders){
+  const isOnline=s.type==='Online';
+  const total=s.fee||0;
+  const dep=Math.round(total*0.3);
+  const rest=total-dep;
+
+  // Xác định từng đợt
+  const dot1=hpOrders.find(o=>!(o.items||'').includes('đợt 2'))||null;
+  const dot2=hpOrders.find(o=>(o.items||'').includes('đợt 2'))||null;
+  const paidTotal=hpOrders.reduce((a,o)=>a+(o.total||0),0);
+  const remaining=total-paidTotal;
+  const allPaid=remaining<=0;
+
+  // Rows cho từng đợt đã thu
+  let dotsHtml='';
+  if(isOnline){
+    if(dot1) dotsHtml+=`
+      <tr style="background:#f0fff4">
+        <td style="padding:8px 10px;font-size:12px">Toàn bộ học phí (Online)</td>
+        <td style="padding:8px 10px;font-size:12px;text-align:center">${dot1.time||''}</td>
+        <td style="padding:8px 10px;font-weight:bold;color:#1a7a1a;text-align:right">${fmt(dot1.total||0)}</td>
+        <td style="padding:8px 10px;text-align:center"><span style="background:#1a7a1a;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px">✓ Đã thu</span></td>
+      </tr>`;
+  } else {
+    if(dot1) dotsHtml+=`
+      <tr style="background:#f0fff4">
+        <td style="padding:8px 10px;font-size:12px">Đợt 1 (30% = ${fmt(dep)})</td>
+        <td style="padding:8px 10px;font-size:12px;text-align:center">${dot1.time||''}</td>
+        <td style="padding:8px 10px;font-weight:bold;color:#1a7a1a;text-align:right">${fmt(dot1.total||0)}</td>
+        <td style="padding:8px 10px;text-align:center"><span style="background:#1a7a1a;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px">✓ Đã thu</span></td>
+      </tr>`;
+    else dotsHtml+=`
+      <tr style="background:#fff0f0">
+        <td style="padding:8px 10px;font-size:12px;color:#999">Đợt 1 (30% = ${fmt(dep)})</td>
+        <td style="padding:8px 10px;font-size:12px;text-align:center;color:#999">—</td>
+        <td style="padding:8px 10px;text-align:right;color:#999">—</td>
+        <td style="padding:8px 10px;text-align:center"><span style="background:#cc0000;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px">Chưa thu</span></td>
+      </tr>`;
+
+    if(dot2) dotsHtml+=`
+      <tr style="background:#f0fff4">
+        <td style="padding:8px 10px;font-size:12px">Đợt 2 (70% = ${fmt(rest)})</td>
+        <td style="padding:8px 10px;font-size:12px;text-align:center">${dot2.time||''}</td>
+        <td style="padding:8px 10px;font-weight:bold;color:#1a7a1a;text-align:right">${fmt(dot2.total||0)}</td>
+        <td style="padding:8px 10px;text-align:center"><span style="background:#1a7a1a;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px">✓ Đã thu</span></td>
+      </tr>`;
+    else dotsHtml+=`
+      <tr style="background:#fff8f0">
+        <td style="padding:8px 10px;font-size:12px;color:#999">Đợt 2 (70% = ${fmt(rest)})</td>
+        <td style="padding:8px 10px;font-size:12px;text-align:center;color:#999">—</td>
+        <td style="padding:8px 10px;text-align:right;color:#999">—</td>
+        <td style="padding:8px 10px;text-align:center"><span style="background:#e67e22;color:#fff;border-radius:4px;padding:2px 8px;font-size:10px">Chưa thu</span></td>
+      </tr>`;
+  }
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Phiếu thu học phí - ${s.name}</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:Arial,sans-serif;font-size:13px;color:#222;width:148mm;margin:0 auto;padding:10mm}
+    .header{background:#FF8C00;color:#fff;text-align:center;padding:12px;border-radius:6px;margin-bottom:16px}
+    .header h1{font-size:16px;font-weight:bold;margin-bottom:3px}
+    .header p{font-size:10px;opacity:.9}
+    .title{text-align:center;font-size:15px;font-weight:bold;color:#FF8C00;margin-bottom:14px;letter-spacing:1px}
+    .info-box{background:#f8fdf8;border:1px solid #d4edda;border-radius:8px;padding:12px;margin-bottom:14px}
+    .row{display:flex;justify-content:space-between;padding:4px 0;font-size:12px}
+    .row .label{color:#666}
+    .row .value{font-weight:500}
+    .divider{border:none;border-top:1px solid #eee;margin:12px 0}
+    table{width:100%;border-collapse:collapse;margin:10px 0}
+    thead tr{background:#FF8C00;color:#fff}
+    th{padding:8px 10px;font-size:11px;text-align:left}
+    th:last-child,th:nth-child(3){text-align:right}
+    th:nth-child(4){text-align:center}
+    .summary{background:#fff3e0;border:2px solid #FF8C00;border-radius:8px;padding:10px 14px;margin:14px 0}
+    .summary-row{display:flex;justify-content:space-between;padding:3px 0;font-size:12px}
+    .summary-row.total{font-size:14px;font-weight:bold;color:#cc5500;border-top:1px solid #ffcc80;padding-top:6px;margin-top:4px}
+    .summary-row.remaining{font-size:12px;color:${remaining>0?'#cc0000':'#1a7a1a'}}
+    .status-badge{text-align:center;margin:12px 0;padding:10px;border-radius:8px;font-size:13px;font-weight:bold;background:${allPaid?'#e8f5e9':'#fff3e0'};color:${allPaid?'#1a7a1a':'#e65100'}}
+    .sign-row{display:flex;justify-content:space-between;margin-top:24px}
+    .sign-col{width:45%;text-align:center;font-size:11px;color:#555}
+    .sign-line{border-top:1px dashed #ccc;margin-top:32px;padding-top:4px;font-size:10px;color:#888}
+    .footer{text-align:center;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:14px}
+    @media print{body{width:100%}}
+  </style></head><body>
+  <div class="header">
+    <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
+    <p>Chuyên gia F&B | ĐT: ${cfg.bankAcc||''}</p>
+  </div>
+  <div class="title">PHIẾU THU HỌC PHÍ</div>
+
+  <div class="info-box">
+    <div class="row"><span class="label">Học viên:</span><span class="value"><strong>${s.name}</strong></span></div>
+    <div class="row"><span class="label">Số điện thoại:</span><span class="value">${s.phone||'—'}</span></div>
+    <div class="row"><span class="label">Khóa học:</span><span class="value">${s.course||'—'}</span></div>
+    <div class="row"><span class="label">Loại hình:</span><span class="value">${s.type||'—'}</span></div>
+    <div class="row"><span class="label">Tổng học phí:</span><span class="value" style="color:#FF8C00;font-weight:bold">${fmt(total)}</span></div>
+    <div class="row"><span class="label">Ngày in phiếu:</span><span class="value">${nowDT()}</span></div>
+  </div>
+
+  <div class="divider"></div>
+  <strong style="font-size:12px">CHI TIẾT CÁC LẦN THU:</strong>
+  <table>
+    <thead><tr>
+      <th>Nội dung</th><th>Thời gian</th><th style="text-align:right">Số tiền</th><th style="text-align:center">Trạng thái</th>
+    </tr></thead>
+    <tbody>${dotsHtml}</tbody>
+  </table>
+
+  <div class="summary">
+    <div class="summary-row"><span>Tổng học phí:</span><span>${fmt(total)}</span></div>
+    <div class="summary-row"><span>Đã thu:</span><span style="color:#1a7a1a;font-weight:bold">${fmt(paidTotal)}</span></div>
+    ${remaining>0?`<div class="summary-row remaining"><span>Còn lại:</span><span style="font-weight:bold">${fmt(remaining)}</span></div>`:''}
+    <div class="summary-row total"><span>TỔNG ĐÃ THANH TOÁN:</span><span>${fmt(paidTotal)}</span></div>
+  </div>
+
+  <div class="status-badge">${allPaid?'✅ ĐÃ THANH TOÁN ĐẦY ĐỦ':'⏳ CÒN LẠI: '+fmt(remaining)}</div>
+
+  <div class="sign-row">
+    <div class="sign-col">Người nộp tiền<div class="sign-line">(Ký, ghi rõ họ tên)</div></div>
+    <div class="sign-col">Người thu tiền<div class="sign-line">(Ký, ghi rõ họ tên)</div></div>
+  </div>
+  <div class="footer">Trương Dáng Hương Academy — Phiếu xuất tự động từ hệ thống quản lý</div>
+  </body></html>`;
+  openPrintWindow(html,'PhieuThu_'+s.name);
 }
 
 function printFeePDF(order){
