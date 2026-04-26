@@ -167,6 +167,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <button onclick="go('products',this)">Hàng hóa</button>
     <button onclick="go('inventory',this)">Kho</button>
     <button onclick="go('orders',this)">Đơn hàng</button>
+    <button onclick="go('customers',this)">👥 Khách hàng</button>
     <button onclick="go('reports',this)" style="color:var(--teal)">📊 Báo cáo</button>
     <button onclick="go('telegram',this)" style="color:#5bc8f0">⚡ Telegram</button>
   </div>
@@ -188,6 +189,9 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   </button>
   <button class="bottom-nav-btn" onclick="go('orders',this);syncBottomNav(this)">
     <span class="bn-icon">📋</span>Đơn hàng
+  </button>
+  <button class="bottom-nav-btn" onclick="go('customers',this);syncBottomNav(this)">
+    <span class="bn-icon">👥</span>Khách hàng
   </button>
   <button class="bottom-nav-btn" onclick="go('reports',this);syncBottomNav(this)">
     <span class="bn-icon">📊</span>Báo cáo
@@ -331,6 +335,27 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="card-head"><span class="card-title">Lịch sử nhập/xuất</span><button class="btn btn-excel btn-sm" onclick="xlExport('stocklog')">📊 Excel</button></div>
     <table><thead><tr><th>Thời gian</th><th>Nguyên liệu</th><th>Loại</th><th>Số lượng</th><th>Ghi chú</th><th></th></tr></thead>
     <tbody id="stock-log"></tbody></table>
+  </div>
+</div>
+
+<!-- KHÁCH HÀNG -->
+<div class="page" id="page-customers">
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">👥 Danh sách khách hàng</span>
+      <div class="btn-group">
+        <button class="btn btn-sm" onclick="showM('modal-add-customer')">+ Thêm khách</button>
+        <button class="btn btn-excel btn-sm" onclick="xlExport('customers')">📊 Excel</button>
+      </div>
+    </div>
+    <div style="margin-bottom:12px">
+      <input id="customer-search" placeholder="🔍 Tìm theo tên, SĐT..." oninput="renderCustomers()"
+        style="width:100%;padding:9px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit"/>
+    </div>
+    <table><thead><tr>
+      <th>Khách hàng</th><th>Điểm tích lũy</th><th class="hide-mobile">Tổng chi tiêu</th><th class="hide-mobile">Lần mua</th><th class="hide-mobile">Lần cuối</th><th></th>
+    </tr></thead>
+    <tbody id="customer-list-main"></tbody></table>
   </div>
 </div>
 
@@ -509,7 +534,9 @@ const CHAT_ID  = '<span style="color:#f38ba8">YOUR_CHAT_ID</span>';
 
 function doPost(e) {
   try {
-    const data = JSON.parse(e.postData.contents);
+    // Nhận từ FormData (payload field) hoặc JSON body
+    const raw = (e.parameter && e.parameter.payload) ? e.parameter.payload : e.postData.contents;
+    const data = JSON.parse(raw);
     const ss   = SpreadsheetApp.getActiveSpreadsheet();
     const sheet = data.sheet;
 
@@ -962,6 +989,41 @@ function sendDailyReminders() {
   </div>
 </div>
 
+<!-- Add Customer -->
+<div class="overlay" id="modal-add-customer">
+  <div class="modal wide">
+    <div class="modal-title">+ Thêm khách hàng</div>
+    <div class="form-row">
+      <div class="fg"><label>Họ tên *</label><input id="nc-name" placeholder="Nguyễn Văn A"/></div>
+      <div class="fg"><label>Số điện thoại</label><input id="nc-phone" placeholder="090xxxxxxx" type="tel"/></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Email</label><input id="nc-email" placeholder="email@gmail.com"/></div>
+      <div class="fg"><label>Điểm ban đầu</label><input id="nc-points" type="number" placeholder="0" min="0"/></div>
+    </div>
+    <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="nc-note" placeholder="VIP, Sinh nhật tháng X..."/></div>
+    <div class="btn-group">
+      <button class="btn btn-green btn-sm" onclick="addCustomer()">Lưu khách hàng</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-customer')">Hủy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Customer Detail -->
+<div class="overlay" id="modal-customer-detail">
+  <div class="modal wide">
+    <div class="modal-title">👤 Thông tin khách hàng</div>
+    <div id="customer-detail-content"></div>
+    <div style="display:flex;justify-content:space-between;margin-top:16px;flex-wrap:wrap;gap:8px">
+      <div class="btn-group">
+        <button class="btn btn-sm" onclick="addPointsManual()">+ Tích điểm thủ công</button>
+        <button class="btn btn-red btn-sm" onclick="deleteCustomer()">🗑 Xóa</button>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-customer-detail')">Đóng</button>
+    </div>
+  </div>
+</div>
+
 <!-- Confirm -->
 <div class="overlay" id="modal-confirm">
   <div class="modal" style="max-width:360px;text-align:center">
@@ -1025,7 +1087,7 @@ const sbUpsert = async (t,d)=> {
 // ══════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════
-let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[]};
+let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[]};
 let cfg = {tgToken:'',tgChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',gsUrl:'https://script.google.com/macros/s/AKfycbz33rZTxDqdH0cy4f1eaCkYFBD9PnMdmr8fTnhx2bMTsFSS9TjMcZ0uNx6_a122VVZG/exec'};
 let cart=[], invoice=null, selectedStudentId=null, stFilter='all', tgLog=[];
 
@@ -1065,7 +1127,7 @@ async function boot(){
 
   setSyncStatus(false,'Đang kết nối...');
   try{
-    const [students,inventory,products,orders,stockLog,settings,recipes,courses] = await Promise.all([
+    const [students,inventory,products,orders,stockLog,settings,recipes,courses,customers] = await Promise.all([
       sbGet('students','?order=created_at.asc'),
       sbGet('inventory','?order=created_at.asc'),
       sbGet('products','?order=created_at.asc'),
@@ -1074,6 +1136,7 @@ async function boot(){
       sbGet('settings','?id=eq.main'),
       sbGet('recipes','?order=created_at.asc'),
       sbGet('courses','?order=created_at.asc'),
+      sbGet('customers','?order=created_at.asc'),
     ]);
 
     D.students = students||[];
@@ -1083,6 +1146,7 @@ async function boot(){
     D.stockLog  = stockLog||[];
     D.recipes   = recipes||[];
     D.courses   = courses||[];
+    D.customers = customers||[];
 
     // Seed defaults nếu inventory/products trống
     if(!inventory||!inventory.length){
@@ -1121,18 +1185,20 @@ async function boot(){
 
 async function pollUpdates(){
   try{
-    const [students,inventory,products,orders,courses] = await Promise.all([
+    const [students,inventory,products,orders,courses,customers] = await Promise.all([
       sbGet('students','?order=created_at.asc'),
       sbGet('inventory','?order=created_at.asc'),
       sbGet('products','?order=created_at.asc'),
       sbGet('orders','?order=created_at.asc'),
       sbGet('courses','?order=created_at.asc'),
+      sbGet('customers','?order=created_at.asc'),
     ]);
     D.students=students||D.students;
     D.inventory=inventory&&inventory.length?inventory:D.inventory;
     D.products=products&&products.length?products:D.products;
     D.orders=orders||D.orders;
     D.courses=courses||D.courses;
+    D.customers=customers||D.customers;
     setSyncStatus(true,'Đồng bộ lúc '+nowTime());
     render();
   }catch(e){setSyncStatus(false,'Mất kết nối');}
@@ -1337,7 +1403,130 @@ async function checkReminders(){
 // ══════════════════════════════════════════════════
 // RENDER
 // ══════════════════════════════════════════════════
-function render(){renderDash();renderStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();renderCourses();fillMatSelects();}
+function render(){renderDash();renderStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();renderCourses();renderCustomers();fillMatSelects();}
+
+// ══════════════════════════════════════════════════
+// CUSTOMERS
+// ══════════════════════════════════════════════════
+let selectedCustomerId=null;
+
+function renderCustomers(){
+  const el=document.getElementById('customer-list-main');if(!el)return;
+  const q=(document.getElementById('customer-search')?.value||'').toLowerCase().trim();
+  const list=D.customers.filter(c=>!q||c.name.toLowerCase().includes(q)||(c.phone||'').includes(q));
+  el.innerHTML=list.length?list.map(c=>{
+    const lvl=c.points>=500?'💎 VIP':c.points>=200?'🥇 Gold':c.points>=50?'🥈 Silver':'🥉 Member';
+    return`<tr style="cursor:pointer" onclick="openCustomerDetail('${c.id}')">
+      <td><strong>${c.name}</strong><br><span style="font-size:11px;color:var(--muted)">${c.phone||'—'}</span></td>
+      <td><span class="tag t-paid" style="font-size:11px">${c.points||0} điểm</span> <span style="font-size:11px">${lvl}</span></td>
+      <td class="hide-mobile" style="color:var(--brand);font-weight:700">${fmt(c.total_spent||0)}</td>
+      <td class="hide-mobile" style="color:var(--muted)">${c.visit_count||0} lần</td>
+      <td class="hide-mobile" style="font-size:11px;color:var(--muted)">${c.last_visit||'—'}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openCustomerDetail('${c.id}')">Chi tiết</button></td>
+    </tr>`;
+  }).join('')
+  :'<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:18px">Chưa có khách hàng nào</td></tr>';
+}
+
+async function addCustomer(){
+  const name=document.getElementById('nc-name').value.trim();
+  if(!name){notify('Nhập tên khách hàng!',false);return;}
+  const phone=document.getElementById('nc-phone').value.trim();
+  // Kiểm tra trùng SĐT
+  if(phone&&D.customers.find(c=>c.phone===phone)){notify('SĐT này đã tồn tại!',false);return;}
+  const c={id:uid(),name,phone,email:document.getElementById('nc-email').value.trim(),
+    points:+document.getElementById('nc-points').value||0,
+    total_spent:0,visit_count:0,last_visit:'',
+    note:document.getElementById('nc-note').value.trim(),created_at:Date.now()};
+  try{
+    await sbUpsert('customers',c);
+    D.customers.push(c);
+    closeM('modal-add-customer');
+    ['nc-name','nc-phone','nc-email','nc-points','nc-note'].forEach(id=>document.getElementById(id).value='');
+    renderCustomers();notify('Đã thêm khách: '+name);
+  }catch(e){notify('Lỗi: '+e.message,false);}
+}
+
+function openCustomerDetail(id){
+  const c=D.customers.find(x=>x.id===id);if(!c)return;
+  selectedCustomerId=id;
+  const lvl=c.points>=500?'💎 VIP':c.points>=200?'🥇 Gold':c.points>=50?'🥈 Silver':'🥉 Member';
+  // Lịch sử mua hàng
+  const history=D.orders.filter(o=>o.customer===c.name||(c.phone&&o.phone===c.phone)).slice(-5).reverse();
+  document.getElementById('customer-detail-content').innerHTML=`
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
+      <div class="detail-avatar" style="font-size:26px">${lvl.split(' ')[0]}</div>
+      <div>
+        <div style="font-size:18px;font-weight:700">${c.name}</div>
+        <div style="font-size:13px;color:var(--muted)">${c.phone||''} ${c.email?'· '+c.email:''}</div>
+      </div>
+      <div style="margin-left:auto;text-align:right">
+        <div style="font-size:24px;font-weight:800;color:var(--brand)">${c.points||0}</div>
+        <div style="font-size:11px;color:var(--muted)">điểm · ${lvl}</div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
+      <div style="background:var(--brand-light);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:16px;font-weight:800;color:var(--brand)">${fmt(c.total_spent||0)}</div>
+        <div style="font-size:10px;color:var(--muted)">Tổng chi tiêu</div>
+      </div>
+      <div style="background:var(--brand-light);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:16px;font-weight:800;color:var(--brand)">${c.visit_count||0}</div>
+        <div style="font-size:10px;color:var(--muted)">Lần mua</div>
+      </div>
+      <div style="background:var(--brand-light);border-radius:8px;padding:10px;text-align:center">
+        <div style="font-size:16px;font-weight:800;color:var(--brand)">${c.last_visit||'—'}</div>
+        <div style="font-size:10px;color:var(--muted)">Lần cuối</div>
+      </div>
+    </div>
+    ${c.note?`<div class="guide" style="margin-bottom:12px">📝 ${c.note}</div>`:''}
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Lịch sử mua gần đây</div>
+    ${history.length?history.map(o=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <span>${o.items}</span><span style="color:var(--brand);font-weight:700">${fmt(o.total)}</span>
+    </div>`).join(''):'<div style="color:var(--muted);font-size:12px">Chưa có lịch sử</div>'}`;
+  showM('modal-customer-detail');
+}
+
+async function addPointsManual(){
+  const c=D.customers.find(x=>x.id===selectedCustomerId);if(!c)return;
+  const pts=+prompt(`Thêm bao nhiêu điểm cho ${c.name}?\n(Hiện có: ${c.points||0} điểm)`)||0;
+  if(!pts)return;
+  const newPts=(c.points||0)+pts;
+  try{
+    await sbPatch('customers',{points:newPts},`?id=eq.${c.id}`);
+    c.points=newPts;
+    openCustomerDetail(c.id);renderCustomers();
+    notify(`✓ Đã cộng ${pts} điểm cho ${c.name}`);
+  }catch(e){notify('Lỗi: '+e.message,false);}
+}
+
+async function deleteCustomer(){
+  const c=D.customers.find(x=>x.id===selectedCustomerId);if(!c)return;
+  confirmAct(`Xóa khách "${c.name}"?`,'Toàn bộ dữ liệu điểm sẽ bị xóa.',async()=>{
+    await sbDel('customers',`?id=eq.${c.id}`);
+    D.customers=D.customers.filter(x=>x.id!==c.id);
+    closeM('modal-customer-detail');renderCustomers();
+    notify('Đã xóa khách hàng');
+  });
+}
+
+// Tích điểm tự động khi markPaid — mỗi 1000đ = 1 điểm
+async function addPointsFromOrder(customerName,phone,amount){
+  const pts=Math.floor((amount||0)/1000);
+  if(!pts)return;
+  let c=D.customers.find(x=>x.name===customerName||(phone&&x.phone===phone));
+  if(!c){
+    // Tự tạo khách mới nếu chưa có
+    c={id:uid(),name:customerName,phone:phone||'',email:'',points:0,total_spent:0,visit_count:0,last_visit:'',note:'',created_at:Date.now()};
+    await sbUpsert('customers',c);D.customers.push(c);
+  }
+  const upd={points:(c.points||0)+pts,total_spent:(c.total_spent||0)+amount,
+    visit_count:(c.visit_count||0)+1,last_visit:nowDT()};
+  await sbPatch('customers',upd,`?id=eq.${c.id}`);
+  Object.assign(c,upd);
+  renderCustomers();
+  console.log(`[Customers] +${pts} điểm cho ${customerName}`);
+}
 
 // ══════════════════════════════════════════════════
 // BÁO CÁO
@@ -1915,6 +2104,8 @@ async function markPaid(){
     tgMsg(`✅ *Thanh toán thành công!*\n\nMã: \`${order.id}\`\n👤 ${order.customer}\n💰 ${fmt(order.total)}\n📦 Kho đã cập nhật tự động\n🕐 ${ts}\n\n_Trương Dáng Hương Academy_`);
   gsSend({sheet:'DonHang',...order});
   gsSend({sheet:'TonKho',rows:D.inventory,time:ts});
+  // Tích điểm tự động cho khách
+  addPointsFromOrder(invoice.name,invoice.phone||'',invoice.total).catch(()=>{});
   if(lowItems.length&&document.getElementById('at-stock').checked)
     setTimeout(()=>tgMsg(`⚠️ *CẢNH BÁO KHO!*\n\n${lowItems.map(i=>`• ${i.name}: còn ${i.qty} ${i.unit}`).join('\n')}\n\n➡️ Cần nhập thêm nguyên liệu!\n\n_Trương Dáng Hương Academy_`),1000);
 }
@@ -2397,9 +2588,14 @@ async function gsSend(data){
   const url=cfg.gsUrl;
   if(!url)return;
   try{
-    // Dùng no-cors vì Apps Script không trả CORS header
-    await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
-  }catch(e){console.warn('GSheet lỗi:',e.message);}
+    // Apps Script yêu cầu FormData với no-cors (không được set Content-Type thủ công)
+    const form=new FormData();
+    form.append('payload',JSON.stringify(data));
+    const res=await fetch(url,{method:'POST',mode:'no-cors',body:form});
+    console.log('[GSheet] gsSend OK — sheet:',data.sheet,'rows:',(data.rows?.length||1));
+  }catch(e){
+    console.error('[GSheet] gsSend lỗi:',e.message,'data:',data);
+  }
 }
 
 async function gsSyncAll(){
@@ -2528,7 +2724,18 @@ function xlExport(type){
   if(typeof XLSX==='undefined'){notify('Thư viện Excel chưa tải!',false);return;}
   const wb=XLSX.utils.book_new();
   const ds=new Date();const ds2=`${ds.getDate()}-${ds.getMonth()+1}-${ds.getFullYear()}`;
-  if(type==='orders'||type==='full'){
+  if(type==='customers'){
+    const ws=XLSX.utils.aoa_to_sheet([
+      ['Họ tên','SĐT','Email','Điểm','Hạng','Tổng chi tiêu','Lần mua','Lần cuối','Ghi chú'],
+      ...D.customers.map(c=>{
+        const lvl=c.points>=500?'VIP':c.points>=200?'Gold':c.points>=50?'Silver':'Member';
+        return[c.name,c.phone||'',c.email||'',c.points||0,lvl,c.total_spent||0,c.visit_count||0,c.last_visit||'',c.note||''];
+      })
+    ]);
+    ws['!cols']=[{wch:22},{wch:14},{wch:25},{wch:8},{wch:10},{wch:14},{wch:10},{wch:18},{wch:25}];
+    XLSX.utils.book_append_sheet(wb,ws,'Khách hàng');
+    XLSX.writeFile(wb,`KhachHang_${ds2}.xlsx`);return;
+  }
     const ws=XLSX.utils.aoa_to_sheet([['Mã đơn','Khách hàng','Sản phẩm','Tổng tiền','Thời gian','Trạng thái'],
       ...D.orders.map(o=>[o.id,o.customer,o.items,o.total||0,o.time,o.status])]);
     ws['!cols']=[{wch:10},{wch:20},{wch:40},{wch:15},{wch:18},{wch:18}];
