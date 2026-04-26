@@ -1463,7 +1463,50 @@ async function checkReminders(){
 // ══════════════════════════════════════════════════
 // RENDER
 // ══════════════════════════════════════════════════
-function render(){renderDash();renderStudents();renderDeletedStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();renderCourses();renderCustomers();fillMatSelects();}
+// ══════════════════════════════════════════════════
+// TỰ ĐỘNG CẬP NHẬT TRẠNG THÁI HỌC VIÊN THEO NGÀY HỌC
+// ══════════════════════════════════════════════════
+async function autoUpdateStudentStatus(){
+  const today=new Date(); today.setHours(0,0,0,0);
+  const updates=[];
+
+  for(const s of D.students){
+    if(s.deleted_at) continue; // bỏ qua đã xóa
+    if(!s.class_date) continue; // chỉ xử lý học viên có ngày học
+
+    const cd=new Date(s.class_date); cd.setHours(0,0,0,0);
+    const diff=Math.round((cd-today)/86400000); // số ngày còn lại
+
+    let newStatus=s.status;
+    if(diff>0){
+      // Ngày học trong tương lai → Chưa học
+      newStatus='Chưa học';
+    } else if(diff===0){
+      // Hôm nay là ngày học → Đang học
+      newStatus='Đang học';
+    } else {
+      // Ngày học đã qua → Học xong
+      newStatus='Học xong';
+    }
+
+    // Chỉ update nếu trạng thái thay đổi
+    if(newStatus!==s.status){
+      updates.push({id:s.id, oldStatus:s.status, newStatus, name:s.name});
+      s.status=newStatus;
+      // Patch lên Supabase (không await để không block UI)
+      sbPatch('students',{status:newStatus},`?id=eq.${s.id}`).catch(()=>{});
+    }
+  }
+
+  // Nếu có thay đổi thì notify và sync GG Sheet
+  if(updates.length>0){
+    const changed=updates.map(u=>u.name+': '+u.oldStatus+' → '+u.newStatus).join(', ');
+    console.log('[AutoStatus] Cap nhat: '+changed);
+    gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
+  }
+}
+
+function render(){autoUpdateStudentStatus();renderDash();renderStudents();renderDeletedStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();renderCourses();renderCustomers();fillMatSelects();}
 
 // ══════════════════════════════════════════════════
 // CUSTOMERS
@@ -1869,7 +1912,7 @@ function renderStudents(){
       <td style="color:var(--brand);font-weight:700">${fee===0?'<span class="tag t-paid">Miễn phí</span>':fmt(fee)}</td>
       <td class="hide-mobile">${classTag||'<span style="color:var(--muted)">—</span>'}</td>
       <td class="hide-mobile"><div style="display:flex;gap:4px">${paid1Tag}${paid2Tag}</div></td>
-      <td class="hide-mobile"><span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Hoàn thành'?'t-done':'t-pending'}">${s.status}</span></td>
+      <td class="hide-mobile"><span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Học xong'||s.status==='Hoàn thành'?'t-done':s.status==='Chưa học'?'t-online':'t-pending'}">${s.status}</span></td>
       <td class="btn-group" style="gap:4px">
         <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openStDetail('${s.id}')">Chi tiết</button>
         ${fee>0?`<button class="btn btn-green btn-sm" onclick="event.stopPropagation();collectFee('${s.id}')">💰</button>`:''}
