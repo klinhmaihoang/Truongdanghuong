@@ -4068,167 +4068,154 @@ function printStudentFee(){
 
 
 // ══════════════════════════════════════════════════
-// XUẤT PDF
+// XUẤT PDF / IN PHIẾU (dùng HTML print — hỗ trợ tiếng Việt)
 // ══════════════════════════════════════════════════
 function exportPDF(orderId){
-  if(typeof window.jspdf==='undefined'&&typeof jspdf==='undefined'){
-    notify('Thư viện PDF chưa tải!',false);return;
-  }
-  const {jsPDF}=window.jspdf||jspdf;
-  const doc=new jsPDF({unit:'mm',format:'a5'});
-
   const order=orderId?D.orders.find(o=>o.id===orderId):invoice?{
     id:invoice.id,customer:invoice.name,items:invoice.items,
     total:invoice.total,time:invoice.time,note:invoice.note,status:'Chờ thanh toán'
   }:null;
-
   if(!order){notify('Không tìm thấy đơn hàng!',false);return;}
-
-  const isHP=order.id.startsWith('HP');
-  if(isHP){
-    exportFeePDF(doc, order);
+  if(order.id.startsWith('HP')){
+    printFeePDF(order);
   } else {
-    exportRetailPDF(doc, order);
+    printRetailPDF(order);
   }
 }
 
-function pdfHeader(doc, title){
-  const W=148, accent=[255,140,0];
-  doc.setFillColor(...accent);
-  doc.rect(0,0,W,18,'F');
-  doc.setTextColor(255,255,255);
-  doc.setFontSize(13);doc.setFont('helvetica','bold');
-  doc.text('TRƯƠNG DÁNG HƯƠNG ACADEMY',W/2,8,{align:'center'});
-  doc.setFontSize(8);doc.setFont('helvetica','normal');
-  doc.text('Chuyên gia F&B | ĐT: '+cfg.bankAcc,W/2,13,{align:'center'});
-  doc.setTextColor(0,0,0);
-  doc.setFontSize(14);doc.setFont('helvetica','bold');
-  doc.setTextColor(...accent);
-  doc.text(title,W/2,26,{align:'center'});
-  doc.setDrawColor(...accent);
-  doc.setLineWidth(0.5);
-  doc.line(10,29,W-10,29);
-  doc.setTextColor(0,0,0);
+function printRetailPDF(order){
+  const student=null;
+  const qrUrl=cfg.bankAcc&&cfg.bankId
+    ?`https://img.vietqr.io/image/${cfg.bankId}-${cfg.bankAcc}-compact2.png?amount=${order.total}&addInfo=${encodeURIComponent(order.id+' '+order.customer)}&accountName=${encodeURIComponent(cfg.accName||'TRUONG DANG HUONG')}`
+    :'';
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Hóa đơn ${order.id}</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:Arial,sans-serif;font-size:13px;color:#222;width:148mm;margin:0 auto;padding:10mm}
+    .header{background:#FF8C00;color:#fff;text-align:center;padding:10px;border-radius:6px;margin-bottom:14px}
+    .header h1{font-size:16px;font-weight:bold;margin-bottom:2px}
+    .header p{font-size:10px;opacity:.9}
+    .title{text-align:center;font-size:15px;font-weight:bold;color:#FF8C00;margin-bottom:12px;letter-spacing:1px}
+    .divider{border:none;border-top:1px solid #ddd;margin:8px 0}
+    .row{display:flex;justify-content:space-between;padding:4px 0;font-size:12px}
+    .row .label{color:#888}
+    .row .value{font-weight:500;text-align:right;max-width:60%}
+    .items{background:#f9f9f9;border-radius:6px;padding:10px;margin:10px 0}
+    .items h3{font-size:11px;font-weight:bold;margin-bottom:6px;color:#555}
+    .item{font-size:11px;padding:2px 0;color:#333}
+    .total-box{background:#fff3e0;border:1.5px solid #FF8C00;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin:12px 0}
+    .total-box .label{font-size:13px;font-weight:bold;color:#cc5500}
+    .total-box .amount{font-size:16px;font-weight:bold;color:#cc5500}
+    .qr{text-align:center;margin:14px 0}
+    .qr img{width:100px;height:100px}
+    .qr p{font-size:9px;color:#888;margin-top:4px}
+    .footer{text-align:center;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:12px}
+    @media print{body{width:100%}}
+  </style></head><body>
+  <div class="header">
+    <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
+    <p>Chuyên gia F&B | ĐT: ${cfg.bankAcc||''}</p>
+  </div>
+  <div class="title">HÓA ĐƠN BÁN HÀNG</div>
+  <div class="row"><span class="label">Mã đơn:</span><span class="value">${order.id}</span></div>
+  <div class="row"><span class="label">Khách hàng:</span><span class="value">${order.customer||'Khách lẻ'}</span></div>
+  <div class="row"><span class="label">Thời gian:</span><span class="value">${order.time||nowDT()}</span></div>
+  <hr class="divider"/>
+  <div class="items">
+    <h3>SẢN PHẨM</h3>
+    ${(order.items||'').split(',').map(i=>`<div class="item">• ${i.trim()}</div>`).join('')}
+  </div>
+  <div class="total-box">
+    <span class="label">TỔNG CỘNG:</span>
+    <span class="amount">${fmt(order.total||0)}</span>
+  </div>
+  ${qrUrl?`<div class="qr"><img src="${qrUrl}" onerror="this.style.display='none'"/><p>Quét mã QR để thanh toán</p></div>`:''}
+  ${order.note?`<div class="row"><span class="label">Ghi chú:</span><span class="value">${order.note}</span></div>`:''}
+  <div class="footer">Trương Dáng Hương Academy — Phiếu xuất tự động từ hệ thống</div>
+  </body></html>`;
+  openPrintWindow(html, 'HoaDon_'+order.id);
 }
 
-function pdfRow(doc, label, value, y, highlight){
-  doc.setFontSize(9);doc.setFont('helvetica','normal');
-  doc.setTextColor(100,100,100);
-  doc.text(label,12,y);
-  doc.setTextColor(0,0,0);
-  if(highlight){doc.setFont('helvetica','bold');doc.setTextColor(220,100,0);}
-  doc.text(String(value),100,y,{align:'right'});
-  doc.setFont('helvetica','normal');doc.setTextColor(0,0,0);
+function printFeePDF(order){
+  const s=D.students.find(x=>x.name===order.customer);
+  const isOnline=(order.items||'').toLowerCase().includes('online');
+  const dotNum=(order.items||'').includes('đợt 2')?2:1;
+  const total=s?s.fee||0:0;
+  const dep=Math.round(total*0.3);
+  const rest=total-dep;
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Phiếu thu ${order.id}</title>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:Arial,sans-serif;font-size:13px;color:#222;width:148mm;margin:0 auto;padding:10mm}
+    .header{background:#FF8C00;color:#fff;text-align:center;padding:10px;border-radius:6px;margin-bottom:14px}
+    .header h1{font-size:16px;font-weight:bold;margin-bottom:2px}
+    .header p{font-size:10px;opacity:.9}
+    .title{text-align:center;font-size:15px;font-weight:bold;color:#FF8C00;margin-bottom:12px;letter-spacing:1px}
+    .info-box{background:#f0faf0;border-radius:8px;padding:12px;margin-bottom:12px}
+    .row{display:flex;justify-content:space-between;padding:4px 0;font-size:12px}
+    .row .label{color:#666}
+    .row .value{font-weight:500;text-align:right}
+    .divider{border:none;border-top:1px solid #ddd;margin:10px 0}
+    .content-title{font-size:12px;font-weight:bold;color:#333;margin-bottom:8px}
+    .item{font-size:12px;padding:3px 0}
+    .sub-note{font-size:10px;color:#888;margin-top:4px}
+    .total-box{background:#fff3e0;border:2px solid #FF8C00;border-radius:8px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;margin:14px 0}
+    .total-box .label{font-size:14px;font-weight:bold;color:#cc5500}
+    .total-box .amount{font-size:18px;font-weight:bold;color:#cc5500}
+    .sign-row{display:flex;justify-content:space-between;margin-top:24px;text-align:center}
+    .sign-col{width:45%;font-size:11px;color:#555}
+    .sign-col .name{margin-top:32px;border-top:1px dashed #ccc;padding-top:4px;font-size:10px;color:#888}
+    .footer{text-align:center;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:16px}
+    @media print{body{width:100%}}
+  </style></head><body>
+  <div class="header">
+    <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
+    <p>Chuyên gia F&B | ĐT: ${cfg.bankAcc||''}</p>
+  </div>
+  <div class="title">PHIẾU THU HỌC PHÍ</div>
+  <div class="info-box">
+    <div class="row"><span class="label">Số phiếu:</span><span class="value">${order.id}</span></div>
+    <div class="row"><span class="label">Ngày thu:</span><span class="value">${order.time||nowDT()}</span></div>
+    <div class="row"><span class="label">Học viên:</span><span class="value"><strong>${order.customer}</strong></span></div>
+    ${s?`<div class="row"><span class="label">Số điện thoại:</span><span class="value">${s.phone||'—'}</span></div>`:''}
+    ${s?`<div class="row"><span class="label">Khóa học:</span><span class="value">${s.course||'—'}</span></div>`:''}
+    ${s?`<div class="row"><span class="label">Loại hình:</span><span class="value">${s.type||'—'}</span></div>`:''}
+  </div>
+  <hr class="divider"/>
+  <div class="content-title">NỘI DUNG THU:</div>
+  <div class="item">• ${isOnline?'Học phí toàn bộ (Online)':'Học phí '+( dotNum===1?'đợt 1 (30%)':'đợt 2 (70%)')}</div>
+  ${s&&!isOnline?`<div class="sub-note">Tổng học phí: ${fmt(total)} &nbsp;|&nbsp; Đợt 1: ${fmt(dep)} &nbsp;|&nbsp; Đợt 2: ${fmt(rest)}</div>`:''}
+  <div class="total-box">
+    <span class="label">SỐ TIỀN ĐÃ THU:</span>
+    <span class="amount">${fmt(order.total||0)}</span>
+  </div>
+  <div class="sign-row">
+    <div class="sign-col">
+      Người nộp tiền
+      <div class="name">(Ký, ghi rõ họ tên)</div>
+    </div>
+    <div class="sign-col">
+      Người thu tiền
+      <div class="name">(Ký, ghi rõ họ tên)</div>
+    </div>
+  </div>
+  <div class="footer">Trương Dáng Hương Academy — Phiếu xuất tự động từ hệ thống quản lý</div>
+  </body></html>`;
+  openPrintWindow(html, 'PhieuThu_'+order.customer+'_Dot'+dotNum);
 }
 
-function exportRetailPDF(doc, order){
-  const W=148;
-  pdfHeader(doc,'HÓA ĐƠN BÁN HÀNG');
-  let y=36;
-  pdfRow(doc,'Mã đơn:',order.id,y);y+=7;
-  pdfRow(doc,'Khách hàng:',order.customer||'Khách lẻ',y);y+=7;
-  pdfRow(doc,'Thời gian:',order.time||nowDT(),y);y+=7;
-  doc.setDrawColor(220,220,220);doc.line(10,y,W-10,y);y+=5;
-  // Items
-  doc.setFontSize(9);doc.setFont('helvetica','bold');
-  doc.text('Sản phẩm',12,y);
-  doc.text('Thành tiền',W-12,y,{align:'right'});
-  y+=5;doc.line(10,y,W-10,y);y+=5;
-  const items=(order.items||'').split(',');
-  items.forEach(item=>{
-    const t=item.trim();if(!t)return;
-    doc.setFont('helvetica','normal');doc.setFontSize(8);
-    doc.text('• '+t,14,y);
-    y+=5;
-  });
-  y+=2;doc.setDrawColor(220,220,220);doc.line(10,y,W-10,y);y+=6;
-  // Total
-  doc.setFillColor(255,245,230);
-  doc.rect(10,y-4,W-20,10,'F');
-  doc.setFontSize(11);doc.setFont('helvetica','bold');
-  doc.setTextColor(220,100,0);
-  doc.text('TỔNG CỘNG:',14,y+2);
-  doc.text(fmt(order.total||0),W-12,y+2,{align:'right'});
-  doc.setTextColor(0,0,0);y+=14;
-  // QR
-  if(cfg.bankAcc&&cfg.bankId){
-    const qr=`https://img.vietqr.io/image/${cfg.bankId}-${cfg.bankAcc}-compact2.png?amount=${order.total}&addInfo=${encodeURIComponent(order.id+' '+order.customer)}&accountName=${encodeURIComponent(cfg.accName||'TRUONG DANG HUONG')}`;
-    const img=new Image();img.crossOrigin='anonymous';
-    img.onload=()=>{
-      doc.addImage(img,'PNG',(W-40)/2,y,40,40);
-      doc.setFontSize(7);doc.setTextColor(100,100,100);
-      doc.text('Quét mã để thanh toán',W/2,y+43,{align:'center'});
-      pdfFooter(doc);
-      doc.save('HoaDon_'+order.id+'.pdf');
-    };
-    img.onerror=()=>{pdfFooter(doc);doc.save('HoaDon_'+order.id+'.pdf');};
-    img.src=qr;
-  } else {
-    pdfFooter(doc);
-    doc.save('HoaDon_'+order.id+'.pdf');
-  }
-}
-
-function exportFeePDF(doc, order){
-  const W=148;
-  pdfHeader(doc,'PHIẾU THU HỌC PHÍ');
-  // Tìm học viên tương ứng
-  const student=D.students.find(s=>s.name===order.customer);
-  const dotNum=order.id.includes('HP')&&(order.items||'').includes('đợt 2')?2:1;
-  const isOnline=(order.items||'').includes('Online');
-  let y=36;
-  doc.setFillColor(240,248,240);
-  doc.rect(10,y-3,W-20,42,'F');
-  pdfRow(doc,'Số phiếu:',order.id,y);y+=7;
-  pdfRow(doc,'Ngày thu:',order.time||nowDT(),y);y+=7;
-  pdfRow(doc,'Học viên:',order.customer,y);y+=7;
-  if(student){
-    pdfRow(doc,'Số điện thoại:',student.phone||'—',y);y+=7;
-    pdfRow(doc,'Khóa học:',student.course||'—',y);y+=7;
-    pdfRow(doc,'Loại hình:',student.type||'—',y);y+=7;
-  }
-  y+=3;doc.setDrawColor(220,220,220);doc.line(10,y,W-10,y);y+=7;
-  // Nội dung thu
-  doc.setFontSize(10);doc.setFont('helvetica','bold');
-  doc.text('NỘI DUNG THU:',12,y);y+=6;
-  doc.setFont('helvetica','normal');doc.setFontSize(9);
-  const desc=isOnline?'Học phí toàn bộ (Online)':`Học phí ${dotNum===1?'đợt 1 (30%)':'đợt 2 (70%)'}`;
-  doc.text('• '+desc,14,y);y+=6;
-  if(student&&!isOnline){
-    const total=student.fee||0;
-    const dep=Math.round(total*0.3);
-    const rest=total-dep;
-    doc.setTextColor(100,100,100);doc.setFontSize(8);
-    doc.text('  Tổng học phí: '+fmt(total)+' | Đợt 1: '+fmt(dep)+' | Đợt 2: '+fmt(rest),14,y);y+=5;
-    doc.setTextColor(0,0,0);
-  }
-  y+=3;
-  // Số tiền lớn
-  doc.setFillColor(255,235,200);
-  doc.rect(10,y-4,W-20,14,'F');
-  doc.setDrawColor(255,140,0);doc.setLineWidth(0.5);
-  doc.rect(10,y-4,W-20,14);
-  doc.setFontSize(13);doc.setFont('helvetica','bold');
-  doc.setTextColor(180,80,0);
-  doc.text('SỐ TIỀN ĐÃ THU:',14,y+4);
-  doc.text(fmt(order.total||0),W-12,y+4,{align:'right'});
-  doc.setTextColor(0,0,0);y+=18;
-  // Chữ ký
-  doc.setFontSize(8);doc.setFont('helvetica','normal');doc.setTextColor(100,100,100);
-  doc.text('Người nộp tiền',30,y,{align:'center'});
-  doc.text('Người thu tiền',W-30,y,{align:'center'});
-  y+=15;
-  doc.text('(Ký, ghi rõ họ tên)',30,y,{align:'center'});
-  doc.text('(Ký, ghi rõ họ tên)',W-30,y,{align:'center'});
-  pdfFooter(doc);
-  doc.save('PhieuThu_'+order.customer+'_Dot'+dotNum+'.pdf');
-}
-
-function pdfFooter(doc){
-  const W=148,H=210;
-  doc.setFontSize(7);doc.setTextColor(150,150,150);
-  doc.setDrawColor(200,200,200);doc.line(10,H-12,W-10,H-12);
-  doc.text('Trương Dáng Hương Academy — Phiếu được xuất tự động từ hệ thống quản lý',W/2,H-7,{align:'center'});
+function openPrintWindow(html, filename){
+  const w=window.open('','_blank','width=600,height=800');
+  if(!w){notify('Trình duyệt chặn popup! Cho phép popup để in phiếu.',false);return;}
+  w.document.write(html);
+  w.document.close();
+  w.onload=()=>{
+    setTimeout(()=>{
+      w.print();
+    },500);
+  };
 }
 
 
