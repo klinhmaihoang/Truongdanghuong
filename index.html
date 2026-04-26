@@ -1279,7 +1279,7 @@ function renderCart(){
 function chgQty(i,d){cart[i].qty+=d;if(cart[i].qty<=0)cart.splice(i,1);renderCart();}
 
 // ── CHECKOUT + VIETQR ──
-function checkout(){
+async function checkout(){
   if(!cart.length){notify('Giỏ hàng trống!',false);return;}
   const name=document.getElementById('c-name').value.trim()||'Khách lẻ';
   const total=cart.reduce((a,c)=>a+c.price*c.qty,0);
@@ -1301,6 +1301,15 @@ function checkout(){
     <div><span>Số tiền</span><span style="color:var(--gold2)">${fmt(total)}</span></div>
     ${invoice.note?`<div><span>Ghi chú</span><span>${invoice.note}</span></div>`:''}`;
   showM('modal-qr');
+  // Lưu đơn "Chờ thanh toán" vào Supabase ngay để hiện trong tab Đơn hàng
+  const pendingOrder={id,customer:name,email:document.getElementById('c-email').value.trim(),
+    items,total,time:nowDT(),note:document.getElementById('c-note').value.trim()||'',
+    status:'Chờ thanh toán',created_at:Date.now()};
+  try{
+    await sbUpsert('orders',pendingOrder);
+    D.orders.push(pendingOrder);
+    renderOrders();renderDash();
+  }catch(e){console.warn('Lưu đơn chờ lỗi:',e.message);}
   if(document.getElementById('at-sale').checked)
     tgMsg(`🛒 *Đơn hàng mới!*\n\nMã: \`${id}\`\n👤 ${name}\n🛍️ ${items}\n💰 ${fmt(total)}\n⏳ Chờ thanh toán\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
 }
@@ -1329,10 +1338,18 @@ async function markPaid(){
       }
     }
   }
-  const order={id:invoice.id,customer:invoice.name,email:invoice.email||'',items:invoice.items,
-    total:invoice.total,time:ts,note:invoice.note||'',status:'Đã thanh toán',created_at:Date.now()};
-  await sbUpsert('orders',order);
-  D.orders.push(order);
+  // Cập nhật đơn hiện có thành "Đã thanh toán" thay vì tạo mới
+  const existingOrder=D.orders.find(o=>o.id===invoice.id);
+  if(existingOrder){
+    existingOrder.status='Đã thanh toán';existingOrder.time=ts;
+    await sbPatch('orders',{status:'Đã thanh toán',time:ts},`?id=eq.${invoice.id}`);
+  } else {
+    const order={id:invoice.id,customer:invoice.name,email:invoice.email||'',items:invoice.items,
+      total:invoice.total,time:ts,note:invoice.note||'',status:'Đã thanh toán',created_at:Date.now()};
+    await sbUpsert('orders',order);
+    D.orders.push(order);
+  }
+  const order=D.orders.find(o=>o.id===invoice.id)||{id:invoice.id,customer:invoice.name,total:invoice.total};
   const lowItems=D.inventory.filter(i=>i.qty<=i.min);
   cart=[];
   ['c-name','c-email','c-note'].forEach(id=>document.getElementById(id).value='');
