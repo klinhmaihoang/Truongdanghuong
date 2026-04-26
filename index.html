@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trương Dáng Hương Academy</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0d14;--surface:#13131f;--card:#1a1a2a;--border:rgba(255,255,255,0.07);
+  --gold:#c9963a;--gold2:#e8b96a;--rose:#c45c7a;--teal:#2dd4a0;
+  --text:#ede8df;--muted:#7a7585;--dim:#3a3548;
+  --green:#27ae60;--red:#c0392b;--blue:#2980b9;--orange:#e67e22;
+  --radius:10px
+}
+body{font-family:'Segoe UI',Tahoma,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;gap:14px;height:54px;position:sticky;top:0;z-index:50}
+.brand-main{font-size:15px;font-weight:700;color:var(--gold2);letter-spacing:.3px}
+.brand-sub{font-size:10px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
+.dot-live{width:7px;height:7px;border-radius:50%;background:var(--teal);animation:pulse 2s infinite;margin-left:4px}
+.nav{display:flex;gap:2px;margin-left:auto}
+.nav button{background:transparent;border:none;color:var(--muted);padding:6px 14px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:500;transition:.15s}
+.nav button.active{background:rgba(201,150,58,0.15);color:var(--gold2)}
+.nav button:hover:not(.active){background:rgba(255,255,255,0.05);color:var(--text)}
+.nav button.tg-btn{color:#5bc8f0}
+.main{padding:20px 24px;max-width:960px;margin:0 auto}
+.page{display:none}.page.active{display:block}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;position:relative;overflow:hidden}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--gold)}
+.stat-num{font-size:26px;font-weight:700;color:var(--gold2)}
+.stat-label{font-size:11px;color:var(--muted);margin-top:3px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:18px;margin-bottom:16px}
+.card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
+.card-title{font-size:14px;font-weight:600;color:var(--text)}
+.btn{background:var(--gold);color:#111;border:none;padding:8px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;transition:.15s}
+.btn:hover{background:var(--gold2)}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+.btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
+.btn-green{background:var(--green);color:#fff}.btn-green:hover{background:#2ecc71;color:#fff}
+.btn-blue{background:var(--blue);color:#fff}.btn-blue:hover{background:#3498db;color:#fff}
+.btn-tg{background:#229ED9;color:#fff}.btn-tg:hover{background:#1a8bbf;color:#fff}
+.btn-excel{background:#1D6F42;color:#fff}.btn-excel:hover{background:#217346;color:#fff}
+.btn-sm{padding:5px 11px;font-size:12px}
+.btn-red{background:var(--red);color:#fff}.btn-red:hover{background:#e74c3c;color:#fff}
+.btn-group{display:flex;gap:7px;flex-wrap:wrap}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
+td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,0.04);color:var(--text);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,0.02)}
+.tag{display:inline-block;padding:2px 10px;border-radius:20px;font-size:11px;font-weight:600}
+.tag-online{background:rgba(41,128,185,0.2);color:#5dade2}
+.tag-offline{background:rgba(45,212,160,0.2);color:#2dd4a0}
+.tag-paid{background:rgba(39,174,96,0.2);color:#58d68d}
+.tag-pending{background:rgba(230,126,34,0.2);color:#f0a84b}
+.tag-low{background:rgba(192,57,43,0.2);color:#e57373}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.form-group input,.form-group select,.form-group textarea{background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-size:13px;outline:none;transition:.2s;width:100%}
+.form-group input:focus,.form-group select:focus{border-color:var(--gold)}
+.form-group select option{background:var(--card)}
+.pos-grid{display:grid;grid-template-columns:1fr 340px;gap:16px;align-items:start}
+.product-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.prod-card{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:12px;cursor:pointer;transition:.18s;text-align:center}
+.prod-card:hover{border-color:var(--gold);transform:translateY(-2px)}
+.prod-icon{font-size:26px;margin-bottom:5px}
+.prod-name{font-size:12px;font-weight:600;margin-bottom:3px}
+.prod-price{font-size:14px;font-weight:700;color:var(--gold2)}
+.prod-stock{font-size:10px;color:var(--muted);margin-top:2px}
+.cart-section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+.cart-item{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)}
+.cart-item:last-child{border-bottom:none}
+.cart-name{flex:1;font-size:13px}
+.qty-btn{background:var(--dim);border:none;color:var(--text);width:24px;height:24px;border-radius:6px;cursor:pointer;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;transition:.15s}
+.qty-btn:hover{background:var(--gold);color:#111}
+.cart-price{font-size:13px;font-weight:700;color:var(--gold2);min-width:70px;text-align:right}
+.total-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--border);margin-top:6px}
+.total-val{font-size:22px;font-weight:700;color:var(--gold2)}
+.progress-bar{background:rgba(255,255,255,0.07);border-radius:20px;height:5px;margin-top:5px}
+.progress-fill{height:5px;border-radius:20px;background:var(--teal);transition:.4s}
+.progress-fill.warn{background:var(--orange)}
+.progress-fill.danger{background:var(--red)}
+.tg-section{background:rgba(34,158,217,0.07);border:1px solid rgba(34,158,217,0.2);border-radius:var(--radius);padding:18px;margin-bottom:16px}
+.tg-title{font-size:15px;font-weight:700;color:#5bc8f0}
+.tg-sub{font-size:12px;color:var(--muted);margin-top:2px}
+.tg-icon{width:40px;height:40px;background:#229ED9;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+.log-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;max-height:200px;overflow-y:auto;font-size:12px;font-family:'Courier New',monospace;color:#aaa}
+.log-entry{padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.04)}
+.log-time{color:var(--muted);margin-right:8px}
+.log-ok{color:var(--teal)}.log-err{color:var(--red)}.log-warn{color:var(--orange)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:24px;width:360px;text-align:center;max-height:90vh;overflow-y:auto}
+.modal-title{font-size:17px;font-weight:700;color:var(--gold2);margin-bottom:4px}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:8px}
+.amount-big{font-size:28px;font-weight:700;color:var(--gold2);margin:10px 0}
+.qr-box{background:#fff;border-radius:10px;padding:14px;display:inline-block;margin:10px 0}
+.bank-note{background:var(--bg);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--text);margin:6px 0;text-align:left;border:1px solid var(--border)}
+.modal-actions{display:flex;gap:8px;justify-content:center;margin-top:14px;flex-wrap:wrap}
+.notif{position:fixed;bottom:20px;right:20px;background:var(--teal);color:#0d2a20;padding:10px 18px;border-radius:10px;font-size:13px;font-weight:700;z-index:200;opacity:0;transform:translateY(10px);transition:.3s;pointer-events:none;max-width:320px}
+.notif.show{opacity:1;transform:translateY(0)}
+.tabs{display:flex;gap:3px;margin-bottom:14px;background:var(--surface);border-radius:var(--radius);padding:4px;width:fit-content}
+.tab{padding:7px 18px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);transition:.18s}
+.tab.active{background:rgba(201,150,58,0.18);color:var(--gold2)}
+.guide-step{background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:12.5px;color:var(--muted);line-height:1.7}
+.guide-step strong{color:var(--gold2)}
+code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);font-size:12px}
+@media(max-width:700px){
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .pos-grid{grid-template-columns:1fr}
+  .product-grid{grid-template-columns:repeat(2,1fr)}
+  .form-row{grid-template-columns:1fr}
+  .nav{flex-wrap:wrap}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div>
+    <div class="brand-main">Trương Dáng Hương Academy</div>
+    <div class="brand-sub">Bartender &amp; Mixology Training</div>
+  </div>
+  <div class="dot-live"></div>
+  <div class="nav">
+    <button class="active" onclick="goPage('dashboard',this)">Tổng quan</button>
+    <button onclick="goPage('students',this)">Học viên</button>
+    <button onclick="goPage('pos',this)">Bán hàng</button>
+    <button onclick="goPage('inventory',this)">Kho</button>
+    <button onclick="goPage('orders',this)">Đơn hàng</button>
+    <button class="tg-btn" onclick="goPage('telegram',this)">⚡ Telegram</button>
+  </div>
+</div>
+
+<div class="main">
+
+<!-- ===== TỔNG QUAN ===== -->
+<div class="page active" id="page-dashboard">
+  <div class="stats">
+    <div class="stat"><div class="stat-num" id="s-students">0</div><div class="stat-label">Học viên đang học</div></div>
+    <div class="stat" style="--gold:var(--teal)"><div class="stat-num" style="color:var(--teal)" id="s-revenue">0</div><div class="stat-label">Doanh thu tháng (₫)</div></div>
+    <div class="stat" style="--gold:var(--rose)"><div class="stat-num" style="color:var(--rose)" id="s-orders">0</div><div class="stat-label">Đơn hàng tháng này</div></div>
+    <div class="stat" style="--gold:var(--orange)"><div class="stat-num" style="color:var(--orange)" id="s-low">0</div><div class="stat-label">Kho cảnh báo</div></div>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Đơn hàng gần đây</span>
+      <div class="btn-group">
+        <button class="btn btn-tg btn-sm" onclick="sendTgReport('daily')">📈 Báo cáo ngày → Telegram</button>
+        <button class="btn btn-excel btn-sm" onclick="exportExcel('daily')">📊 Xuất Excel</button>
+      </div>
+    </div>
+    <table><thead><tr><th>Khách hàng</th><th>Sản phẩm</th><th>Tổng tiền</th><th>Trạng thái</th></tr></thead>
+    <tbody id="recent-orders"></tbody></table>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title">Cảnh báo tồn kho</span></div>
+    <table><thead><tr><th>Nguyên liệu</th><th>Tồn kho</th><th>Mức tối thiểu</th><th>Trạng thái</th></tr></thead>
+    <tbody id="low-stock"></tbody></table>
+  </div>
+</div>
+
+<!-- ===== HỌC VIÊN ===== -->
+<div class="page" id="page-students">
+  <div class="tabs">
+    <div class="tab active" onclick="switchTab(this,'all')">Tất cả</div>
+    <div class="tab" onclick="switchTab(this,'online')">Online</div>
+    <div class="tab" onclick="switchTab(this,'offline')">Offline</div>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Danh sách học viên</span>
+      <div class="btn-group">
+        <button class="btn btn-sm" onclick="toggleForm('add-student-form')">+ Thêm học viên</button>
+        <button class="btn btn-tg btn-sm" onclick="sendTgReport('students')">→ Telegram</button>
+        <button class="btn btn-excel btn-sm" onclick="exportExcel('students')">📊 Excel</button>
+      </div>
+    </div>
+    <table><thead><tr><th>Họ tên</th><th>Loại</th><th>Khóa học</th><th>Ngày bắt đầu</th><th>Học phí</th><th>Trạng thái</th><th></th></tr></thead>
+    <tbody id="student-list"></tbody></table>
+  </div>
+  <div class="card" id="add-student-form" style="display:none">
+    <div class="card-head"><span class="card-title">Thêm học viên mới</span></div>
+    <div class="form-row">
+      <div class="form-group"><label>Họ tên *</label><input id="f-name" placeholder="Nguyễn Văn A"/></div>
+      <div class="form-group"><label>Số điện thoại</label><input id="f-phone" placeholder="090xxxxxxx"/></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Loại học</label>
+        <select id="f-type"><option>Offline</option><option>Online</option></select></div>
+      <div class="form-group"><label>Khóa học</label>
+        <select id="f-course"><option>Cơ bản</option><option>Nâng cao</option><option>Chuyên nghiệp</option></select></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Email</label><input id="f-email" placeholder="email@example.com"/></div>
+      <div class="form-group"><label>Học phí (₫)</label><input id="f-fee" type="number" placeholder="2500000"/></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Ngày bắt đầu</label><input id="f-start" type="date"/></div>
+      <div class="form-group"><label>Ghi chú</label><input id="f-note" placeholder="Ghi chú thêm..."/></div>
+    </div>
+    <div class="btn-group" style="margin-top:6px">
+      <button class="btn btn-green btn-sm" onclick="addStudent()">Lưu học viên</button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleForm('add-student-form')">Hủy</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== BÁN HÀNG ===== -->
+<div class="page" id="page-pos">
+  <div class="pos-grid">
+    <div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">Chọn sản phẩm</div>
+      <div class="product-grid" id="product-grid"></div>
+    </div>
+    <div class="cart-section">
+      <div class="card-title" style="margin-bottom:12px">🛒 Giỏ hàng</div>
+      <div id="cart-items" style="min-height:80px"></div>
+      <div class="total-row">
+        <span style="font-size:13px;color:var(--muted)">Tổng cộng</span>
+        <span class="total-val" id="cart-total">0 ₫</span>
+      </div>
+      <div class="form-row" style="margin-top:12px">
+        <div class="form-group"><label>Tên khách *</label><input id="c-name" placeholder="Tên khách hàng"/></div>
+        <div class="form-group"><label>Email khách</label><input id="c-email" placeholder="email@gmail.com"/></div>
+      </div>
+      <button class="btn" style="width:100%;padding:12px;font-size:14px;margin-top:4px" onclick="checkout()">Tạo hóa đơn &amp; QR thanh toán</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== KHO ===== -->
+<div class="page" id="page-inventory">
+  <div class="btn-group" style="margin-bottom:14px">
+    <button class="btn btn-green btn-sm" onclick="toggleForm('import-form')">+ Nhập kho</button>
+    <button class="btn btn-ghost btn-sm" onclick="toggleForm('export-form')">- Xuất thủ công</button>
+    <button class="btn btn-tg btn-sm" onclick="sendTgReport('inventory')">📦 Báo cáo kho → Telegram</button>
+    <button class="btn btn-excel btn-sm" onclick="exportExcel('inventory')">📊 Xuất Excel kho</button>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title">Tình trạng tồn kho</span></div>
+    <table><thead><tr><th>Nguyên liệu</th><th>Đơn vị</th><th>Tồn kho</th><th>Tối thiểu</th><th>Mức tồn</th><th></th></tr></thead>
+    <tbody id="inv-list"></tbody></table>
+  </div>
+  <div class="card" id="import-form" style="display:none">
+    <div class="card-head"><span class="card-title">Nhập kho</span></div>
+    <div class="form-row">
+      <div class="form-group"><label>Nguyên liệu</label>
+        <select id="i-mat"><option value="0">Trà lài</option><option value="1">Hồng trà</option><option value="2">Trà mix</option><option value="3">Bột sữa</option></select></div>
+      <div class="form-group"><label>Số lượng nhập</label><input id="i-qty" type="number" placeholder="10" min="1"/></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Nhà cung cấp</label><input id="i-sup" placeholder="Tên nhà cung cấp"/></div>
+      <div class="form-group"><label>Giá nhập (₫/đơn vị)</label><input id="i-price" type="number" placeholder="50000"/></div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-green btn-sm" onclick="importStock()">Nhập kho</button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleForm('import-form')">Hủy</button>
+    </div>
+  </div>
+  <div class="card" id="export-form" style="display:none">
+    <div class="card-head"><span class="card-title">Xuất kho thủ công</span></div>
+    <div class="form-row">
+      <div class="form-group"><label>Nguyên liệu</label>
+        <select id="e-mat"><option value="0">Trà lài</option><option value="1">Hồng trà</option><option value="2">Trà mix</option><option value="3">Bột sữa</option></select></div>
+      <div class="form-group"><label>Số lượng xuất</label><input id="e-qty" type="number" placeholder="5" min="1"/></div>
+    </div>
+    <div class="form-group" style="margin-bottom:12px"><label>Lý do xuất</label><input id="e-reason" placeholder="VD: Dùng thử, tặng mẫu..."/></div>
+    <div class="btn-group">
+      <button class="btn btn-red btn-sm" onclick="exportStock()">Xác nhận xuất kho</button>
+      <button class="btn btn-ghost btn-sm" onclick="toggleForm('export-form')">Hủy</button>
+    </div>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Lịch sử nhập/xuất kho</span>
+      <button class="btn btn-excel btn-sm" onclick="exportExcel('stocklog')">📊 Xuất Excel</button>
+    </div>
+    <table><thead><tr><th>Thời gian</th><th>Nguyên liệu</th><th>Loại</th><th>Số lượng</th><th>Nhà cung cấp / Lý do</th></tr></thead>
+    <tbody id="stock-log"></tbody></table>
+  </div>
+</div>
+
+<!-- ===== ĐƠN HÀNG ===== -->
+<div class="page" id="page-orders">
+  <div class="btn-group" style="margin-bottom:14px">
+    <button class="btn btn-tg btn-sm" onclick="sendTgReport('orders')">📋 Đơn hàng → Telegram</button>
+    <button class="btn btn-tg btn-sm" onclick="sendTgReport('daily')">📈 Tổng kết → Telegram</button>
+    <button class="btn btn-excel btn-sm" onclick="exportExcel('orders')">📊 Xuất Excel đơn hàng</button>
+    <button class="btn btn-excel btn-sm" onclick="exportExcel('full')">📁 Xuất toàn bộ (tất cả sheet)</button>
+  </div>
+  <div class="card">
+    <div class="card-head"><span class="card-title">Lịch sử đơn hàng</span></div>
+    <table><thead><tr><th>Mã đơn</th><th>Khách hàng</th><th>Sản phẩm</th><th>Tổng tiền</th><th>Thời gian</th><th>Trạng thái</th><th></th></tr></thead>
+    <tbody id="all-orders"></tbody></table>
+  </div>
+</div>
+
+<!-- ===== TELEGRAM ===== -->
+<div class="page" id="page-telegram">
+  <div class="tg-section">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div class="tg-icon">✈</div>
+      <div style="flex:1">
+        <div class="tg-title">Kết nối Telegram Bot</div>
+        <div class="tg-sub">Báo cáo tự động gửi về nhóm/kênh của team</div>
+      </div>
+      <div>
+        <span style="display:flex;align-items:center;gap:6px;font-size:12px">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block" id="tg-dot"></span>
+          <span id="tg-status-text" style="color:var(--muted)">Chưa kết nối</span>
+        </span>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Bot Token</label><input id="tg-token" placeholder="123456789:AABBcc..." type="password"/></div>
+      <div class="form-group"><label>Chat ID (group/channel)</label><input id="tg-chatid" placeholder="-1001234567890 hoặc @tenchannel"/></div>
+    </div>
+    <div class="btn-group" style="margin-top:4px">
+      <button class="btn btn-tg btn-sm" onclick="saveTgConfig()">Lưu &amp; Kiểm tra kết nối</button>
+      <button class="btn btn-ghost btn-sm" onclick="sendTgReport('test')">Gửi tin test</button>
+      <button class="btn btn-ghost btn-sm" onclick="clearTg()">Xóa cấu hình</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">Cài đặt báo cáo tự động</span></div>
+    <div style="display:grid;gap:12px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px">
+        <input type="checkbox" id="auto-sale" checked style="accent-color:var(--gold);width:16px;height:16px">
+        Tự động báo khi có đơn hàng mới tạo
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px">
+        <input type="checkbox" id="auto-payment" checked style="accent-color:var(--gold);width:16px;height:16px">
+        Báo khi xác nhận thanh toán thành công
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px">
+        <input type="checkbox" id="auto-lowstock" checked style="accent-color:var(--gold);width:16px;height:16px">
+        Cảnh báo khi nguyên liệu xuống dưới mức tối thiểu
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px">
+        <input type="checkbox" id="auto-student" checked style="accent-color:var(--gold);width:16px;height:16px">
+        Báo khi có học viên mới đăng ký
+      </label>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px">
+        <input type="checkbox" id="auto-import" checked style="accent-color:var(--gold);width:16px;height:16px">
+        Báo khi nhập kho mới
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><span class="card-title">Gửi báo cáo thủ công</span></div>
+    <div class="btn-group">
+      <button class="btn btn-tg btn-sm" onclick="sendTgReport('daily')">📈 Tổng kết hôm nay</button>
+      <button class="btn btn-tg btn-sm" onclick="sendTgReport('orders')">📋 Danh sách đơn hàng</button>
+      <button class="btn btn-tg btn-sm" onclick="sendTgReport('inventory')">📦 Tình trạng kho</button>
+      <button class="btn btn-tg btn-sm" onclick="sendTgReport('students')">🎓 Danh sách học viên</button>
+      <button class="btn btn-tg btn-sm" onclick="sendTgReport('revenue')">💰 Báo cáo doanh thu</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">Nhật ký gửi Telegram</span>
+      <button class="btn btn-ghost btn-sm" onclick="clearLog()">Xóa log</button>
+    </div>
+    <div class="log-box" id="tg-log">
+      <div class="log-entry"><span class="log-time">--:--</span><span style="color:var(--muted)">Chưa có hoạt động nào...</span></div>
+    </div>
+  </div>
+
+  <div class="card" style="border-color:rgba(34,158,217,0.2)">
+    <div class="card-head"><span class="card-title">Hướng dẫn tạo Telegram Bot</span></div>
+    <div class="guide-step"><strong>Bước 1</strong> — Mở Telegram, tìm <strong style="color:#5bc8f0">@BotFather</strong> và gửi lệnh <code>/newbot</code></div>
+    <div class="guide-step"><strong>Bước 2</strong> — Đặt tên bot và username (phải kết thúc bằng <code>_bot</code>). Copy <strong>Bot Token</strong> được cấp</div>
+    <div class="guide-step"><strong>Bước 3</strong> — Tạo group Telegram cho team, thêm bot vào group, đặt bot làm <strong>Admin</strong></div>
+    <div class="guide-step"><strong>Bước 4</strong> — Lấy Chat ID: gửi 1 tin nhắn vào group, sau đó mở trình duyệt vào:<br><code>https://api.telegram.org/bot[TOKEN_CỦA_BẠN]/getUpdates</code><br>Tìm <code>"chat":{"id":</code> — đó là Chat ID (số âm với group)</div>
+    <div class="guide-step"><strong>Bước 5</strong> — Dán Token và Chat ID vào form phía trên rồi bấm <strong style="color:var(--teal)">Lưu &amp; Kiểm tra kết nối</strong></div>
+  </div>
+</div>
+
+</div><!-- end .main -->
+
+<!-- Modal QR -->
+<div class="modal-overlay" id="qr-modal">
+  <div class="modal">
+    <div class="modal-title">Thanh toán chuyển khoản</div>
+    <div class="modal-sub">Vietcombank · 1234 5678 90 · TRUONG DANG HUONG</div>
+    <div class="amount-big" id="qr-amount">0 ₫</div>
+    <div class="qr-box">
+      <svg id="qr-svg" width="160" height="160" viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+    <div class="bank-note" id="qr-note"></div>
+    <div class="modal-actions">
+      <button class="btn btn-green btn-sm" onclick="markPaid()">✓ Xác nhận đã nhận tiền</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeModal()">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<div class="notif" id="notif"></div>
+
+<script>
+// ===== STATE =====
+const S = {
+  students: [
+    {id:1,name:'Linh Nguyễn',phone:'0901234567',type:'Online',course:'Nâng cao',email:'linh@gmail.com',fee:3500000,start:'2025-04-01',status:'Đang học',note:''},
+    {id:2,name:'Minh Trần',phone:'0912345678',type:'Offline',course:'Cơ bản',email:'minh@gmail.com',fee:2500000,start:'2025-04-05',status:'Đang học',note:''},
+    {id:3,name:'Hoa Lê',phone:'0923456789',type:'Offline',course:'Chuyên nghiệp',email:'hoa@gmail.com',fee:5000000,start:'2025-03-01',status:'Hoàn thành',note:''},
+    {id:4,name:'Tuấn Phạm',phone:'0934567890',type:'Online',course:'Cơ bản',email:'tuan@gmail.com',fee:2500000,start:'2025-04-10',status:'Đang học',note:''},
+    {id:5,name:'Mai Vũ',phone:'0945678901',type:'Offline',course:'Nâng cao',email:'mai@gmail.com',fee:3500000,start:'2025-04-12',status:'Đang học',note:''},
+  ],
+  inventory: [
+    {name:'Trà lài',unit:'kg',qty:12,min:5,cost:80000},
+    {name:'Hồng trà',unit:'kg',qty:8,min:5,cost:70000},
+    {name:'Trà mix',unit:'kg',qty:3,min:4,cost:90000},
+    {name:'Bột sữa',unit:'gói',qty:20,min:8,cost:45000},
+  ],
+  products: [
+    {name:'Trà lài',icon:'🍵',price:35000,matIdx:0,matUse:0.1},
+    {name:'Hồng trà',icon:'🍂',price:30000,matIdx:1,matUse:0.1},
+    {name:'Trà mix',icon:'🫖',price:45000,matIdx:2,matUse:0.1},
+    {name:'Bột sữa',icon:'🥛',price:25000,matIdx:3,matUse:1},
+    {name:'Combo Trà + Sữa',icon:'☕',price:55000,matIdx:-1,matUse:0},
+    {name:'Khóa học Online',icon:'💻',price:2500000,matIdx:-1,matUse:0},
+  ],
+  orders: [
+    {id:'HĐ001',customer:'Linh Nguyễn',items:'Trà lài x2',total:70000,time:'26/04 09:15',status:'Đã thanh toán'},
+    {id:'HĐ002',customer:'Minh Trần',items:'Bột sữa x3',total:75000,time:'26/04 10:30',status:'Chờ thanh toán'},
+    {id:'HĐ003',customer:'Hoa Lê',items:'Combo x1',total:55000,time:'26/04 11:00',status:'Đã thanh toán'},
+  ],
+  stockLog: [],
+  cart: [],
+  currentInvoice: null,
+  studentFilter: 'all',
+  tg: {token:'', chatId:'', connected:false},
+  tgLog: []
+};
+
+// ===== UTILS =====
+function fmt(n){return n.toLocaleString('vi-VN')+'₫'}
+function nowTime(){const d=new Date();return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0')+':'+d.getSeconds().toString().padStart(2,'0')}
+function nowDateTime(){const d=new Date();return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`}
+function todayDate(){const d=new Date();return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`}
+
+function notify(msg, ok=true){
+  const el=document.getElementById('notif');
+  el.textContent=msg;
+  el.style.background=ok?'var(--teal)':'var(--red)';
+  el.style.color=ok?'#0d2a20':'#fff';
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),3200);
+}
+
+// ===== NAVIGATION =====
+function goPage(p, btn){
+  document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+  document.getElementById('page-'+p).classList.add('active');
+  document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  render();
+}
+function switchTab(el,f){
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  el.classList.add('active'); S.studentFilter=f; renderStudents();
+}
+function toggleForm(id){
+  const f=document.getElementById(id);
+  f.style.display=f.style.display==='none'?'block':'none';
+}
+
+// ===== RENDER ALL =====
+function render(){renderDash();renderStudents();renderProducts();renderInventory();renderOrders();renderStockLog();renderLog();}
+
+// ===== DASHBOARD =====
+function renderDash(){
+  document.getElementById('s-students').textContent=S.students.filter(s=>s.status==='Đang học').length;
+  const rev=S.orders.filter(o=>o.status==='Đã thanh toán').reduce((a,o)=>a+o.total,0);
+  document.getElementById('s-revenue').textContent=(rev/1000000).toFixed(1)+'M';
+  document.getElementById('s-orders').textContent=S.orders.length;
+  document.getElementById('s-low').textContent=S.inventory.filter(i=>i.qty<=i.min).length;
+  document.getElementById('recent-orders').innerHTML=S.orders.slice(-5).reverse().map(o=>`<tr>
+    <td>${o.customer}</td>
+    <td style="font-size:12px;color:var(--muted)">${o.items}</td>
+    <td style="color:var(--gold2);font-weight:700">${fmt(o.total)}</td>
+    <td><span class="tag ${o.status==='Đã thanh toán'?'tag-paid':'tag-pending'}">${o.status}</span></td>
+  </tr>`).join('');
+  const low=S.inventory.filter(i=>i.qty<=i.min*1.5);
+  document.getElementById('low-stock').innerHTML=low.length?low.map(i=>`<tr>
+    <td>${i.name}</td><td>${i.qty} ${i.unit}</td><td>${i.min} ${i.unit}</td>
+    <td><span class="tag ${i.qty<=i.min?'tag-low':'tag-pending'}">${i.qty<=i.min?'Sắp hết':'Cảnh báo'}</span></td>
+  </tr>`).join(''):'<tr><td colspan="4" style="color:var(--teal);text-align:center;padding:14px;font-size:12px">✓ Tất cả nguyên liệu đủ hàng</td></tr>';
+}
+
+// ===== STUDENTS =====
+function renderStudents(){
+  const list=S.students.filter(s=>S.studentFilter==='all'||s.type.toLowerCase()===S.studentFilter);
+  document.getElementById('student-list').innerHTML=list.map(s=>`<tr>
+    <td><strong>${s.name}</strong><br><span style="font-size:11px;color:var(--muted)">${s.phone}</span></td>
+    <td><span class="tag ${s.type==='Online'?'tag-online':'tag-offline'}">${s.type}</span></td>
+    <td style="font-size:12px">${s.course}</td>
+    <td style="font-size:12px;color:var(--muted)">${s.start||'—'}</td>
+    <td style="color:var(--gold2);font-weight:700">${fmt(s.fee)}</td>
+    <td><span class="tag ${s.status==='Đang học'?'tag-paid':'tag-pending'}">${s.status}</span></td>
+    <td><button class="btn btn-ghost btn-sm" onclick="toggleStudentStatus(${s.id})">Đổi trạng thái</button></td>
+  </tr>`).join('');
+}
+
+function addStudent(){
+  const n=document.getElementById('f-name').value.trim();
+  if(!n){notify('Vui lòng nhập họ tên!',false);return;}
+  const student={
+    id:Date.now(),
+    name:n,phone:document.getElementById('f-phone').value,
+    type:document.getElementById('f-type').value,
+    course:document.getElementById('f-course').value,
+    email:document.getElementById('f-email').value,
+    fee:+document.getElementById('f-fee').value||0,
+    start:document.getElementById('f-start').value||todayDate(),
+    note:document.getElementById('f-note').value,
+    status:'Đang học'
+  };
+  S.students.push(student);
+  toggleForm('add-student-form');
+  ['f-name','f-phone','f-email','f-fee','f-start','f-note'].forEach(id=>document.getElementById(id).value='');
+  renderStudents();renderDash();
+  notify('Đã thêm học viên: '+n);
+  if(document.getElementById('auto-student').checked)
+    sendTgMsg(`🎓 *Học viên mới đăng ký!*\n\n👤 Tên: ${n}\n📱 Loại: ${student.type}\n📚 Khóa: ${student.course}\n💰 Học phí: ${fmt(student.fee)}\n📧 Email: ${student.email||'—'}\n📅 Ngày BĐ: ${student.start}\n\n_Trương Dáng Hương Academy_`);
+}
+
+function toggleStudentStatus(id){
+  const s=S.students.find(x=>x.id===id);
+  if(!s)return;
+  s.status=s.status==='Đang học'?'Hoàn thành':'Đang học';
+  renderStudents();renderDash();
+  notify('Đã cập nhật trạng thái: '+s.name);
+}
+
+// ===== POS =====
+function renderProducts(){
+  document.getElementById('product-grid').innerHTML=S.products.map((p,i)=>{
+    const stock=p.matIdx>=0?Math.floor(S.inventory[p.matIdx].qty/p.matUse):999;
+    return`<div class="prod-card" onclick="addToCart(${i})">
+      <div class="prod-icon">${p.icon}</div>
+      <div class="prod-name">${p.name}</div>
+      <div class="prod-price">${fmt(p.price)}</div>
+      <div class="prod-stock">${p.matIdx>=0?stock+' phần':'Không giới hạn'}</div>
+    </div>`;
+  }).join('');
+}
+
+function addToCart(idx){
+  const existing=S.cart.find(c=>c.idx===idx);
+  if(existing){existing.qty++;}else{S.cart.push({idx,name:S.products[idx].name,price:S.products[idx].price,qty:1});}
+  renderCart();
+}
+
+function renderCart(){
+  const el=document.getElementById('cart-items');
+  if(!S.cart.length){
+    el.innerHTML='<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Chưa có sản phẩm</div>';
+    document.getElementById('cart-total').textContent='0 ₫';return;
+  }
+  el.innerHTML=S.cart.map((c,i)=>`<div class="cart-item">
+    <div class="cart-name">${c.name}</div>
+    <div style="display:flex;align-items:center;gap:5px">
+      <button class="qty-btn" onclick="changeQty(${i},-1)">−</button>
+      <span style="font-size:12px;min-width:16px;text-align:center">${c.qty}</span>
+      <button class="qty-btn" onclick="changeQty(${i},1)">+</button>
+    </div>
+    <div class="cart-price">${fmt(c.price*c.qty)}</div>
+  </div>`).join('');
+  document.getElementById('cart-total').textContent=fmt(S.cart.reduce((a,c)=>a+c.price*c.qty,0));
+}
+
+function changeQty(i,d){
+  S.cart[i].qty+=d;
+  if(S.cart[i].qty<=0)S.cart.splice(i,1);
+  renderCart();
+}
+
+function checkout(){
+  if(!S.cart.length){notify('Giỏ hàng trống!',false);return;}
+  const name=document.getElementById('c-name').value.trim()||'Khách lẻ';
+  const email=document.getElementById('c-email').value.trim();
+  const total=S.cart.reduce((a,c)=>a+c.price*c.qty,0);
+  const id='HĐ'+String(S.orders.length+1).padStart(3,'0');
+  const items=S.cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')).join(', ');
+  S.currentInvoice={id,name,email,total,items};
+  document.getElementById('qr-amount').textContent=fmt(total);
+  document.getElementById('qr-note').innerHTML='<strong>Ngân hàng:</strong> Vietcombank<br><strong>STK:</strong> 1234 5678 90<br><strong>Chủ TK:</strong> TRUONG DANG HUONG<br><strong>Nội dung:</strong> '+id+' '+name;
+  genQR(total+S.orders.length*7+13);
+  document.getElementById('qr-modal').classList.add('show');
+  if(document.getElementById('auto-sale').checked)
+    sendTgMsg(`🛒 *Đơn hàng mới!*\n\nMã đơn: \`${id}\`\n👤 Khách: ${name}\n🛍️ Sản phẩm: ${items}\n💰 Tổng tiền: ${fmt(total)}\n⏳ Trạng thái: Chờ thanh toán\n🕐 Thời gian: ${nowDateTime()}\n\n_Trương Dáng Hương Academy_`);
+}
+
+function genQR(seed){
+  const svg=document.getElementById('qr-svg');
+  const size=21,cell=6,pad=10;
+  let cells=Array.from({length:size},()=>Array(size).fill(0));
+  const finder=[[0,0],[0,1],[0,2],[0,3],[0,4],[0,5],[0,6],[1,0],[1,6],[2,0],[2,2],[2,3],[2,4],[2,6],[3,0],[3,2],[3,3],[3,4],[3,6],[4,0],[4,2],[4,3],[4,4],[4,6],[5,0],[5,6],[6,0],[6,1],[6,2],[6,3],[6,4],[6,5],[6,6]];
+  finder.forEach(([r,c])=>{cells[r][c]=1;cells[r][size-1-c]=1;cells[size-1-r][c]=1;});
+  let v=seed>>>0;
+  for(let r=0;r<size;r++)for(let c=7;c<size-7;c++)if(!cells[r][c]){v=(v*1103515245+12345)&0x7fffffff;cells[r][c]=v%2;}
+  let html='<rect width="160" height="160" fill="white"/>';
+  for(let r=0;r<size;r++)for(let c=0;c<size;c++)if(cells[r][c])html+=`<rect x="${pad+c*cell}" y="${pad+r*cell}" width="${cell}" height="${cell}" fill="#111"/>`;
+  svg.innerHTML=html;
+}
+
+function markPaid(){
+  const inv=S.currentInvoice;
+  const ts=nowDateTime();
+  S.cart.forEach(c=>{
+    const p=S.products[c.idx];
+    if(p.matIdx>=0) S.inventory[p.matIdx].qty=Math.max(0,S.inventory[p.matIdx].qty-p.matUse*c.qty);
+  });
+  S.orders.push({id:inv.id,customer:inv.name,items:inv.items,total:inv.total,time:ts,status:'Đã thanh toán'});
+  const lowItems=S.inventory.filter(i=>i.qty<=i.min);
+  S.cart=[];
+  document.getElementById('c-name').value='';
+  document.getElementById('c-email').value='';
+  closeModal();renderCart();render();
+  notify('✓ Thanh toán xong! Kho đã cập nhật tự động');
+  if(document.getElementById('auto-payment').checked)
+    sendTgMsg(`✅ *Thanh toán thành công!*\n\nMã đơn: \`${inv.id}\`\n👤 Khách: ${inv.name}\n💰 Số tiền: ${fmt(inv.total)}\n🕐 Thời gian: ${ts}\n📦 Kho đã cập nhật tự động\n\n_Trương Dáng Hương Academy_`);
+  if(lowItems.length && document.getElementById('auto-lowstock').checked){
+    const warn=lowItems.map(i=>`• ${i.name}: còn ${i.qty} ${i.unit} (tối thiểu ${i.min} ${i.unit})`).join('\n');
+    setTimeout(()=>sendTgMsg(`⚠️ *CẢNH BÁO KHO HÀNG!*\n\n${warn}\n\n➡️ Vui lòng kiểm tra và nhập thêm ngay!\n\n_Trương Dáng Hương Academy_`),1000);
+  }
+}
+
+function closeModal(){document.getElementById('qr-modal').classList.remove('show');}
+
+// ===== INVENTORY =====
+function renderInventory(){
+  document.getElementById('inv-list').innerHTML=S.inventory.map((item,i)=>{
+    const max=Math.max(item.qty,item.min*3);
+    const pct=Math.round(item.qty/max*100);
+    const cls=item.qty<=item.min?'danger':item.qty<=item.min*1.5?'warn':'';
+    const col=item.qty<=item.min?'var(--red)':item.qty<=item.min*1.5?'var(--orange)':'var(--teal)';
+    return`<tr>
+      <td><strong>${item.name}</strong></td>
+      <td style="color:var(--muted)">${item.unit}</td>
+      <td><strong style="color:${col}">${item.qty}</strong></td>
+      <td style="color:var(--muted)">${item.min}</td>
+      <td style="width:120px"><div class="progress-bar"><div class="progress-fill ${cls}" style="width:${pct}%"></div></div></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="quickImport(${i})">Nhập nhanh</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function quickImport(i){
+  toggleForm('import-form');
+  if(document.getElementById('import-form').style.display!=='none')
+    document.getElementById('i-mat').value=i;
+}
+
+function importStock(){
+  const idx=+document.getElementById('i-mat').value;
+  const qty=+document.getElementById('i-qty').value;
+  const sup=document.getElementById('i-sup').value||'—';
+  const price=+document.getElementById('i-price').value||0;
+  if(!qty||qty<=0){notify('Nhập số lượng hợp lệ!',false);return;}
+  S.inventory[idx].qty+=qty;
+  S.stockLog.unshift({time:nowDateTime(),name:S.inventory[idx].name,type:'Nhập',qty:'+'+qty+' '+S.inventory[idx].unit,note:sup+(price?` (${fmt(price)}/đv)`:'')} );
+  toggleForm('import-form');
+  ['i-qty','i-sup','i-price'].forEach(id=>document.getElementById(id).value='');
+  render();
+  notify(`Đã nhập kho: +${qty} ${S.inventory[idx].unit} ${S.inventory[idx].name}`);
+  if(document.getElementById('auto-import').checked)
+    sendTgMsg(`📦 *Nhập kho mới!*\n\nNguyên liệu: ${S.inventory[idx].name}\nSố lượng: +${qty} ${S.inventory[idx].unit}\nNhà cung cấp: ${sup}\nGiá nhập: ${price?fmt(price)+'/đv':'—'}\nTồn kho hiện tại: ${S.inventory[idx].qty} ${S.inventory[idx].unit}\n🕐 ${nowDateTime()}\n\n_Trương Dáng Hương Academy_`);
+}
+
+function exportStock(){
+  const idx=+document.getElementById('e-mat').value;
+  const qty=+document.getElementById('e-qty').value;
+  const reason=document.getElementById('e-reason').value||'Xuất thủ công';
+  if(!qty||qty<=0){notify('Nhập số lượng hợp lệ!',false);return;}
+  if(qty>S.inventory[idx].qty){notify('Không đủ tồn kho!',false);return;}
+  S.inventory[idx].qty-=qty;
+  S.stockLog.unshift({time:nowDateTime(),name:S.inventory[idx].name,type:'Xuất',qty:'-'+qty+' '+S.inventory[idx].unit,note:reason});
+  toggleForm('export-form');
+  ['e-qty','e-reason'].forEach(id=>document.getElementById(id).value='');
+  render();
+  notify(`Đã xuất kho: -${qty} ${S.inventory[idx].unit} ${S.inventory[idx].name}`);
+}
+
+function renderStockLog(){
+  const el=document.getElementById('stock-log');
+  if(!el)return;
+  el.innerHTML=S.stockLog.length?S.stockLog.map(l=>`<tr>
+    <td style="font-size:12px;color:var(--muted)">${l.time}</td>
+    <td>${l.name}</td>
+    <td><span class="tag ${l.type==='Nhập'?'tag-paid':'tag-pending'}">${l.type}</span></td>
+    <td style="font-weight:700;color:${l.type==='Nhập'?'var(--teal)':'var(--orange)'}">${l.qty}</td>
+    <td style="font-size:12px;color:var(--muted)">${l.note}</td>
+  </tr>`).join(''):'<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:16px;font-size:12px">Chưa có lịch sử nhập/xuất</td></tr>';
+}
+
+// ===== ORDERS =====
+function renderOrders(){
+  const el=document.getElementById('all-orders');
+  if(!el)return;
+  el.innerHTML=S.orders.slice().reverse().map(o=>`<tr>
+    <td style="font-weight:700;color:var(--gold2)">${o.id}</td>
+    <td>${o.customer}</td>
+    <td style="font-size:12px;color:var(--muted)">${o.items}</td>
+    <td style="font-weight:700">${fmt(o.total)}</td>
+    <td style="font-size:12px;color:var(--muted)">${o.time}</td>
+    <td><span class="tag ${o.status==='Đã thanh toán'?'tag-paid':'tag-pending'}">${o.status}</span></td>
+    <td>${o.status!=='Đã thanh toán'?`<button class="btn btn-green btn-sm" onclick="directPay('${o.id}')">Thu tiền</button>`:''}</td>
+  </tr>`).join('');
+}
+
+function directPay(id){
+  const o=S.orders.find(x=>x.id===id);if(!o)return;
+  o.status='Đã thanh toán';render();
+  notify('✓ Đã xác nhận thanh toán đơn '+id);
+  sendTgMsg(`✅ *Thu tiền thành công!*\n\nMã đơn: \`${o.id}\`\n👤 Khách: ${o.customer}\n💰 Số tiền: ${fmt(o.total)}\n🕐 ${nowDateTime()}\n\n_Trương Dáng Hương Academy_`);
+}
+
+// ===== TELEGRAM =====
+async function sendTgMsg(text){
+  const token=S.tg.token||document.getElementById('tg-token').value.trim();
+  const chatId=S.tg.chatId||document.getElementById('tg-chatid').value.trim();
+  const entry={time:nowTime(),text:text.split('\n')[0].replace(/[*`]/g,''),ok:false,err:''};
+  if(!token||!chatId){
+    entry.text='[Chưa cấu hình] '+entry.text;
+    addLog(entry);return;
+  }
+  try{
+    const r=await fetch(`https://api.telegram.org/bot${token}/sendMessage`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chat_id:chatId,text:text,parse_mode:'Markdown'})
+    });
+    const d=await r.json();
+    entry.ok=d.ok;
+    entry.text=(d.ok?'✓ Đã gửi: ':'✗ Lỗi: ')+entry.text;
+    if(!d.ok)entry.err=d.description||'';
+  }catch(e){entry.text='✗ Lỗi mạng: '+entry.text;entry.err=e.message;}
+  addLog(entry);
+}
+
+function addLog(entry){
+  S.tgLog.unshift(entry);
+  if(S.tgLog.length>100)S.tgLog.pop();
+  renderLog();
+}
+
+function renderLog(){
+  const el=document.getElementById('tg-log');
+  if(!el)return;
+  el.innerHTML=S.tgLog.length?S.tgLog.map(e=>`<div class="log-entry">
+    <span class="log-time">${e.time}</span>
+    <span class="${e.ok?'log-ok':e.text.startsWith('[Chưa')?'log-warn':'log-err'}">${e.text}</span>
+    ${e.err?`<span style="color:var(--muted);font-size:11px"> — ${e.err}</span>`:''}
+  </div>`).join(''):'<div class="log-entry"><span style="color:var(--muted)">Chưa có hoạt động nào...</span></div>';
+}
+
+async function saveTgConfig(){
+  const t=document.getElementById('tg-token').value.trim();
+  const c=document.getElementById('tg-chatid').value.trim();
+  if(!t||!c){notify('Nhập đầy đủ Token và Chat ID!',false);return;}
+  S.tg.token=t;S.tg.chatId=c;
+  try{
+    const r=await fetch(`https://api.telegram.org/bot${t}/getMe`);
+    const d=await r.json();
+    if(d.ok){
+      S.tg.connected=true;
+      const dot=document.getElementById('tg-dot');
+      dot.style.background='var(--teal)';
+      document.getElementById('tg-status-text').textContent='Đã kết nối: @'+d.result.username;
+      document.getElementById('tg-status-text').style.color='var(--teal)';
+      notify('✓ Kết nối thành công với @'+d.result.username);
+      sendTgMsg(`🎉 *Kết nối thành công!*\n\n🏫 Academy *Trương Dáng Hương* đã kết nối Telegram.\n\nTừ giờ mọi hoạt động sẽ được báo cáo tại đây:\n✅ Đơn hàng mới\n✅ Xác nhận thanh toán\n✅ Cảnh báo kho\n✅ Học viên mới\n\n_Chào mừng team!_ 🍵☕`);
+    }else{notify('Token không hợp lệ: '+(d.description||''),false);}
+  }catch(e){notify('Không kết nối được. Kiểm tra lại Token.',false);}
+}
+
+function clearTg(){
+  S.tg={token:'',chatId:'',connected:false};
+  document.getElementById('tg-token').value='';
+  document.getElementById('tg-chatid').value='';
+  document.getElementById('tg-dot').style.background='var(--red)';
+  document.getElementById('tg-status-text').textContent='Chưa kết nối';
+  document.getElementById('tg-status-text').style.color='var(--muted)';
+  notify('Đã xóa cấu hình Telegram');
+}
+
+function clearLog(){S.tgLog=[];renderLog();}
+
+function sendTgReport(type){
+  let msg='';
+  if(type==='test')
+    msg=`🤖 *Test kết nối thành công!*\n\nAcademy *Trương Dáng Hương* đang hoạt động.\n🕐 ${nowDateTime()}\n\n_Hệ thống hoạt động bình thường_ ✅`;
+  else if(type==='daily'){
+    const paid=S.orders.filter(o=>o.status==='Đã thanh toán');
+    const rev=paid.reduce((a,o)=>a+o.total,0);
+    const pending=S.orders.filter(o=>o.status!=='Đã thanh toán');
+    const active=S.students.filter(s=>s.status==='Đang học').length;
+    msg=`📈 *BÁO CÁO NGÀY ${todayDate()}*\n━━━━━━━━━━━━━━\n💰 Doanh thu: ${fmt(rev)}\n✅ Đơn hoàn thành: ${paid.length}\n⏳ Đơn chờ thanh toán: ${pending.length}\n🎓 Học viên đang học: ${active}\n━━━━━━━━━━━━━━\n🏪 *Tồn kho:*\n${S.inventory.map(i=>`${i.qty<=i.min?'⚠️':i.qty<=i.min*1.5?'🟡':'✅'} ${i.name}: ${i.qty} ${i.unit}`).join('\n')}\n━━━━━━━━━━━━━━\n_Trương Dáng Hương Academy_`;
+  }else if(type==='orders'){
+    const list=S.orders.slice(-8).reverse().map(o=>`${o.status==='Đã thanh toán'?'✅':'⏳'} \`${o.id}\` | ${o.customer} | ${fmt(o.total)}`).join('\n');
+    msg=`📋 *DANH SÁCH ĐƠN HÀNG GẦN NHẤT*\n━━━━━━━━━━━━━━\n${list}\n━━━━━━━━━━━━━━\nTổng: ${S.orders.length} đơn\n_Trương Dáng Hương Academy_`;
+  }else if(type==='inventory'){
+    const list=S.inventory.map(i=>`${i.qty<=i.min?'⚠️':i.qty<=i.min*1.5?'🟡':'✅'} *${i.name}*: ${i.qty} ${i.unit} (min: ${i.min})`).join('\n');
+    msg=`📦 *BÁO CÁO KHO HÀNG*\n━━━━━━━━━━━━━━\n${list}\n━━━━━━━━━━━━━━\nLegend: ✅ Đủ | 🟡 Cảnh báo | ⚠️ Sắp hết\n🕐 ${nowDateTime()}\n_Trương Dáng Hương Academy_`;
+  }else if(type==='students'){
+    const active=S.students.filter(s=>s.status==='Đang học');
+    const online=active.filter(s=>s.type==='Online').length;
+    const offline=active.filter(s=>s.type==='Offline').length;
+    msg=`🎓 *DANH SÁCH HỌC VIÊN ĐANG HỌC* (${active.length} người)\n━━━━━━━━━━━━━━\n${active.map(s=>`• ${s.name} — ${s.type} — ${s.course}`).join('\n')}\n━━━━━━━━━━━━━━\n🌐 Online: ${online} | 🏫 Offline: ${offline}\n_Trương Dáng Hương Academy_`;
+  }else if(type==='revenue'){
+    const paid=S.orders.filter(o=>o.status==='Đã thanh toán');
+    const rev=paid.reduce((a,o)=>a+o.total,0);
+    const fees=S.students.reduce((a,s)=>a+s.fee,0);
+    msg=`💰 *BÁO CÁO DOANH THU*\n━━━━━━━━━━━━━━\n📦 Bán hàng (đã thu): ${fmt(rev)}\n🎓 Học phí (tổng): ${fmt(fees)}\n📊 Tổng đơn: ${S.orders.length} (${paid.length} đã thanh toán)\n━━━━━━━━━━━━━━\n🕐 ${nowDateTime()}\n_Trương Dáng Hương Academy_`;
+  }
+  if(msg)sendTgMsg(msg);
+}
+
+// ===== EXCEL EXPORT =====
+function exportExcel(type){
+  if(typeof XLSX==='undefined'){notify('Thư viện Excel chưa tải xong, thử lại sau!',false);return;}
+  const wb=XLSX.utils.book_new();
+  const now=new Date();
+  const dateStr=`${now.getDate()}-${now.getMonth()+1}-${now.getFullYear()}`;
+
+  if(type==='orders'||type==='full'){
+    const data=[['Mã đơn','Khách hàng','Sản phẩm','Tổng tiền (₫)','Thời gian','Trạng thái'],
+      ...S.orders.map(o=>[o.id,o.customer,o.items,o.total,o.time,o.status])];
+    const ws=XLSX.utils.aoa_to_sheet(data);
+    ws['!cols']=[{wch:10},{wch:20},{wch:35},{wch:15},{wch:18},{wch:18}];
+    XLSX.utils.book_append_sheet(wb,ws,'Đơn hàng');
+  }
+  if(type==='students'||type==='full'){
+    const data=[['ID','Họ tên','Số điện thoại','Loại','Khóa học','Email','Học phí (₫)','Ngày bắt đầu','Trạng thái','Ghi chú'],
+      ...S.students.map(s=>[s.id,s.name,s.phone,s.type,s.course,s.email,s.fee,s.start,s.status,s.note||''])];
+    const ws=XLSX.utils.aoa_to_sheet(data);
+    ws['!cols']=[{wch:6},{wch:22},{wch:14},{wch:10},{wch:18},{wch:25},{wch:15},{wch:14},{wch:14},{wch:20}];
+    XLSX.utils.book_append_sheet(wb,ws,'Học viên');
+  }
+  if(type==='inventory'||type==='full'){
+    const data=[['Nguyên liệu','Đơn vị','Tồn kho','Mức tối thiểu','Giá nhập (₫/đv)','Trạng thái'],
+      ...S.inventory.map(i=>[i.name,i.unit,i.qty,i.min,i.cost,i.qty<=i.min?'Sắp hết':i.qty<=i.min*1.5?'Cảnh báo':'Đủ hàng'])];
+    const ws=XLSX.utils.aoa_to_sheet(data);
+    ws['!cols']=[{wch:14},{wch:8},{wch:10},{wch:14},{wch:16},{wch:12}];
+    XLSX.utils.book_append_sheet(wb,ws,'Tồn kho');
+  }
+  if(type==='stocklog'||type==='full'){
+    const data=[['Thời gian','Nguyên liệu','Loại','Số lượng','Nhà cung cấp / Lý do'],
+      ...S.stockLog.map(l=>[l.time,l.name,l.type,l.qty,l.note])];
+    const ws=XLSX.utils.aoa_to_sheet(data);
+    ws['!cols']=[{wch:18},{wch:14},{wch:8},{wch:14},{wch:30}];
+    XLSX.utils.book_append_sheet(wb,ws,'Lịch sử kho');
+  }
+  if(type==='daily'||type==='full'){
+    const paid=S.orders.filter(o=>o.status==='Đã thanh toán');
+    const rev=paid.reduce((a,o)=>a+o.total,0);
+    const data=[
+      ['BÁO CÁO TỔNG KẾT - TRƯƠNG DÁNG HƯƠNG ACADEMY'],
+      ['Ngày xuất báo cáo',todayDate()],
+      [''],
+      ['CHỈ SỐ','GIÁ TRỊ'],
+      ['Tổng doanh thu (đã thu)',rev],
+      ['Số đơn hàng',S.orders.length],
+      ['Đơn đã thanh toán',paid.length],
+      ['Đơn chờ thanh toán',S.orders.length-paid.length],
+      ['Học viên đang học',S.students.filter(s=>s.status==='Đang học').length],
+      ['Tổng học viên',S.students.length],
+    ];
+    const ws=XLSX.utils.aoa_to_sheet(data);
+    ws['!cols']=[{wch:30},{wch:20}];
+    XLSX.utils.book_append_sheet(wb,ws,'Tổng kết');
+  }
+
+  if(wb.SheetNames.length===0){notify('Không có dữ liệu để xuất!',false);return;}
+  const filename=`TruongDangHuong_${type}_${dateStr}.xlsx`;
+  XLSX.writeFile(wb,filename);
+  notify(`✓ Đã xuất file: ${filename}`);
+  sendTgMsg(`📊 *File Excel đã được xuất!*\n\nLoại báo cáo: ${type==='full'?'Toàn bộ dữ liệu':type==='orders'?'Đơn hàng':type==='students'?'Học viên':type==='inventory'?'Tồn kho':type==='stocklog'?'Lịch sử kho':'Tổng kết'}\nFile: \`${filename}\`\n🕐 ${nowDateTime()}\n\n_Trương Dáng Hương Academy_`);
+}
+
+// ===== INIT =====
+render();
+document.getElementById('qr-modal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+</script>
+</body>
+</html>
