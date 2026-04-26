@@ -1284,10 +1284,10 @@ async function checkReminders(){
 
     // Nhắc chưa thanh toán đợt 1
     if(fee>0&&!s.paid1)
-      msgs.push(`💳 *Chưa thanh toán đợt 1!*\n\n👤 ${s.name}\n📚 ${courseName}\n${s.type==='Offline'?`🗓 Ngày học: ${s.class_date||'—'}\n`:''}\n❌ Đợt 1 (30%): ${fmt(dep)}\n\n_Trương Dáng Hương Academy_`);
+      msgs.push(`💳 *Chưa thanh toán${s.type==='Online'?'':' đợt 1'}!*\n\n👤 ${s.name} (${s.type})\n📚 ${courseName}\n${s.type==='Offline'&&s.class_date?`🗓 Ngày học: ${s.class_date}\n`:''}\n❌ ${s.type==='Online'?fmt(fee)+' (toàn bộ)':'Đợt 1 (30%): '+fmt(dep)}\n\n_Trương Dáng Hương Academy_`);
 
-    // Nhắc chưa thanh toán đợt 2
-    if(fee>0&&s.paid1&&!s.paid2)
+    // Nhắc chưa thanh toán đợt 2 (chỉ Offline)
+    if(s.type==='Offline'&&fee>0&&s.paid1&&!s.paid2)
       msgs.push(`💸 *Nhắc thanh toán đợt 2!*\n\n👤 ${s.name}\n📚 ${courseName}\n✅ Đã thu đợt 1: ${fmt(dep)}\n⏳ Còn lại đợt 2 (70%): ${fmt(rest)}\n\n_Trương Dáng Hương Academy_`);
   });
 
@@ -1897,31 +1897,53 @@ async function saveEditOrder(){
   }catch(e){notify('Lỗi: '+e.message,false);}
 }
 
-// ── THU HỌC PHÍ 2 ĐỢT ──
+// ── THU HỌC PHÍ ──
 function collectFee(id){
   const s=D.students.find(x=>x.id===id);if(!s)return;
-  const fee=s.fee||0;const dep=Math.round(fee*0.3);const rest=fee-dep;
+  const fee=s.fee||0;
+  const isOnline=s.type==='Online';
+  const dep=isOnline?fee:Math.round(fee*0.3);
+  const rest=isOnline?0:fee-dep;
+
   document.getElementById('cf-student-id').value=id;
   document.getElementById('cf-student-name').textContent=s.name;
   const course=D.courses.find(c=>c.id===s.course_id);
-  document.getElementById('cf-student-info').textContent=(course?course.name:(s.course||''))+(s.class_date?` · Ngày học: ${s.class_date}`:'');
-  document.getElementById('cf-amount1').textContent=fmt(dep);
-  document.getElementById('cf-amount2').textContent=fmt(rest);
-  // Đợt 1
-  document.getElementById('cf-paid1-badge').style.display=s.paid1?'inline-block':'none';
-  document.getElementById('cf-btn1').style.display=s.paid1?'none':'flex';
-  document.getElementById('cf-qr1').style.display='none';
-  // Đợt 2
-  document.getElementById('cf-paid2-badge').style.display=s.paid2?'inline-block':'none';
-  document.getElementById('cf-btn2').style.display=s.paid2?'none':'flex';
-  document.getElementById('cf-qr2').style.display='none';
+  document.getElementById('cf-student-info').textContent=(course?course.name:(s.course||''))+(s.class_date?` · Ngày học: ${s.class_date}`:'')+' · '+s.type;
+
+  if(isOnline){
+    // Online: chỉ 1 đợt, toàn bộ học phí
+    document.getElementById('cf-box1').querySelector('[data-dot-label]')||
+      document.getElementById('cf-box1').querySelector('div').firstChild;
+    document.getElementById('cf-box1').querySelector('div > div').textContent='💻 Thanh toán toàn bộ (Online)';
+    document.getElementById('cf-amount1').textContent=fmt(fee);
+    document.getElementById('cf-paid1-badge').style.display=s.paid1?'inline-block':'none';
+    document.getElementById('cf-btn1').style.display=s.paid1?'none':'flex';
+    document.getElementById('cf-qr1').style.display='none';
+    // Ẩn đợt 2
+    document.getElementById('cf-box2').style.display='none';
+  } else {
+    // Offline: 2 đợt
+    document.getElementById('cf-box1').querySelector('div > div').textContent='Đợt 1 — 30% học phí';
+    document.getElementById('cf-amount1').textContent=fmt(dep);
+    document.getElementById('cf-paid1-badge').style.display=s.paid1?'inline-block':'none';
+    document.getElementById('cf-btn1').style.display=s.paid1?'none':'flex';
+    document.getElementById('cf-qr1').style.display='none';
+    document.getElementById('cf-box2').style.display='block';
+    document.getElementById('cf-amount2').textContent=fmt(rest);
+    document.getElementById('cf-paid2-badge').style.display=s.paid2?'inline-block':'none';
+    document.getElementById('cf-btn2').style.display=s.paid2?'none':'flex';
+    document.getElementById('cf-qr2').style.display='none';
+  }
   showM('modal-collect-fee');
 }
 
 function genFeeQR(dotNum){
   const id=document.getElementById('cf-student-id').value;
   const s=D.students.find(x=>x.id===id);if(!s)return;
-  const fee=s.fee||0;const dep=Math.round(fee*0.3);const rest=fee-dep;
+  const isOnline=s.type==='Online';
+  const fee=s.fee||0;
+  const dep=isOnline?fee:Math.round(fee*0.3);
+  const rest=isOnline?0:fee-dep;
   const amount=dotNum===1?dep:rest;
   if(!amount){notify('Học phí bằng 0!',false);return;}
   const bankId=cfg.bankId||'VCB';const accNo=cfg.bankAcc||'';
@@ -1936,7 +1958,10 @@ function genFeeQR(dotNum){
 async function markFeePaid(dotNum){
   const id=document.getElementById('cf-student-id').value;
   const s=D.students.find(x=>x.id===id);if(!s)return;
-  const fee=s.fee||0;const dep=Math.round(fee*0.3);const rest=fee-dep;
+  const isOnline=s.type==='Online';
+  const fee=s.fee||0;
+  const dep=isOnline?fee:Math.round(fee*0.3);
+  const rest=isOnline?0:fee-dep;
   const amount=dotNum===1?dep:rest;
   const ts=nowDT();
   const upd=dotNum===1?{paid1:true,paid1_at:ts}:{paid2:true,paid2_at:ts};
@@ -1946,13 +1971,16 @@ async function markFeePaid(dotNum){
     document.getElementById(`cf-paid${dotNum}-badge`).style.display='inline-block';
     document.getElementById(`cf-btn${dotNum}`).style.display='none';
     document.getElementById(`cf-qr${dotNum}`).style.display='none';
-    notify(`✓ Đã thu đợt ${dotNum}: ${fmt(amount)}`);
+    notify(`✓ Đã thu ${isOnline?'toàn bộ':'đợt '+dotNum}: ${fmt(amount)}`);
     // Ghi vào đơn hàng
+    const label=isOnline?'Học phí (Online)':`Học phí đợt ${dotNum}`;
     const order={id:'HP'+Date.now(),customer:s.name,email:s.email||'',
-      items:`Học phí đợt ${dotNum} — ${s.course||''}`,total:amount,
-      time:ts,note:`Đợt ${dotNum}/${2}`,status:'Đã thanh toán',created_at:Date.now()};
+      items:`${label} — ${s.course||''}`,total:amount,
+      time:ts,note:isOnline?'Online — 1 lần':`Đợt ${dotNum}/2`,
+      status:'Đã thanh toán',created_at:Date.now()};
     await sbUpsert('orders',order);D.orders.push(order);renderOrders();renderDash();
-    tgMsg(`💰 *Thu học phí đợt ${dotNum}!*\n\n👤 ${s.name}\n📚 ${s.course||'—'}\n💵 ${fmt(amount)} (${dotNum===1?'30%':'70%'})\n✅ Đã thu ${dotNum===1?'đợt 1':'cả 2 đợt'}\n🕐 ${ts}\n\n_Trương Dáng Hương Academy_`);
+    const dotLabel=isOnline?'toàn bộ học phí':`đợt ${dotNum} (${dotNum===1?'30%':'70%'})`;
+    tgMsg(`💰 *Thu học phí!*\n\n👤 ${s.name} (${s.type})\n📚 ${s.course||'—'}\n💵 ${fmt(amount)} — ${dotLabel}\n🕐 ${ts}\n\n_Trương Dáng Hương Academy_`);
     gsSend({sheet:'HocVien',rows:gsStudents(),time:ts});
     renderStudents();
   }catch(e){notify('Lỗi: '+e.message,false);}
@@ -2320,7 +2348,8 @@ async function gsSend(data){
   const url=cfg.gsUrl;
   if(!url)return;
   try{
-    await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
+    // Dùng no-cors vì Apps Script không trả CORS header
+    await fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)});
   }catch(e){console.warn('GSheet lỗi:',e.message);}
 }
 
