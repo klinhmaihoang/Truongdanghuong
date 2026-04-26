@@ -252,7 +252,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <span style="font-size:18px">💳</span>
       <span style="font-size:13px;font-weight:700;color:#7d4f00">Có <span id="dash-unpaid-count">0</span> học viên chưa thanh toán</span>
     </div>
-    <button class="btn btn-sm" style="background:#e67e22;font-size:12px;padding:5px 12px" onclick="go('students',null);stTab(document.querySelector('.tab'),\'all\')">Xem ngay →</button>
+    <button class="btn btn-sm" style="background:#e67e22;font-size:12px;padding:5px 12px" onclick="go('students',document.querySelector('.nav button'));stTab(document.querySelector('#page-students .tab'),'all')">Xem ngay →</button>
   </div>
   <!-- 2 cột: học viên gần đây + đơn bán lẻ gần đây -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
@@ -2795,7 +2795,7 @@ async function checkout(){
   const total=cart.reduce((a,c)=>a+c.price*c.qty,0);
   const id='HĐ'+String(D.orders.length+1).padStart(3,'0');
   const items=cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')).join(', ');
-  invoice={id,name,phone:document.getElementById('c-phone')?.value?.trim()||'',email:document.getElementById('c-email').value.trim(),
+  invoice={id,name,phone:document.getElementById('c-phone')?.value?.trim()||'',email:document.getElementById('c-email')?.value?.trim()||'',
     note:document.getElementById('c-note').value.trim(),total,items,time:nowDT()};
   const bankId=cfg.bankId||'VCB';
   const accNo=cfg.bankAcc||'9704220000000000';
@@ -2814,7 +2814,7 @@ async function checkout(){
     ${invoice.note?`<div><span>Ghi chú</span><span>${invoice.note}</span></div>`:''}`;
   showM('modal-qr');
   // Lưu đơn "Chờ thanh toán" vào Supabase ngay để hiện trong tab Đơn hàng
-  const pendingOrder={id,customer:name,email:document.getElementById('c-email').value.trim(),
+  const pendingOrder={id,customer:name,email:document.getElementById('c-email')?.value?.trim()||'',
     items,total,time:nowDT(),note:document.getElementById('c-note').value.trim()||'',
     status:'Chờ thanh toán',created_at:Date.now()};
   try{
@@ -2861,7 +2861,7 @@ async function markPaid(){
   }
   const lowItems=D.inventory.filter(i=>i.qty<=i.min);
   cart=[];
-  ['c-name','c-email','c-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['c-name','c-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   closeM('modal-qr');renderCart();render();
   notify('✓ Thanh toán xong! Kho đã cập nhật');
   if(document.getElementById('at-paid').checked)
@@ -3044,7 +3044,7 @@ async function saveDraft(){
   const total=cart.reduce((a,c)=>a+c.price*c.qty,0);
   const id='HĐ'+String(D.orders.length+1).padStart(3,'0');
   const items=cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')).join(', ');
-  const order={id,customer:name,email:document.getElementById('c-email').value.trim(),
+  const order={id,customer:name,email:document.getElementById('c-email')?.value?.trim()||'',
     items,total,time:nowDT(),note,status:'Chờ thanh toán',created_at:Date.now()};
   try{
     await sbUpsert('orders',order);
