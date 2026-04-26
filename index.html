@@ -751,53 +751,112 @@ function doPost(e) {
   }
 }
 
-// Chạy tự động 8h sáng mỗi ngày — set Trigger cho hàm này
-function sendDailyReminders() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sh = ss.getSheetByName('HocVien');
-  if (!sh || sh.getLastRow() &lt; 2) return;
-  const data  = sh.getDataRange().getValues();
-  const heads = data[0]; // headers row
-  const idx   = h => heads.indexOf(h);
-  const today = new Date(); today.setHours(0,0,0,0);
-  const msgs  = [];
+// ═══════════════════════════════════════════════════
+// BÁO CÁO TỰ ĐỘNG 8H SÁNG
+// Set Trigger: Apps Script → Triggers → sendDailyReport8am → Time-driven → Day timer → 8-9am
+// ═══════════════════════════════════════════════════
+function sendDailyReport8am() {
+  const ss      = SpreadsheetApp.getActiveSpreadsheet();
+  const shSt    = ss.getSheetByName('HocVien');
+  const shOrd   = ss.getSheetByName('DonHang');
+  const shStock = ss.getSheetByName('TonKho');
+  const today   = new Date(); today.setHours(0, 0, 0, 0);
+  const fmtMoney = n =&gt; (+n||0).toLocaleString('vi-VN') + 'đ';
+  const todayStr = Utilities.formatDate(today, 'Asia/Ho_Chi_Minh', 'dd/MM/yyyy');
 
-  data.slice(1).forEach(row => {
-    const name       = row[idx('Họ tên')]      || '';
-    const fee        = +row[idx('Học phí')]    || 0;
-    const status     = row[idx('Trạng thái')] || '';
-    const course     = row[idx('Khóa học')]   || '';
-    const class_date = row[idx('Ngày học')]   || '';
-    const paid1      = row[idx('Đợt 1')]      || '';
-    const paid2      = row[idx('Đợt 2')]      || '';
-    if (status !== 'Đang học') return;
-    const dep  = Math.round(fee * 0.3);
-    const rest = fee - dep;
-
-    // Nhắc ngày học sắp tới
-    if (class_date) {
-      const cd   = new Date(class_date); cd.setHours(0,0,0,0);
-      const diff = Math.round((cd - today) / 86400000);
-      if (diff === 7) msgs.push(`📅 Còn 7 ngày tới ngày học!\n👤 ${name}\n📚 ${course}\n🗓 ${class_date}\n${paid1!=='Đã thu'?'❌ Chưa cọc đợt 1: '+dep.toLocaleString()+'đ':'✅ Đã cọc đợt 1'}`);
-      if (diff === 3) msgs.push(`⏰ Còn 3 ngày tới ngày học!\n👤 ${name}\n🗓 ${class_date}\n${paid1!=='Đã thu'?'❌ Chưa cọc: '+dep.toLocaleString()+'đ':'✅ Đã cọc'}`);
-      if (diff === 1) msgs.push(`🔔 NGÀY MAI LÀ NGÀY HỌC!\n👤 ${name}\n📚 ${course}`);
-      if (diff === 0) msgs.push(`🎉 HÔM NAY LÀ NGÀY HỌC!\n👤 ${name}\n📚 ${course}`);
-    }
-    // Nhắc chưa thanh toán đợt 1
-    if (fee &gt; 0 &amp;&amp; paid1 !== 'Đã thu')
-      msgs.push(`💳 Chưa thanh toán đợt 1!\n👤 ${name}\n📚 ${course}\n❌ Đợt 1 (30%): ${dep.toLocaleString()}đ`);
-    // Nhắc đợt 2
-    if (fee &gt; 0 &amp;&amp; paid1 === 'Đã thu' &amp;&amp; paid2 !== 'Đã thu')
-      msgs.push(`💸 Nhắc thanh toán đợt 2!\n👤 ${name}\n📚 ${course}\n✅ Đã thu đợt 1\n⏳ Đợt 2 (70%): ${rest.toLocaleString()}đ`);
-  });
-
-  msgs.forEach(m => {
-    UrlFetchApp.fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
-      method: 'post',
-      payload: { chat_id: CHAT_ID, text: m }
+  // ── Học viên ──
+  let activeCount = 0, unpaid1 = [], unpaid2 = [], endingSoon = [];
+  if (shSt &amp;&amp; shSt.getLastRow() &gt; 1) {
+    const rows  = shSt.getDataRange().getValues();
+    const heads = rows[0];
+    const col   = h =&gt; heads.indexOf(h);
+    rows.slice(1).forEach(r =&gt; {
+      const name    = r[col('Họ tên')]      || '';
+      const status  = r[col('Trạng thái')] || '';
+      const course  = r[col('Khóa học')]   || '';
+      const fee     = +r[col('Học phí')]   || 0;
+      const type    = r[col('Loại')]       || '';
+      const paid1   = r[col('Đợt 1')]      || '';
+      const paid2   = r[col('Đợt 2')]      || '';
+      const endDate = r[col('Ngày KT')]    || '';
+      if (status === 'Đang học') activeCount++;
+      if (fee &gt; 0 &amp;&amp; paid1 !== 'Đã thu')
+        unpaid1.push(name + ' — ' + fmtMoney(Math.round(fee * 0.3)));
+      if (fee &gt; 0 &amp;&amp; paid1 === 'Đã thu' &amp;&amp; paid2 !== 'Đã thu' &amp;&amp; type === 'Offline') {
+        const rest = fee - Math.round(fee * 0.3);
+        let suffix = '';
+        if (endDate) {
+          const ed = new Date(endDate); ed.setHours(0,0,0,0);
+          const d  = Math.round((ed - today) / 86400000);
+          suffix   = d === 0 ? ' ⚠️ KT HÔM NAY' : ' (còn ' + d + ' ngày)';
+          if (d &gt;= 0 &amp;&amp; d &lt;= 3) endingSoon.push(name + ' — ' + (d===0?'HÔM NAY':'còn '+d+' ngày') + (paid2==='Đã thu'?' ✅':' ❌ chưa thu đợt 2'));
+        }
+        unpaid2.push(name + ' — ' + fmtMoney(rest) + suffix);
+      }
     });
+  }
+
+  // ── Đơn hàng hôm nay ──
+  let todayRev = 0, todayCount = 0;
+  if (shOrd &amp;&amp; shOrd.getLastRow() &gt; 1) {
+    shOrd.getDataRange().getValues().slice(1).forEach(r =&gt; {
+      if ((r[5]||'').toString().includes(todayStr) &amp;&amp; r[4]==='Đã thanh toán' &amp;&amp; !(r[0]||'').toString().startsWith('HP')) {
+        todayRev += +r[3]||0; todayCount++;
+      }
+    });
+  }
+
+  // ── Kho sắp hết ──
+  let lowStock = [];
+  if (shStock &amp;&amp; shStock.getLastRow() &gt; 1) {
+    const sRows  = shStock.getDataRange().getValues();
+    const sHeads = sRows[0];
+    const sc     = h =&gt; sHeads.indexOf(h);
+    sRows.slice(1).forEach(r =&gt; {
+      const qty = +r[sc('Tồn kho')]||0, min = +r[sc('Tối thiểu')]||0;
+      if (qty &lt;= min) lowStock.push(r[sc('Tên nguyên liệu')] + ': còn ' + qty + ' ' + (r[sc('Đơn vị')]||''));
+    });
+  }
+
+  // ── Build message ──
+  const d = Utilities.formatDate(today, 'Asia/Ho_Chi_Minh', 'dd/MM/yyyy');
+  let msg = '🌅 *BÁO CÁO SÁNG — ' + d + '*
+━━━━━━━━━━━━━━━━
+
+';
+  msg += '🎓 *HỌC VIÊN ĐANG HỌC: ' + activeCount + ' người*
+';
+  if (unpaid1.length) { msg += '
+💳 *CHƯA THU ĐỢT 1 (' + unpaid1.length + ')*
+'; unpaid1.forEach(s =&gt; msg += '• ' + s + '
+'); }
+  if (unpaid2.length) { msg += '
+💸 *CHƯA THU ĐỢT 2 (' + unpaid2.length + ')*
+'; unpaid2.forEach(s =&gt; msg += '• ' + s + '
+'); }
+  if (endingSoon.length) { msg += '
+🏁 *KẾT THÚC KHÓA SẮP TỚI*
+'; endingSoon.forEach(s =&gt; msg += '• ' + s + '
+'); }
+  if (todayRev &gt; 0) { msg += '
+🛍️ *HÔM NAY*
+• ' + todayCount + ' đơn — ' + fmtMoney(todayRev) + '
+'; }
+  if (lowStock.length) { msg += '
+⚠️ *KHO SẮP HẾT*
+'; lowStock.forEach(s =&gt; msg += '• ' + s + '
+'); }
+  msg += '
+━━━━━━━━━━━━━━━━
+_Trương Dáng Hương Academy_';
+
+  UrlFetchApp.fetch('https://api.telegram.org/bot' + TG_TOKEN + '/sendMessage', {
+    method: 'post', payload: { chat_id: CHAT_ID, text: msg, parse_mode: 'Markdown' }
   });
-}</div>
+}
+
+// Giữ hàm cũ để tương thích trigger cũ
+function sendDailyReminders() { sendDailyReport8am(); }</div>
     <div class="guide"><strong style="color:var(--brand)">B1</strong> — Mở Google Apps Script → thay TOÀN BỘ code bằng đoạn trên → điền <code>YOUR_BOT_TOKEN</code> và <code>YOUR_CHAT_ID</code></div>
     <div class="guide"><strong style="color:var(--brand)">B2</strong> — Deploy → <strong>Manage deployments</strong> → chọn deployment cũ → ✏️ Edit → New version → Deploy lại</div>
     <div class="guide"><strong style="color:var(--brand)">B3</strong> — Triggers → Add trigger → hàm <code>sendDailyReminders</code> → Time-driven → Day timer → <strong>8:00–9:00 AM</strong></div>
@@ -873,7 +932,11 @@ function sendDailyReminders() {
     </div>
     <div class="form-row">
       <div class="fg"><label>Ngày bắt đầu</label><input id="es-start" type="date"/></div>
-      <div class="fg"><label>Ngày học (Offline)</label><input id="es-class-date" type="date"/></div>
+      <div class="fg"><label>📅 Ngày học (Offline)</label><input id="es-class-date" type="date"/></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>🏁 Ngày kết thúc học</label><input id="es-end-date" type="date"/></div>
+      <div class="fg"></div>
     </div>
     <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="es-note" placeholder="Ghi chú thêm..."/></div>
     <div class="btn-group" style="margin-top:8px">
@@ -902,6 +965,10 @@ function sendDailyReminders() {
     <div class="form-row">
       <div class="fg"><label>Ngày bắt đầu</label><input id="fs-start" type="date"/></div>
       <div class="fg" id="fg-class-date"><label>📅 Ngày học (Offline)</label><input id="fs-class-date" type="date"/></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>🏁 Ngày kết thúc học</label><input id="fs-end-date" type="date"/></div>
+      <div class="fg"></div>
     </div>
     <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="fs-note" placeholder="Ghi chú..."/></div>
     <div class="btn-group" style="margin-top:8px">
@@ -1620,40 +1687,61 @@ async function checkReminders(){
 async function autoUpdateStudentStatus(){
   const today=new Date(); today.setHours(0,0,0,0);
   const updates=[];
+  const unpaidReminders=[];
 
   for(const s of D.students){
-    if(s.deleted_at) continue; // bỏ qua đã xóa
-    if(!s.class_date) continue; // chỉ xử lý học viên có ngày học
+    if(s.deleted_at) continue;
+    if(!s.class_date) continue;
 
     const cd=new Date(s.class_date); cd.setHours(0,0,0,0);
-    const diff=Math.round((cd-today)/86400000); // số ngày còn lại
+    const diff=Math.round((cd-today)/86400000);
 
+    // Cập nhật trạng thái theo ngày học
     let newStatus=s.status;
-    if(diff>0){
-      // Ngày học trong tương lai → Chưa học
-      newStatus='Chưa học';
-    } else if(diff===0){
-      // Hôm nay là ngày học → Đang học
-      newStatus='Đang học';
-    } else {
-      // Ngày học đã qua → Học xong
-      newStatus='Học xong';
+    if(diff>0) newStatus='Chưa học';
+    else if(diff===0) newStatus='Đang học';
+    else newStatus='Học xong';
+
+    if(newStatus!==s.status){
+      updates.push({id:s.id,oldStatus:s.status,newStatus,name:s.name});
+      s.status=newStatus;
+      sbPatch('students',{status:newStatus},`?id=eq.${s.id}`).catch(()=>{});
     }
 
-    // Chỉ update nếu trạng thái thay đổi
-    if(newStatus!==s.status){
-      updates.push({id:s.id, oldStatus:s.status, newStatus, name:s.name});
-      s.status=newStatus;
-      // Patch lên Supabase (không await để không block UI)
-      sbPatch('students',{status:newStatus},`?id=eq.${s.id}`).catch(()=>{});
+    // Kiểm tra nhắc đóng tiền đợt 2: trong khoảng class_date → end_date mà chưa đóng
+    if(s.end_date && s.paid1 && !s.paid2 && s.type==='Offline'){
+      const ed=new Date(s.end_date); ed.setHours(0,0,0,0);
+      const daysToEnd=Math.round((ed-today)/86400000);
+      // Đang trong khoảng học (đã qua ngày học, chưa qua ngày kết thúc)
+      const inRange=diff<=0 && daysToEnd>=0;
+      if(inRange){
+        const fee=s.fee||0;
+        const rest=fee-Math.round(fee*0.3);
+        unpaidReminders.push({s,rest,daysToEnd});
+      }
     }
   }
 
-  // Nếu có thay đổi thì notify và sync GG Sheet
   if(updates.length>0){
-    const changed=updates.map(u=>u.name+': '+u.oldStatus+' → '+u.newStatus).join(', ');
-    console.log('[AutoStatus] Cap nhat: '+changed);
+    console.log('[AutoStatus] Updated: '+updates.map(u=>u.name+': '+u.newStatus).join(', '));
     gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
+  }
+
+  // Gửi nhắc đợt 2 (chỉ 1 lần/ngày — check localStorage)
+  if(unpaidReminders.length>0){
+    const lastRemindKey='tdh_remind2_'+todayStr();
+    if(!localStorage.getItem(lastRemindKey)){
+      localStorage.setItem(lastRemindKey,'1');
+      let msg='💸 *NHẮC ĐÓNG TIỀN ĐỢT 2!*\n\n';
+      unpaidReminders.forEach(({s,rest,daysToEnd})=>{
+        msg+='👤 '+s.name+'\n';
+        msg+='📚 '+( s.course||'')+'\n';
+        msg+='💰 Còn lại (70%): '+fmt(rest)+'\n';
+        msg+='🏁 Kết thúc học: '+s.end_date+(daysToEnd===0?' — HÔM NAY!':' — còn '+daysToEnd+' ngày')+'\n\n';
+      });
+      msg+='➡️ Liên hệ thu tiền trước khi kết thúc khóa!\n_Trương Dáng Hương Academy_';
+      tgMsg(msg);
+    }
   }
 }
 
@@ -2192,6 +2280,7 @@ function openStDetail(id){
     <div class="detail-row"><span class="detail-label">Loại hình</span><span>${s.type}</span></div>
     <div class="detail-row"><span class="detail-label">Ngày bắt đầu</span><span>${s.start||'—'}</span></div>
     ${s.class_date?`<div class="detail-row"><span class="detail-label">📅 Ngày học</span><span style="font-weight:700;color:var(--brand)">${s.class_date}</span></div>`:''}
+    ${s.end_date?`<div class="detail-row"><span class="detail-label">🏁 Kết thúc học</span><span style="color:var(--muted)">${s.end_date}</span></div>`:''}
     <div class="detail-row"><span class="detail-label">Học phí</span><span style="color:var(--brand);font-weight:700">${fee===0?'Miễn phí':fmt(fee)}</span></div>
     ${fee>0?`<div class="detail-row"><span class="detail-label">Đợt 1 (30%)</span><span>${s.paid1?`<span class="tag t-paid">✓ Đã thu ${fmt(dep)}</span> <small style="color:var(--muted)">${s.paid1_at||''}</small>`:`<span class="tag t-low">Chưa thu — ${fmt(dep)}</span>`}</span></div>`:''}
     ${fee>0?`<div class="detail-row"><span class="detail-label">Đợt 2 (70%)</span><span>${s.paid2?`<span class="tag t-paid">✓ Đã thu ${fmt(rest)}</span> <small style="color:var(--muted)">${s.paid2_at||''}</small>`:`<span class="tag t-pending">Chưa thu — ${fmt(rest)}</span>`}</span></div>`:''}
@@ -2309,6 +2398,7 @@ function openEditStudent(){
     else document.getElementById('es-start').value=s.start;
   }
   if(s.class_date) document.getElementById('es-class-date').value=s.class_date;
+  if(s.end_date) document.getElementById('es-end-date').value=s.end_date;
 
   // Fill courses select
   const courseEl=document.getElementById('es-course-id');
@@ -2347,6 +2437,7 @@ async function saveEditStudent(){
     fee:+document.getElementById('es-fee').value||s.fee||0,
     start:startFmt,
     class_date:document.getElementById('es-class-date').value||null,
+    end_date:document.getElementById('es-end-date').value||null,
     note:document.getElementById('es-note').value,
   };
 
@@ -2399,6 +2490,7 @@ async function addStudent(){
     email:document.getElementById('fs-email').value,fee:feeVal,
     start:document.getElementById('fs-start').value||todayStr(),
     class_date:type==='Offline'?(document.getElementById('fs-class-date').value||null):null,
+    end_date:document.getElementById('fs-end-date').value||null,
     note:document.getElementById('fs-note').value,
     paid1:false,paid1_at:null,paid2:false,paid2_at:null,
     status:'Đang học',created_at:Date.now()};
@@ -2406,7 +2498,7 @@ async function addStudent(){
     await sbUpsert('students',s);
     D.students.push(s);
     closeM('modal-add-student');
-    ['fs-name','fs-phone','fs-email','fs-fee','fs-start','fs-class-date','fs-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    ['fs-name','fs-phone','fs-email','fs-fee','fs-start','fs-class-date','fs-end-date','fs-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     renderStudents();renderDash();notify('Đã thêm: '+n);
     if(document.getElementById('at-student').checked)
       tgMsg(`🎓 *Học viên mới!*\n\n👤 ${n}\n📱 ${type}\n📚 ${course?course.name:'—'}\n💰 ${feeVal===0?'Miễn phí':fmt(feeVal)}\n${s.class_date?`🗓 Ngày học: ${s.class_date}\n`:''}\n_Trương Dáng Hương Academy_`);
@@ -2532,7 +2624,10 @@ function renderCart(){
     <div class="cart-name">${c.name}</div>
     <div style="display:flex;align-items:center;gap:5px">
       <button class="qb" onclick="chgQty(${i},-1)">−</button>
-      <span style="font-size:12px;min-width:16px;text-align:center">${c.qty}</span>
+      <input type="number" min="1" value="${c.qty}"
+        style="width:44px;text-align:center;font-size:13px;font-weight:700;padding:3px 4px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;background:var(--bg2)"
+        onchange="setQty(${i},this.value)"
+        onclick="this.select()"/>
       <button class="qb" onclick="chgQty(${i},1)">+</button>
     </div>
     <div class="cart-sub">${fmt(c.price*c.qty)}</div>
@@ -2540,6 +2635,7 @@ function renderCart(){
   document.getElementById('cart-total').textContent=fmt(cart.reduce((a,c)=>a+c.price*c.qty,0));
 }
 function chgQty(i,d){cart[i].qty+=d;if(cart[i].qty<=0)cart.splice(i,1);renderCart();}
+function setQty(i,v){const n=parseInt(v)||1;if(n<=0){cart.splice(i,1);}else{cart[i].qty=n;}renderCart();}
 
 // ── CHECKOUT + VIETQR ──
 async function checkout(){
