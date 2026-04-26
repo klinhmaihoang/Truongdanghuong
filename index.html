@@ -219,19 +219,30 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
     <button class="btn btn-sm" style="background:#e67e22;font-size:12px;padding:5px 12px" onclick="go('students',null);stTab(document.querySelector('.tab'),\'all\')">Xem ngay →</button>
   </div>
-  <div class="card">
-    <div class="card-head">
-      <span class="card-title">Đơn hàng gần đây</span>
-      <div class="btn-group">
-        <button class="btn btn-tg btn-sm" onclick="tgReport('daily')">📈 Telegram</button>
-        <button class="btn btn-excel btn-sm" onclick="xlExport('full')">📊 Excel</button>
+  <!-- 2 cột: học viên gần đây + đơn bán lẻ gần đây -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+    <div class="card" style="margin-bottom:0">
+      <div class="card-head">
+        <span class="card-title">🎓 Học viên gần đây</span>
+        <button class="btn btn-ghost btn-sm" onclick="go('students',document.querySelectorAll('.nav button')[1])">Xem tất cả →</button>
       </div>
+      <table><thead><tr><th>Họ tên</th><th>Khóa</th><th>Trạng thái</th></tr></thead>
+      <tbody id="dash-students"></tbody></table>
     </div>
-    <table><thead><tr><th>Khách</th><th>Sản phẩm</th><th>Tiền</th><th>Trạng thái</th></tr></thead>
-    <tbody id="dash-orders"></tbody></table>
+    <div class="card" style="margin-bottom:0">
+      <div class="card-head">
+        <span class="card-title">🛍️ Đơn bán lẻ gần đây</span>
+        <button class="btn btn-ghost btn-sm" onclick="go('orders',document.querySelectorAll('.nav button')[5])">Xem tất cả →</button>
+      </div>
+      <table><thead><tr><th>Khách</th><th>Sản phẩm</th><th>Tiền</th><th>TT</th></tr></thead>
+      <tbody id="dash-orders"></tbody></table>
+    </div>
   </div>
   <div class="card">
-    <div class="card-head"><span class="card-title">Cảnh báo tồn kho</span></div>
+    <div class="card-head">
+      <span class="card-title">⚠️ Cảnh báo tồn kho</span>
+      <button class="btn btn-ghost btn-sm" onclick="go('inventory',document.querySelectorAll('.nav button')[4])">Xem kho →</button>
+    </div>
     <table><thead><tr><th>Nguyên liệu</th><th>Tồn kho</th><th>Tối thiểu</th><th>Trạng thái</th></tr></thead>
     <tbody id="dash-stock"></tbody></table>
   </div>
@@ -373,16 +384,60 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 
 <!-- ĐƠN HÀNG -->
 <div class="page" id="page-orders">
+  <div class="tabs">
+    <div class="tab active" onclick="ordTab(this,'retail')">🛍️ Bán lẻ</div>
+    <div class="tab" onclick="ordTab(this,'tuition')">🎓 Học phí</div>
+    <div class="tab" onclick="ordTab(this,'all')">Tất cả</div>
+  </div>
+
+  <!-- Stats dòng trên -->
+  <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+    <div class="stat" style="--accent:var(--teal)">
+      <div class="stat-num" id="ord-retail-rev">0</div>
+      <div class="stat-label">Doanh thu bán lẻ (₫)</div>
+    </div>
+    <div class="stat" style="--accent:var(--rose)">
+      <div class="stat-num" id="ord-tuition-rev">0</div>
+      <div class="stat-label">Học phí đã thu (₫)</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="ord-pending-count">0</div>
+      <div class="stat-label">Đơn chờ thanh toán</div>
+    </div>
+  </div>
+
   <div class="btn-group" style="margin-bottom:14px">
     <button class="btn btn-tg btn-sm" onclick="tgReport('orders')">📋 Telegram</button>
     <button class="btn btn-tg btn-sm" onclick="tgReport('daily')">📈 Tổng kết TG</button>
-    <button class="btn btn-excel btn-sm" onclick="xlExport('orders')">📊 Excel</button>
+    <button class="btn btn-excel btn-sm" id="ord-excel-btn" onclick="xlExport('orders')">📊 Excel bán lẻ</button>
     <button class="btn btn-excel btn-sm" onclick="xlExport('full')">📁 Xuất toàn bộ</button>
   </div>
-  <div class="card">
-    <div class="card-head"><span class="card-title">Lịch sử đơn hàng</span></div>
-    <table><thead><tr><th>Mã đơn</th><th>Khách</th><th>Sản phẩm</th><th>Tổng tiền</th><th>Thời gian</th><th>Trạng thái</th><th></th></tr></thead>
-    <tbody id="all-orders"></tbody></table>
+
+  <!-- Bán lẻ -->
+  <div id="panel-retail-orders">
+    <div class="card">
+      <div class="card-head"><span class="card-title">🛍️ Đơn hàng bán lẻ</span></div>
+      <table><thead><tr><th>Mã đơn</th><th>Khách</th><th>Sản phẩm</th><th>Tổng tiền</th><th>Thời gian</th><th>Trạng thái</th><th></th></tr></thead>
+      <tbody id="retail-orders"></tbody></table>
+    </div>
+  </div>
+
+  <!-- Học phí -->
+  <div id="panel-tuition-orders" style="display:none">
+    <div class="card">
+      <div class="card-head"><span class="card-title">🎓 Thu học phí</span></div>
+      <table><thead><tr><th>Mã đơn</th><th>Học viên</th><th>Khóa học</th><th>Số tiền</th><th>Thời gian</th><th>Trạng thái</th></tr></thead>
+      <tbody id="tuition-orders"></tbody></table>
+    </div>
+  </div>
+
+  <!-- Tất cả -->
+  <div id="panel-all-orders" style="display:none">
+    <div class="card">
+      <div class="card-head"><span class="card-title">Tất cả đơn hàng</span></div>
+      <table><thead><tr><th>Mã đơn</th><th>Khách</th><th>Sản phẩm</th><th>Tổng tiền</th><th>Thời gian</th><th>Trạng thái</th><th></th></tr></thead>
+      <tbody id="all-orders"></tbody></table>
+    </div>
   </div>
 </div>
 
@@ -1857,20 +1912,59 @@ function renderRpStudents(){
 }
 
 function renderDash(){
-  document.getElementById('s0').textContent=D.students.filter(s=>s.status==='Đang học').length;
-  const rev=D.orders.filter(o=>o.status==='Đã thanh toán').reduce((a,o)=>a+(o.total||0),0);
-  document.getElementById('s1').textContent=(rev/1000000).toFixed(1)+'M';
-  document.getElementById('s2').textContent=D.orders.length;
+  const activeStudents=D.students.filter(s=>s.status==='Đang học'&&!s.deleted_at);
+  const retailOrders=D.orders.filter(o=>!o.id.startsWith('HP'));
+  const tuitionOrders=D.orders.filter(o=>o.id.startsWith('HP'));
+  const retailRev=retailOrders.filter(o=>o.status==='Đã thanh toán').reduce((a,o)=>a+(o.total||0),0);
+  const tuitionRev=tuitionOrders.filter(o=>o.status==='Đã thanh toán').reduce((a,o)=>a+(o.total||0),0);
+
+  document.getElementById('s0').textContent=activeStudents.length;
+  document.getElementById('s1').textContent=((retailRev+tuitionRev)/1000000).toFixed(1)+'M';
+  document.getElementById('s2').textContent=retailOrders.length;
   document.getElementById('s3').textContent=D.inventory.filter(i=>i.qty<=i.min).length;
-  // Badge học viên chưa thu tiền
-  const unpaid=D.students.filter(s=>s.status==='Đang học'&&(s.fee||0)>0&&!s.paid1);
+
+  // Badge chưa thanh toán
+  const unpaid=D.students.filter(s=>s.status!=='Đã xóa'&&(s.fee||0)>0&&!s.paid1);
   const bar=document.getElementById('dash-unpaid-bar');
-  if(bar){bar.style.display=unpaid.length?'flex':'none';const el=document.getElementById('dash-unpaid-count');if(el)el.textContent=unpaid.length;}
-  document.getElementById('dash-orders').innerHTML=D.orders.slice(-5).reverse().map(o=>`<tr>
-    <td>${o.customer}</td><td style="font-size:12px;color:var(--muted)">${o.items}</td>
-    <td style="color:var(--gold2);font-weight:700">${fmt(o.total)}</td>
-    <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':'t-pending'}">${o.status}</span></td>
-  </tr>`).join('');
+  if(bar) bar.style.display=unpaid.length?'flex':'none';
+  const uc=document.getElementById('dash-unpaid-count');
+  if(uc) uc.textContent=unpaid.length;
+
+  // Bảng unpaid
+  const unpaidTable=document.getElementById('dash-unpaid-table');
+  const unpaidRows=document.getElementById('dash-unpaid-rows');
+  if(unpaidTable&&unpaidRows){
+    unpaidTable.style.display=unpaid.length?'block':'none';
+    unpaidRows.innerHTML=unpaid.map(s=>{
+      const dep=Math.round((s.fee||0)*0.3);
+      return`<tr style="cursor:pointer" onclick="openStDetail('${s.id}')">
+        <td><strong>${s.name}</strong><br><span style="font-size:11px;color:var(--muted)">${s.phone||''}</span></td>
+        <td style="font-size:12px">${s.course||''}</td>
+        <td style="color:var(--brand);font-weight:700">${fmt(s.fee||0)}</td>
+        <td><span class="tag t-low">❌ Chưa thu đợt 1 — ${fmt(dep)}</span></td>
+        <td><button class="btn btn-sm btn-tg" onclick="event.stopPropagation();remindUnpaid('${s.id}')">Nhắc TG</button></td>
+      </tr>`;
+    }).join('');
+  }
+
+  // Học viên gần đây (5 người mới nhất)
+  const recentStudents=D.students.filter(s=>!s.deleted_at).slice(-5).reverse();
+  const dsEl=document.getElementById('dash-students');
+  if(dsEl) dsEl.innerHTML=recentStudents.length?recentStudents.map(s=>`<tr style="cursor:pointer" onclick="openStDetail('${s.id}')">
+    <td><strong style="font-size:13px">${s.name}</strong><br><span style="font-size:11px;color:var(--muted)">${s.phone||''}</span></td>
+    <td style="font-size:12px;color:var(--muted)">${s.course||''}</td>
+    <td><span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Học xong'||s.status==='Hoàn thành'?'t-done':s.status==='Chưa học'?'t-online':'t-pending'}">${s.status}</span></td>
+  </tr>`).join(''):'<tr><td colspan="3" style="color:var(--muted);text-align:center;padding:14px;font-size:12px">Chưa có học viên</td></tr>';
+
+  // Đơn bán lẻ gần đây (5 đơn mới nhất)
+  document.getElementById('dash-orders').innerHTML=retailOrders.slice(-5).reverse().map(o=>`<tr>
+    <td style="font-size:12px">${o.customer}</td>
+    <td style="font-size:11px;color:var(--muted)">${o.items.substring(0,20)}${o.items.length>20?'...':''}</td>
+    <td style="color:var(--brand);font-weight:700;font-size:12px">${fmt(o.total||0)}</td>
+    <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':'t-pending'}" style="font-size:10px">${o.status==='Đã thanh toán'?'✓':'⏳'}</span></td>
+  </tr>`).join('') || '<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:14px;font-size:12px">Chưa có đơn bán lẻ</td></tr>';
+
+  // Cảnh báo kho
   const low=D.inventory.filter(i=>i.qty<=i.min*1.5);
   document.getElementById('dash-stock').innerHTML=low.length?low.map(i=>`<tr>
     <td>${i.name}</td><td>${i.qty} ${i.unit}</td><td>${i.min} ${i.unit}</td>
@@ -2661,21 +2755,68 @@ async function exportPDF(orderId){
 
 // ── ORDERS ──
 function renderOrders(){
-  const el=document.getElementById('all-orders');if(!el)return;
-  el.innerHTML=D.orders.slice().reverse().map(o=>`<tr>
-    <td style="font-weight:700;color:var(--gold2)">${o.id}</td>
+  // Phân loại: HP... = học phí, còn lại = bán lẻ
+  const retailOrders = D.orders.filter(o=>!o.id.startsWith('HP'));
+  const tuitionOrders = D.orders.filter(o=>o.id.startsWith('HP'));
+
+  // Stats
+  const retailRev = retailOrders.filter(o=>o.status==='Đã thanh toán').reduce((a,o)=>a+(o.total||0),0);
+  const tuitionRev = tuitionOrders.filter(o=>o.status==='Đã thanh toán').reduce((a,o)=>a+(o.total||0),0);
+  const pending = D.orders.filter(o=>o.status!=='Đã thanh toán').length;
+  const s0=document.getElementById('ord-retail-rev');
+  const s1=document.getElementById('ord-tuition-rev');
+  const s2=document.getElementById('ord-pending-count');
+  if(s0) s0.textContent=(retailRev/1000000).toFixed(1)+'M';
+  if(s1) s1.textContent=(tuitionRev/1000000).toFixed(1)+'M';
+  if(s2) s2.textContent=pending;
+
+  // Bán lẻ
+  const elR=document.getElementById('retail-orders');
+  if(elR) elR.innerHTML=retailOrders.slice().reverse().map(o=>`<tr>
+    <td style="font-weight:700;color:var(--brand)">${o.id}</td>
     <td>${o.customer}</td>
     <td style="font-size:12px;color:var(--muted)">${o.items}</td>
-    <td style="font-weight:700">${fmt(o.total)}</td>
+    <td style="font-weight:700">${fmt(o.total||0)}</td>
     <td style="font-size:12px;color:var(--muted)">${o.time}</td>
-    <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':o.status==='Đã hủy'?'t-done':'t-pending'}">${o.status}</span></td>
+    <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':'t-pending'}">${o.status}</span></td>
     <td class="btn-group" style="gap:4px">
-      ${o.status==='Chờ thanh toán'?`<button class="btn btn-green btn-sm" onclick="directPay('${o.id}')">Thu tiền</button>`:''}
-      ${o.status!=='Đã hủy'?`<button class="btn btn-ghost btn-sm" onclick="openEditOrder('${o.id}')">✏️</button>`:''}
-      ${o.status!=='Đã hủy'?`<button class="btn btn-red btn-sm" onclick="cancelOrder('${o.id}')">🗑</button>`:''}
-      <button class="btn btn-pdf btn-sm" onclick="exportPDF('${o.id}')">📄</button>
+      ${o.status!=='Đã thanh toán'?`<button class="btn btn-green btn-sm" onclick="directPay('${o.id}')">Thu tiền</button>`:''}
+      <button class="btn btn-pdf btn-sm" onclick="exportPDF('${o.id}')">📄 PDF</button>
     </td>
-  </tr>`).join('');
+  </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;padding:18px;color:var(--muted)">Chưa có đơn bán lẻ</td></tr>';
+
+  // Học phí
+  const elT=document.getElementById('tuition-orders');
+  if(elT) elT.innerHTML=tuitionOrders.slice().reverse().map(o=>`<tr>
+    <td style="font-weight:700;color:var(--brand)">${o.id}</td>
+    <td>${o.customer}</td>
+    <td style="font-size:12px;color:var(--muted)">${o.items}</td>
+    <td style="font-weight:700;color:var(--green)">${fmt(o.total||0)}</td>
+    <td style="font-size:12px;color:var(--muted)">${o.time}</td>
+    <td><span class="tag t-paid">${o.status}</span></td>
+  </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--muted)">Chưa có thu học phí</td></tr>';
+
+  // Tất cả
+  const elA=document.getElementById('all-orders');
+  if(elA) elA.innerHTML=D.orders.slice().reverse().map(o=>`<tr>
+    <td style="font-weight:700;color:var(--brand)">${o.id}</td>
+    <td>${o.customer}</td>
+    <td style="font-size:12px;color:var(--muted)">${o.items}</td>
+    <td style="font-weight:700">${fmt(o.total||0)}</td>
+    <td style="font-size:12px;color:var(--muted)">${o.time}</td>
+    <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':'t-pending'}">${o.status}</span></td>
+    <td>${!o.id.startsWith('HP')&&o.status!=='Đã thanh toán'?`<button class="btn btn-green btn-sm" onclick="directPay('${o.id}')">Thu tiền</button>`:''}</td>
+  </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;padding:18px;color:var(--muted)">Chưa có đơn hàng</td></tr>';
+}
+
+function ordTab(el,type){
+  document.querySelectorAll('#page-orders .tab').forEach(x=>x.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('panel-retail-orders').style.display=type==='retail'?'block':'none';
+  document.getElementById('panel-tuition-orders').style.display=type==='tuition'?'block':'none';
+  document.getElementById('panel-all-orders').style.display=type==='all'?'block':'none';
+  const excelBtn=document.getElementById('ord-excel-btn');
+  if(excelBtn) excelBtn.textContent=type==='tuition'?'📊 Excel học phí':type==='all'?'📊 Excel tất cả':'📊 Excel bán lẻ';
 }
 
 async function directPay(id){
