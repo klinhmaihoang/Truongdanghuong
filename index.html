@@ -634,6 +634,32 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
   </div>
 </div>
 
+<!-- Sửa đơn hàng -->
+<div class="overlay" id="modal-edit-order">
+  <div class="modal wide">
+    <div class="modal-title">✏️ Chỉnh sửa đơn hàng</div>
+    <input type="hidden" id="eo-id"/>
+    <div class="form-row">
+      <div class="fg"><label>Mã đơn</label><input id="eo-id-show" readonly style="opacity:.6"/></div>
+      <div class="fg"><label>Trạng thái</label>
+        <select id="eo-status">
+          <option value="Chờ thanh toán">Chờ thanh toán</option>
+          <option value="Đã thanh toán">Đã thanh toán</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Khách hàng</label><input id="eo-customer"/></div>
+      <div class="fg"><label>Tổng tiền (₫)</label><input id="eo-total" type="number"/></div>
+    </div>
+    <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="eo-note" placeholder="Ghi chú..."/></div>
+    <div class="btn-group">
+      <button class="btn btn-green btn-sm" onclick="saveEditOrder()">Lưu thay đổi</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-edit-order')">Hủy</button>
+    </div>
+  </div>
+</div>
+
 <!-- Confirm -->
 <div class="overlay" id="modal-confirm">
   <div class="modal" style="max-width:360px;text-align:center">
@@ -1366,9 +1392,59 @@ async function markPaid(){
     setTimeout(()=>tgMsg(`⚠️ *CẢNH BÁO KHO!*\n\n${lowItems.map(i=>`• ${i.name}: còn ${i.qty} ${i.unit}`).join('\n')}\n\n➡️ Cần nhập thêm nguyên liệu!\n\n_Trương Dáng Hương Academy_`),1000);
 }
 
-// ── PDF ──
+function openEditOrder(id){
+  const o=D.orders.find(x=>x.id===id);if(!o)return;
+  document.getElementById('eo-id').value=id;
+  document.getElementById('eo-id-show').value=id;
+  document.getElementById('eo-customer').value=o.customer||'';
+  document.getElementById('eo-total').value=o.total||0;
+  document.getElementById('eo-note').value=o.note||'';
+  document.getElementById('eo-status').value=o.status||'Chờ thanh toán';
+  showM('modal-edit-order');
+}
+
+async function saveEditOrder(){
+  const id=document.getElementById('eo-id').value;
+  const upd={
+    customer:document.getElementById('eo-customer').value.trim(),
+    total:+document.getElementById('eo-total').value||0,
+    note:document.getElementById('eo-note').value.trim(),
+    status:document.getElementById('eo-status').value
+  };
+  try{
+    await sbPatch('orders',upd,`?id=eq.${id}`);
+    const o=D.orders.find(x=>x.id===id);if(o)Object.assign(o,upd);
+    closeM('modal-edit-order');render();notify('Đã cập nhật đơn hàng '+id);
+    tgMsg(`✏️ *Cập nhật đơn hàng!*\n\nMã: \`${id}\`\n👤 ${upd.customer}\n💰 ${fmt(upd.total)}\n📊 ${upd.status}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+  }catch(e){notify('Lỗi: '+e.message,false);}
+}
+
+function cancelOrder(id){
+  const o=D.orders.find(x=>x.id===id);if(!o)return;
+  const reasonEl=document.createElement('div');
+  reasonEl.innerHTML=`<div class="fg" style="margin:10px 0"><label>Lý do hủy</label><input id="cancel-reason" placeholder="VD: Khách đổi ý, nhập sai..." style="background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:8px;font-size:13px;width:100%;margin-top:5px"/></div>`;
+  confirmAct(`Hủy đơn "${id}" — ${o.customer}?`,
+    'Nhập lý do hủy đơn:',
+    async()=>{
+      const reason=document.getElementById('cancel-reason')?.value||'Không có lý do';
+      try{
+        await sbPatch('orders',{status:'Đã hủy',note:(o.note?o.note+' | ':'')+`Hủy: ${reason}`},`?id=eq.${id}`);
+        const ord=D.orders.find(x=>x.id===id);
+        if(ord){ord.status='Đã hủy';ord.note=(ord.note?ord.note+' | ':'')+`Hủy: ${reason}`;}
+        render();notify('Đã hủy đơn '+id);
+        tgMsg(`🗑 *Hủy đơn hàng!*\n\nMã: \`${id}\`\n👤 ${o.customer}\n💰 ${fmt(o.total)}\n📝 Lý do: ${reason}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+      }catch(e){notify('Lỗi: '+e.message,false);}
+    }
+  );
+  // Inject input vào modal confirm
+  setTimeout(()=>{
+    const msg=document.getElementById('cfm-msg');
+    if(msg)msg.appendChild(reasonEl);
+  },50);
+}
+
+// ── PDF (dùng HTML để có tiếng Việt đầy đủ) ──
 async function exportPDF(orderId){
-  if(!window.jspdf){notify('Thư viện PDF chưa tải!',false);return;}
   let inv=invoice;
   let cartData=cart;
   if(orderId){
@@ -1382,58 +1458,82 @@ async function exportPDF(orderId){
     }).filter(Boolean);
   }
   if(!inv){notify('Không có hóa đơn!',false);return;}
-  const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({unit:'mm',format:'a5',orientation:'portrait'});
-  const W=doc.internal.pageSize.getWidth();
-  const bankId=cfg.bankId||'VCB',accNo=cfg.bankAcc||'9704220000000000';
-  const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
-  doc.setFillColor(13,13,20);doc.rect(0,0,W,35,'F');
-  doc.setTextColor(232,185,106);doc.setFontSize(14);doc.setFont('helvetica','bold');
-  doc.text('TRUONG DANG HUONG ACADEMY',W/2,12,{align:'center'});
-  doc.setFontSize(8);doc.setTextColor(170,160,150);
-  doc.text('BARTENDER & MIXOLOGY TRAINING',W/2,18,{align:'center'});
-  doc.setFontSize(9);doc.setTextColor(45,212,160);
-  doc.text('HOA DON BAN HANG',W/2,26,{align:'center'});
-  let y=42;
-  doc.setFillColor(248,246,240);doc.rect(5,37,W-10,32,'F');
-  doc.setFont('helvetica','bold');doc.setTextColor(180,130,50);doc.text('THONG TIN HOA DON',10,y);y+=7;
-  doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);
-  doc.text('Ma don:',10,y);doc.setFont('helvetica','bold');doc.text(inv.id,50,y);y+=7;
-  doc.setFont('helvetica','normal');doc.text('Khach hang:',10,y);doc.text(inv.name,50,y);y+=7;
-  doc.text('Thoi gian:',10,y);doc.text(inv.time,50,y);
-  if(inv.note){y+=7;doc.text('Ghi chu:',10,y);doc.text(inv.note,50,y);}
-  y+=12;
-  doc.setFillColor(201,150,58);doc.rect(5,y-5,W-10,8,'F');
-  doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(8);
-  doc.text('SAN PHAM',10,y);doc.text('SL',W-38,y,{align:'center'});doc.text('THANH TIEN',W-8,y,{align:'right'});
-  y+=3;doc.setTextColor(50,50,50);doc.setFont('helvetica','normal');
-  cartData.forEach((c,i)=>{
-    y+=7;if(i%2===0){doc.setFillColor(252,250,245);doc.rect(5,y-5,W-10,7,'F');}
-    doc.text(c.name.substring(0,30),10,y);doc.text(String(c.qty),W-38,y,{align:'center'});
-    doc.text(fmt(c.price*c.qty),W-8,y,{align:'right'});
-  });
-  y+=10;doc.setFillColor(232,185,106);doc.rect(5,y-5,W-10,10,'F');
-  doc.setTextColor(20,20,20);doc.setFont('helvetica','bold');doc.setFontSize(11);
-  doc.text('TONG CONG:',10,y+1);doc.text(fmt(inv.total),W-8,y+1,{align:'right'});
-  y+=18;doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(180,130,50);
-  doc.text('THANH TOAN CHUYEN KHOAN (VIETQR)',W/2,y,{align:'center'});y+=5;
-  doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);doc.setFontSize(8);
-  doc.text(`NH: ${bankId}   STK: ${accNo}`,W/2,y,{align:'center'});y+=5;
-  doc.text(`Chu TK: ${accName}`,W/2,y,{align:'center'});y+=5;
-  doc.text(`ND: ${inv.id} ${inv.name}`,W/2,y,{align:'center'});
-  try{
-    const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${inv.total}&addInfo=${encodeURIComponent(inv.id+' '+inv.name)}&accountName=${encodeURIComponent(accName)}`;
-    const imgData=await new Promise(res=>{
-      const img=new Image();img.crossOrigin='anonymous';
-      img.onload=()=>{const c=document.createElement('canvas');c.width=img.width;c.height=img.height;c.getContext('2d').drawImage(img,0,0);res(c.toDataURL('image/png'));};
-      img.onerror=()=>res(null);img.src=qrUrl;
-    });
-    if(imgData){y+=5;const qs=48;doc.addImage(imgData,'PNG',(W-qs)/2,y,qs,qs);y+=qs+5;}
-  }catch(e){}
-  doc.setFontSize(7.5);doc.setTextColor(130,130,130);
-  doc.text('Cam on quy khach! Truong Dang Huong Academy',W/2,y+5,{align:'center'});
-  doc.save(`HoaDon_${inv.id}.pdf`);
-  notify('✓ Đã xuất PDF: '+inv.id);
+  const bankId=cfg.bankId||'VCB',accNo=cfg.bankAcc||'',accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
+  const qrUrl=accNo?`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${inv.total}&addInfo=${encodeURIComponent(inv.id+' '+inv.name)}&accountName=${encodeURIComponent(accName)}`:'';
+  const rows=cartData.map(c=>`
+    <tr>
+      <td style="padding:8px 10px;border-bottom:1px solid #f0ebe0">${c.name}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #f0ebe0;text-align:center">${c.qty}</td>
+      <td style="padding:8px 10px;border-bottom:1px solid #f0ebe0;text-align:right;font-weight:600">${(c.price*c.qty).toLocaleString('vi-VN')}₫</td>
+    </tr>`).join('');
+  const html=`<!DOCTYPE html><html lang="vi"><head><meta charset="UTF-8">
+  <title>Hóa đơn ${inv.id}</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Be Vietnam Pro',sans-serif;background:#fff;color:#1a1a1a;padding:0}
+    .page{max-width:420px;margin:0 auto;padding:0}
+    .header{background:linear-gradient(135deg,#0d0d14,#1a1a2a);color:#fff;padding:24px 20px;text-align:center}
+    .brand{font-size:18px;font-weight:700;color:#e8b96a;letter-spacing:1px;margin-bottom:4px}
+    .sub{font-size:10px;color:#aaa;letter-spacing:3px;text-transform:uppercase;margin-bottom:8px}
+    .label{display:inline-block;background:rgba(45,212,160,.2);color:#2dd4a0;padding:3px 12px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:1px}
+    .info-box{background:#faf8f4;border:1px solid #ede8df;margin:16px;border-radius:10px;padding:14px 16px}
+    .info-title{font-size:11px;font-weight:700;color:#c9963a;text-transform:uppercase;letter-spacing:1px;margin-bottom:10px}
+    .info-row{display:flex;justify-content:space-between;padding:4px 0;font-size:13px;border-bottom:1px solid #f0ebe0}
+    .info-row:last-child{border-bottom:none}
+    .info-row span:first-child{color:#888}
+    .info-row span:last-child{font-weight:600}
+    table{width:calc(100% - 32px);margin:0 16px;border-collapse:collapse;font-size:13px}
+    thead{background:#c9963a}
+    thead th{color:#fff;padding:9px 10px;text-align:left;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px}
+    thead th:last-child{text-align:right}
+    thead th:nth-child(2){text-align:center}
+    .total-row{margin:0 16px;background:#e8b96a;border-radius:0 0 8px 8px;padding:12px 10px;display:flex;justify-content:space-between;align-items:center}
+    .total-row .label-t{font-size:13px;font-weight:700;color:#1a1a1a}
+    .total-row .amount{font-size:20px;font-weight:700;color:#1a1a1a}
+    .payment{margin:16px;background:#f0faf6;border:1px solid #2dd4a0;border-radius:10px;padding:14px 16px;text-align:center}
+    .pay-title{font-size:11px;font-weight:700;color:#2dd4a0;text-transform:uppercase;letter-spacing:1px;margin-bottom:8px}
+    .pay-info{font-size:12px;color:#555;margin-bottom:4px}
+    .qr-wrap{margin:10px auto 0;text-align:center}
+    .qr-wrap img{width:140px;height:140px;border-radius:8px}
+    .footer{text-align:center;padding:14px 16px 20px;font-size:11px;color:#aaa}
+    .footer strong{color:#c9963a}
+    @media print{body{print-color-adjust:exact;-webkit-print-color-adjust:exact}}
+  </style></head><body>
+  <div class="page">
+    <div class="header">
+      <div class="brand">TRƯƠNG DÁNG HƯƠNG ACADEMY</div>
+      <div class="sub">Bartender &amp; Mixology Training</div>
+      <div class="label">HÓA ĐƠN BÁN HÀNG</div>
+    </div>
+    <div class="info-box">
+      <div class="info-title">Thông tin hóa đơn</div>
+      <div class="info-row"><span>Mã đơn</span><span style="color:#c9963a">${inv.id}</span></div>
+      <div class="info-row"><span>Khách hàng</span><span>${inv.name}</span></div>
+      <div class="info-row"><span>Thời gian</span><span>${inv.time}</span></div>
+      ${inv.note?`<div class="info-row"><span>Ghi chú</span><span>${inv.note}</span></div>`:''}
+    </div>
+    <table>
+      <thead><tr><th>Sản phẩm</th><th style="text-align:center">SL</th><th style="text-align:right">Thành tiền</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="total-row">
+      <span class="label-t">TỔNG CỘNG</span>
+      <span class="amount">${inv.total.toLocaleString('vi-VN')}₫</span>
+    </div>
+    ${accNo?`<div class="payment">
+      <div class="pay-title">Thanh toán chuyển khoản (VietQR)</div>
+      <div class="pay-info"><strong>${bankId}</strong> · ${accNo} · ${accName}</div>
+      <div class="pay-info">Nội dung: <strong>${inv.id} ${inv.name}</strong></div>
+      ${qrUrl?`<div class="qr-wrap"><img src="${qrUrl}" alt="QR"/></div>`:''}
+    </div>`:''}
+    <div class="footer">Cảm ơn quý khách!<br><strong>Trương Dáng Hương Academy</strong></div>
+  </div>
+  <script>window.onload=()=>{window.print();}<\/script>
+  </body></html>`;
+  const w=window.open('','_blank','width=480,height=700');
+  if(w){w.document.write(html);w.document.close();}
+  notify('✓ Đang mở hóa đơn để in...');
 }
 
 // ── ORDERS ──
@@ -1445,10 +1545,12 @@ function renderOrders(){
     <td style="font-size:12px;color:var(--muted)">${o.items}</td>
     <td style="font-weight:700">${fmt(o.total)}</td>
     <td style="font-size:12px;color:var(--muted)">${o.time}</td>
-    <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':'t-pending'}">${o.status}</span></td>
-    <td class="btn-group">
-      ${o.status!=='Đã thanh toán'?`<button class="btn btn-green btn-sm" onclick="directPay('${o.id}')">Thu tiền</button>`:''}
-      <button class="btn btn-pdf btn-sm" onclick="exportPDF('${o.id}')">📄 PDF</button>
+    <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':o.status==='Đã hủy'?'t-done':'t-pending'}">${o.status}</span></td>
+    <td class="btn-group" style="gap:4px">
+      ${o.status==='Chờ thanh toán'?`<button class="btn btn-green btn-sm" onclick="directPay('${o.id}')">Thu tiền</button>`:''}
+      ${o.status!=='Đã hủy'?`<button class="btn btn-ghost btn-sm" onclick="openEditOrder('${o.id}')">✏️</button>`:''}
+      ${o.status!=='Đã hủy'?`<button class="btn btn-red btn-sm" onclick="cancelOrder('${o.id}')">🗑</button>`:''}
+      <button class="btn btn-pdf btn-sm" onclick="exportPDF('${o.id}')">📄</button>
     </td>
   </tr>`).join('');
 }
