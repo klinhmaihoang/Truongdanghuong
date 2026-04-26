@@ -233,7 +233,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
   </div>
   <div class="card">
     <div class="card-head"><span class="card-title">Tình trạng tồn kho</span></div>
-    <table><thead><tr><th>Nguyên liệu</th><th>Đơn vị</th><th>Tồn kho</th><th>Tối thiểu</th><th>Mức tồn</th><th></th></tr></thead>
+    <table><thead><tr><th>Nguyên liệu</th><th>Đơn vị</th><th>Tồn kho</th><th>Tối thiểu</th><th>Giá nhập gần nhất</th><th>Mức tồn</th><th></th></tr></thead>
     <tbody id="inv-list"></tbody></table>
   </div>
   <div class="card">
@@ -1029,6 +1029,7 @@ function renderInventory(){
       <td><strong>${item.name}</strong></td><td style="color:var(--muted)">${item.unit}</td>
       <td><strong style="color:${col}">${item.qty}</strong></td>
       <td style="color:var(--muted)">${item.min}</td>
+      <td style="color:var(--gold2);font-weight:600">${item.cost?fmt(item.cost)+'<span style="font-size:10px;color:var(--muted);font-weight:400">/'+item.unit+'</span>':'<span style="color:var(--muted)">—</span>'}</td>
       <td style="width:120px"><div class="pb"><div class="pf ${cls}" style="width:${pct}%"></div></div></td>
       <td><button class="btn btn-ghost btn-sm" onclick="document.getElementById('im-mat').value='${item.id}';showM('modal-import')">Nhập nhanh</button></td>
     </tr>`;
@@ -1043,7 +1044,9 @@ async function importStock(){
   if(!qty||qty<=0){notify('Nhập số lượng hợp lệ!',false);return;}
   const mat=D.inventory.find(i=>i.id===id);if(!mat)return;
   mat.qty=Math.round((mat.qty+qty)*100)/100;
-  await sbPatch('inventory',{qty:mat.qty},`?id=eq.${id}`);
+  const patch={qty:mat.qty};
+  if(price>0){mat.cost=price;patch.cost=price;}
+  await sbPatch('inventory',patch,`?id=eq.${id}`);
   const log={id:uid(),time:nowDT(),name:mat.name,type:'Nhập',qty:'+'+qty+' '+mat.unit,
     note:sup+(price?' ('+fmt(price)+'/đv)':''),created_at:Date.now()};
   await sbUpsert('stock_log',log);D.stockLog.unshift(log);
