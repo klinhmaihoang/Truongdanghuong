@@ -705,7 +705,7 @@ function doPost(e) {
     if (sheet === 'HocVien' &amp;&amp; data.rows) {
       const sh = ss.getSheetByName('HocVien') || ss.insertSheet('HocVien');
       sh.clearContents();
-      const headers = ['ID','Họ tên','SĐT','Loại','Khóa học','Học phí','Ngày BĐ','Trạng thái','Email','Ngày học','Đợt 1','Thời gian Đ1','Đợt 2','Thời gian Đ2','Ghi chú','Cập nhật'];
+      const headers = ['ID','Họ tên','SĐT','Loại','Khóa học','Học phí','Ngày ĐK','Trạng thái','Email','Ngày học','Đợt 1','Thời gian Đ1','Đợt 2','Thời gian Đ2','Ghi chú','Cập nhật'];
       sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
       if (data.rows.length) {
         const rows = data.rows.map(s => [
@@ -931,7 +931,7 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       <div class="fg"><label>Học phí (₫)</label><input id="es-fee" type="number" placeholder="2500000"/></div>
     </div>
     <div class="form-row">
-      <div class="fg"><label>Ngày bắt đầu</label><input id="es-start" type="date"/></div>
+      <div class="fg"><label>Ngày đăng ký</label><input id="es-start" type="date"/></div>
       <div class="fg"><label>📅 Ngày học (Offline)</label><input id="es-class-date" type="date"/></div>
     </div>
     <div class="form-row">
@@ -963,7 +963,7 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       <div class="fg"><label>Học phí (₫)</label><input id="fs-fee" type="number" placeholder="2500000"/></div>
     </div>
     <div class="form-row">
-      <div class="fg"><label>Ngày bắt đầu</label><input id="fs-start" type="date"/></div>
+      <div class="fg"><label>Ngày đăng ký</label><input id="fs-start" type="date"/></div>
       <div class="fg" id="fg-class-date"><label>📅 Ngày học (Offline)</label><input id="fs-class-date" type="date"/></div>
     </div>
     <div class="form-row">
@@ -1691,16 +1691,32 @@ async function autoUpdateStudentStatus(){
 
   for(const s of D.students){
     if(s.deleted_at) continue;
-    if(!s.class_date) continue;
 
-    const cd=new Date(s.class_date); cd.setHours(0,0,0,0);
-    const diff=Math.round((cd-today)/86400000);
+    // Chỉ dùng ngày học (class_date) để xác định trạng thái
+    const refDateStr=s.class_date||null;
+    if(!refDateStr) continue;
 
-    // Cập nhật trạng thái theo ngày học
+    // Parse DD/MM/YYYY hoặc YYYY-MM-DD
+    let refDate;
+    if(refDateStr.includes('/')){
+      const p=refDateStr.split('/');
+      refDate=new Date(+p[2],+p[1]-1,+p[0]);
+    } else {
+      refDate=new Date(refDateStr);
+    }
+    refDate.setHours(0,0,0,0);
+    const diff=Math.round((refDate-today)/86400000);
+
     let newStatus=s.status;
     if(diff>0) newStatus='Chưa học';
     else if(diff===0) newStatus='Đang học';
     else newStatus='Học xong';
+
+    // Nếu có end_date và đã qua end_date → Học xong
+    if(s.end_date){
+      const ed=new Date(s.end_date); ed.setHours(0,0,0,0);
+      if(today>ed) newStatus='Học xong';
+    }
 
     if(newStatus!==s.status){
       updates.push({id:s.id,oldStatus:s.status,newStatus,name:s.name});
@@ -1708,13 +1724,11 @@ async function autoUpdateStudentStatus(){
       sbPatch('students',{status:newStatus},`?id=eq.${s.id}`).catch(()=>{});
     }
 
-    // Kiểm tra nhắc đóng tiền đợt 2: trong khoảng class_date → end_date mà chưa đóng
-    if(s.end_date && s.paid1 && !s.paid2 && s.type==='Offline'){
+    // Nhắc đóng tiền đợt 2
+    if(s.end_date&&s.paid1&&!s.paid2&&s.type==='Offline'){
       const ed=new Date(s.end_date); ed.setHours(0,0,0,0);
       const daysToEnd=Math.round((ed-today)/86400000);
-      // Đang trong khoảng học (đã qua ngày học, chưa qua ngày kết thúc)
-      const inRange=diff<=0 && daysToEnd>=0;
-      if(inRange){
+      if(diff<=0&&daysToEnd>=0){
         const fee=s.fee||0;
         const rest=fee-Math.round(fee*0.3);
         unpaidReminders.push({s,rest,daysToEnd});
@@ -1727,19 +1741,15 @@ async function autoUpdateStudentStatus(){
     gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
   }
 
-  // Gửi nhắc đợt 2 (chỉ 1 lần/ngày — check localStorage)
   if(unpaidReminders.length>0){
     const lastRemindKey='tdh_remind2_'+todayStr();
     if(!localStorage.getItem(lastRemindKey)){
       localStorage.setItem(lastRemindKey,'1');
       let msg='💸 *NHẮC ĐÓNG TIỀN ĐỢT 2!*\n\n';
       unpaidReminders.forEach(({s,rest,daysToEnd})=>{
-        msg+='👤 '+s.name+'\n';
-        msg+='📚 '+( s.course||'')+'\n';
-        msg+='💰 Còn lại (70%): '+fmt(rest)+'\n';
-        msg+='🏁 Kết thúc học: '+s.end_date+(daysToEnd===0?' — HÔM NAY!':' — còn '+daysToEnd+' ngày')+'\n\n';
+        msg+='👤 '+s.name+'\n📚 '+(s.course||'')+'\n💰 Còn lại (70%): '+fmt(rest)+'\n🏁 Kết thúc: '+s.end_date+(daysToEnd===0?' — HÔM NAY!':' — còn '+daysToEnd+' ngày')+'\n\n';
       });
-      msg+='➡️ Liên hệ thu tiền trước khi kết thúc khóa!\n_Trương Dáng Hương Academy_';
+      msg+='_Trương Dáng Hương Academy_';
       tgMsg(msg);
     }
   }
@@ -2146,7 +2156,7 @@ function renderRpStudents(){
 
   // Bảng học viên đang học
   document.getElementById('rp-active-students').innerHTML=active.length?`
-    <table><thead><tr><th>Họ tên</th><th>Loại</th><th>Khóa học</th><th>Học phí</th><th>Ngày BĐ</th></tr></thead>
+    <table><thead><tr><th>Họ tên</th><th>Loại</th><th>Khóa học</th><th>Học phí</th><th>Ngày ĐK</th></tr></thead>
     <tbody>${active.map(s=>`<tr>
       <td><strong>${s.name}</strong>${s.phone?`<br><span style="font-size:11px;color:var(--muted)">${s.phone}</span>`:''}</td>
       <td><span class="tag ${s.type==='Online'?'t-online':'t-offline'}">${s.type}</span></td>
@@ -2278,7 +2288,7 @@ function openStDetail(id){
     <div class="detail-row"><span class="detail-label">Email</span><span>${s.email||'—'}</span></div>
     <div class="detail-row"><span class="detail-label">Khóa học</span><span>${courseName}</span></div>
     <div class="detail-row"><span class="detail-label">Loại hình</span><span>${s.type}</span></div>
-    <div class="detail-row"><span class="detail-label">Ngày bắt đầu</span><span>${s.start||'—'}</span></div>
+    <div class="detail-row"><span class="detail-label">Ngày đăng ký</span><span>${s.start||'—'}</span></div>
     ${s.class_date?`<div class="detail-row"><span class="detail-label">📅 Ngày học</span><span style="font-weight:700;color:var(--brand)">${s.class_date}</span></div>`:''}
     ${s.end_date?`<div class="detail-row"><span class="detail-label">🏁 Kết thúc học</span><span style="color:var(--muted)">${s.end_date}</span></div>`:''}
     <div class="detail-row"><span class="detail-label">Học phí</span><span style="color:var(--brand);font-weight:700">${fee===0?'Miễn phí':fmt(fee)}</span></div>
@@ -3443,7 +3453,7 @@ function xlExport(type){
   }
   if(type==='students'||type==='full'){
     const ws=XLSX.utils.aoa_to_sheet([
-      ['Họ tên','SĐT','Loại','Khóa học','Học phí','Ngày BĐ','Ngày học','Trạng thái','Đợt 1','Thời gian Đ1','Đợt 2','Thời gian Đ2','Email','Ghi chú'],
+      ['Họ tên','SĐT','Loại','Khóa học','Học phí','Ngày ĐK','Ngày học','Trạng thái','Đợt 1','Thời gian Đ1','Đợt 2','Thời gian Đ2','Email','Ghi chú'],
       ...D.students.map(s=>{
         const c=D.courses.find(x=>x.id===s.course_id);
         return[s.name,s.phone||'',s.type,c?c.name:(s.course||''),s.fee||0,s.start||'',s.class_date||'',s.status,
