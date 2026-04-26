@@ -901,8 +901,15 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     <div id="student-detail-content"></div>
     <div id="student-payment-history" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)"></div>
     <div style="display:flex;justify-content:space-between;margin-top:16px;flex-wrap:wrap;gap:8px">
-      <div class="btn-group">
-        <button class="btn btn-orange btn-sm" id="btn-toggle-st" onclick="toggleSt()">Đổi trạng thái</button>
+      <div class="btn-group" style="align-items:center">
+        <select id="st-status-sel" onchange="changeStudentStatus(this.value)"
+          style="padding:6px 10px;border-radius:8px;border:1.5px solid var(--border);font-size:12px;font-family:inherit;background:var(--bg2);color:var(--text);cursor:pointer">
+          <option value="Chưa học">Chưa học</option>
+          <option value="Đang học">Đang học</option>
+          <option value="Học xong">Học xong</option>
+          <option value="Bảo lưu">Bảo lưu</option>
+          <option value="Nghỉ học">Nghỉ học</option>
+        </select>
         <button class="btn btn-blue btn-sm" onclick="openEditStudent()">✏️ Sửa thông tin</button>
         <button class="btn btn-red btn-sm" onclick="deleteSt()">🗑 Xóa</button>
       </div>
@@ -2209,7 +2216,7 @@ function renderDash(){
   if(dsEl) dsEl.innerHTML=recentStudents.length?recentStudents.map(s=>`<tr style="cursor:pointer" onclick="openStDetail('${s.id}')">
     <td><strong style="font-size:13px">${s.name}</strong><br><span style="font-size:11px;color:var(--muted)">${s.phone||''}</span></td>
     <td style="font-size:12px;color:var(--muted)">${s.course||''}</td>
-    <td><span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Học xong'||s.status==='Hoàn thành'?'t-done':s.status==='Chưa học'?'t-online':'t-pending'}">${s.status}</span></td>
+    <td><span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Học xong'||s.status==='Hoàn thành'?'t-done':s.status==='Chưa học'?'t-online':s.status==='Bảo lưu'?'t-pending':s.status==='Nghỉ học'?'t-low':'t-pending'}">${s.status}</span></td>
   </tr>`).join(''):'<tr><td colspan="3" style="color:var(--muted);text-align:center;padding:14px;font-size:12px">Chưa có học viên</td></tr>';
 
   // Đơn bán lẻ gần đây (5 đơn mới nhất)
@@ -2262,7 +2269,7 @@ function renderStudents(){
       <td style="color:var(--brand);font-weight:700">${fee===0?'<span class="tag t-paid">Miễn phí</span>':fmt(fee)}</td>
       <td class="hide-mobile">${classTag||'<span style="color:var(--muted)">—</span>'}</td>
       <td class="hide-mobile"><div style="display:flex;gap:4px">${paid1Tag}${paid2Tag}</div></td>
-      <td class="hide-mobile"><span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Học xong'||s.status==='Hoàn thành'?'t-done':s.status==='Chưa học'?'t-online':'t-pending'}">${s.status}</span></td>
+      <td class="hide-mobile"><span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Học xong'||s.status==='Hoàn thành'?'t-done':s.status==='Chưa học'?'t-online':s.status==='Bảo lưu'?'t-pending':s.status==='Nghỉ học'?'t-low':'t-pending'}">${s.status}</span></td>
       <td class="btn-group" style="gap:4px">
         <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openStDetail('${s.id}')">Chi tiết</button>
         ${fee>0?`<button class="btn btn-green btn-sm" onclick="event.stopPropagation();collectFee('${s.id}')">💰</button>`:''}
@@ -2296,8 +2303,9 @@ function openStDetail(id){
     ${fee>0?`<div class="detail-row"><span class="detail-label">Đợt 2 (70%)</span><span>${s.paid2?`<span class="tag t-paid">✓ Đã thu ${fmt(rest)}</span> <small style="color:var(--muted)">${s.paid2_at||''}</small>`:`<span class="tag t-pending">Chưa thu — ${fmt(rest)}</span>`}</span></div>`:''}
     <div class="detail-row"><span class="detail-label">Ghi chú</span><span style="color:var(--muted)">${s.note||'—'}</span></div>
   `;
-  const _stLabels={'Chưa học':'▶️ Chuyển → Đang học','Đang học':'✅ Chuyển → Học xong','Học xong':'↩️ Chuyển → Đang học','Hoàn thành':'↩️ Chuyển → Đang học'};
-  document.getElementById('btn-toggle-st').textContent=_stLabels[s.status]||'Đổi trạng thái';
+  // Set dropdown trạng thái
+  const stSel=document.getElementById('st-status-sel');
+  if(stSel) stSel.value=s.status||'Chưa học';
 
   // Lịch sử đóng tiền — inject riêng để tránh lỗi template
   const hFee=s.fee||0;
@@ -2323,25 +2331,33 @@ function openStDetail(id){
   showM('modal-student-detail');
 }
 
-async function toggleSt(){
+async function changeStudentStatus(newStatus){
   const s=D.students.find(x=>x.id===selectedStudentId);if(!s)return;
-  if(s.status==='Đã xóa') return;
-  // Cycle theo logic ngày học
-  const cycle={
-    'Chưa học':'Đang học',
-    'Đang học':'Học xong',
-    'Học xong':'Đang học',
-    'Hoàn thành':'Đang học',
-  };
-  const newStatus=cycle[s.status]||'Đang học';
+  if(newStatus===s.status) return; // không đổi nếu giống cũ
+  const oldStatus=s.status;
   s.status=newStatus;
-  await sbPatch('students',{status:newStatus},`?id=eq.${s.id}`);
-  closeM('modal-student-detail');
-  renderStudents();renderDash();
-  notify('Đã cập nhật: '+s.name+' → '+newStatus);
-  tgMsg('🔄 Trạng thái học viên: '+s.name+' → '+newStatus+' ('+nowDT()+')');
-  gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
+  try{
+    await sbPatch('students',{status:newStatus},`?id=eq.${s.id}`);
+    // Cập nhật badge trong modal ngay lập tức
+    const badge=document.querySelector('#modal-student-detail .tag');
+    if(badge){
+      badge.textContent=newStatus;
+      badge.className='tag '+(newStatus==='Đang học'?'t-paid':newStatus==='Học xong'||newStatus==='Hoàn thành'?'t-done':newStatus==='Chưa học'?'t-online':'t-pending');
+    }
+    renderStudents();renderDash();
+    notify('Đã cập nhật: '+s.name+' → '+newStatus);
+    tgMsg('🔄 *Cập nhật trạng thái!*\n\n👤 '+s.name+'\n'+oldStatus+' → '+newStatus+'\n🕐 '+nowDT()+'\n\n_Trương Dáng Hương Academy_');
+    gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
+  }catch(e){
+    s.status=oldStatus; // rollback nếu lỗi
+    const stSel=document.getElementById('st-status-sel');
+    if(stSel) stSel.value=oldStatus;
+    notify('Lỗi cập nhật: '+e.message,false);
+  }
 }
+
+// Giữ lại toggleSt để tương thích code cũ
+async function toggleSt(){ }
 
 function deleteSt(){
   const s=D.students.find(x=>x.id===selectedStudentId);if(!s)return;
