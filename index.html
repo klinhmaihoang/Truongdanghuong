@@ -115,9 +115,35 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 .tab.active{background:rgba(201,150,58,.18);color:var(--gold2)}
 @media(max-width:700px){
   .stats{grid-template-columns:repeat(2,1fr)}
-  .pos-wrap,.form-row{grid-template-columns:1fr}
+  .pos-wrap{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr}
   .prod-grid{grid-template-columns:repeat(2,1fr)}
-  .nav button{font-size:11px;padding:5px 8px}
+  .main{padding:12px 12px 80px}
+  .card{padding:14px 12px}
+  /* Ẩn topbar nav trên mobile */
+  .topbar .nav{display:none}
+  .sync-badge{display:none}
+  .live{display:none}
+  .topbar{padding:0 14px;height:54px}
+  .brand-main{font-size:14px}
+  /* Bottom navigation bar */
+  .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#FF8C00,#FFA500);z-index:60;box-shadow:0 -2px 12px rgba(255,140,0,.3);height:62px;align-items:center;justify-content:space-around;padding:0 4px}
+  .bottom-nav-btn{display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;color:rgba(255,255,255,.7);font-size:9px;font-weight:600;padding:6px 4px;border-radius:10px;cursor:pointer;min-width:40px;transition:.15s;font-family:inherit}
+  .bottom-nav-btn .bn-icon{font-size:18px;line-height:1}
+  .bottom-nav-btn.active{color:#fff;background:rgba(255,255,255,.22)}
+  /* Table responsive */
+  table{font-size:12px}
+  th{font-size:10px;padding:6px 7px}
+  td{padding:7px 7px}
+  /* Stats smaller */
+  .stat-num{font-size:22px}
+  /* Bán hàng layout */
+  .cart-box{margin-top:14px}
+  /* Ẩn cột không cần thiết trên mobile */
+  .hide-mobile{display:none!important}
+}
+@media(min-width:701px){
+  .bottom-nav{display:none}
 }
 </style>
 </head>
@@ -144,6 +170,31 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <button onclick="go('reports',this)" style="color:var(--teal)">📊 Báo cáo</button>
     <button onclick="go('telegram',this)" style="color:#5bc8f0">⚡ Telegram</button>
   </div>
+</div>
+
+<!-- Bottom Nav (mobile only) -->
+<div class="bottom-nav" id="bottom-nav">
+  <button class="bottom-nav-btn active" onclick="go('dashboard',this);syncBottomNav(this)">
+    <span class="bn-icon">🏠</span>Tổng quan
+  </button>
+  <button class="bottom-nav-btn" onclick="go('students',this);syncBottomNav(this)">
+    <span class="bn-icon">🎓</span>Học viên
+  </button>
+  <button class="bottom-nav-btn" onclick="go('pos',this);syncBottomNav(this)">
+    <span class="bn-icon">🛒</span>Bán hàng
+  </button>
+  <button class="bottom-nav-btn" onclick="go('inventory',this);syncBottomNav(this)">
+    <span class="bn-icon">📦</span>Kho
+  </button>
+  <button class="bottom-nav-btn" onclick="go('orders',this);syncBottomNav(this)">
+    <span class="bn-icon">📋</span>Đơn hàng
+  </button>
+  <button class="bottom-nav-btn" onclick="go('reports',this);syncBottomNav(this)">
+    <span class="bn-icon">📊</span>Báo cáo
+  </button>
+  <button class="bottom-nav-btn" onclick="go('telegram',this);syncBottomNav(this)">
+    <span class="bn-icon">⚡</span>Cài đặt
+  </button>
 </div>
 
 <div class="main">
@@ -190,7 +241,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
         <button class="btn btn-excel btn-sm" onclick="xlExport('students')">📊 Excel</button>
       </div>
     </div>
-    <table><thead><tr><th>Họ tên</th><th>Loại</th><th>Khóa học</th><th>Học phí</th><th>Ngày BĐ</th><th>Trạng thái</th><th></th></tr></thead>
+    <table><thead><tr><th>Họ tên</th><th class="hide-mobile">Loại</th><th class="hide-mobile">Khóa học</th><th>Học phí</th><th class="hide-mobile">Ngày BĐ</th><th class="hide-mobile">Trạng thái</th><th></th></tr></thead>
     <tbody id="student-list"></tbody></table>
   </div>
 </div>
@@ -226,7 +277,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <span class="card-title">Danh sách hàng hóa &amp; giá bán</span>
       <button class="btn btn-sm" onclick="showM('modal-add-product')">+ Thêm sản phẩm</button>
     </div>
-    <table><thead><tr><th>Icon</th><th>Tên sản phẩm</th><th>Giá bán (₫)</th><th>Giá nhập (₫)</th><th>Lợi nhuận</th><th>Nguyên liệu</th><th>Mức dùng/lần</th><th></th></tr></thead>
+    <table><thead><tr><th>Icon</th><th>Tên sản phẩm</th><th>Giá bán (₫)</th><th class="hide-mobile">Giá nhập (₫)</th><th class="hide-mobile">Lợi nhuận</th><th class="hide-mobile">Nguyên liệu</th><th class="hide-mobile">Mức dùng/lần</th><th></th></tr></thead>
     <tbody id="product-list"></tbody></table>
   </div>
 </div>
@@ -892,11 +943,24 @@ function rpTab(el,tab){
   renderReports();
 }
 
+function syncBottomNav(btn){
+  document.querySelectorAll('.bottom-nav-btn').forEach(x=>x.classList.remove('active'));
+  if(btn&&btn.classList.contains('bottom-nav-btn'))btn.classList.add('active');
+}
+
 function go(p,btn){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
+  // Sync top nav
   document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
-  if(btn)btn.classList.add('active');
+  if(btn&&btn.classList.contains('nav')===false&&!btn.classList.contains('bottom-nav-btn'))btn.classList.add('active');
+  if(btn&&btn.closest&&btn.closest('.nav'))btn.classList.add('active');
+  // Sync bottom nav
+  document.querySelectorAll('.bottom-nav-btn').forEach(x=>{
+    const onclick=x.getAttribute('onclick')||'';
+    if(onclick.includes("'"+p+"'"))x.classList.add('active');
+    else x.classList.remove('active');
+  });
   fillMatSelects();
   if(p==='reports')renderReports();
 }
@@ -1114,11 +1178,11 @@ function renderStudents(){
   const list=D.students.filter(s=>stFilter==='all'||s.type.toLowerCase()===stFilter);
   document.getElementById('student-list').innerHTML=list.map(s=>`<tr style="cursor:pointer" onclick="openStDetail('${s.id}')">
     <td><strong>${s.name}</strong><br><span style="font-size:11px;color:var(--muted)">${s.phone||''}</span></td>
-    <td><span class="tag ${s.type==='Online'?'t-online':'t-offline'}">${s.type}</span></td>
-    <td style="font-size:12px">${s.course}</td>
+    <td class="hide-mobile"><span class="tag ${s.type==='Online'?'t-online':'t-offline'}">${s.type}</span></td>
+    <td class="hide-mobile" style="font-size:12px">${s.course}</td>
     <td style="color:var(--gold2);font-weight:700">${fmt(s.fee)}</td>
-    <td style="font-size:12px;color:var(--muted)">${s.start||'—'}</td>
-    <td><span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Hoàn thành'?'t-done':'t-pending'}">${s.status}</span></td>
+    <td class="hide-mobile" style="font-size:12px;color:var(--muted)">${s.start||'—'}</td>
+    <td class="hide-mobile"><span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Hoàn thành'?'t-done':'t-pending'}">${s.status}</span></td>
     <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openStDetail('${s.id}')">Chi tiết →</button></td>
   </tr>`).join('');
 }
@@ -1221,10 +1285,10 @@ function renderProductList(){
       <td style="font-size:22px">${p.icon||'📦'}</td>
       <td><strong>${p.name}</strong></td>
       <td style="color:var(--gold2);font-weight:700">${fmt(p.price)}</td>
-      <td style="font-weight:600">${cost>0?fmt(cost):'<span style="color:var(--muted)">—</span>'}</td>
-      <td style="font-weight:700;color:${profitColor}">${profit===null?'—':fmt(profit)}</td>
-      <td style="font-size:12px;color:var(--muted)">${mat?mat.name:'—'}</td>
-      <td style="font-size:12px;color:var(--muted)">${mat&&p.mat_use?p.mat_use+' '+mat.unit+'/lần':'—'}</td>
+      <td class="hide-mobile" style="font-weight:600">${cost>0?fmt(cost):'<span style="color:var(--muted)">—</span>'}</td>
+      <td class="hide-mobile" style="font-weight:700;color:${profitColor}">${profit===null?'—':fmt(profit)}</td>
+      <td class="hide-mobile" style="font-size:12px;color:var(--muted)">${mat?mat.name:'—'}</td>
+      <td class="hide-mobile" style="font-size:12px;color:var(--muted)">${mat&&p.mat_use?p.mat_use+' '+mat.unit+'/lần':'—'}</td>
       <td class="btn-group" style="gap:5px">
         <button class="btn btn-ghost btn-sm" onclick="openEditProd('${p.id}')">✏️ Sửa</button>
         <button class="btn btn-ghost btn-sm" onclick="openRecipe('${p.id}')">🧪 Công thức</button>
