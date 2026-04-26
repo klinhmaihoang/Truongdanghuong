@@ -1154,13 +1154,25 @@ async function addStudent(){
 // ── PRODUCTS ──
 function renderProducts(){
   document.getElementById('prod-grid').innerHTML=D.products.filter(p=>p.price>0).map(p=>{
-    const mat=D.inventory.find(i=>i.id===p.mat_id);
-    const stock=mat&&p.mat_use>0?Math.floor(mat.qty/p.mat_use):null;
-    return`<div class="prod-card" onclick="addToCart('${p.id}')" style="${stock!==null&&stock<5?'border-color:rgba(192,57,43,.4)':''}">
+    // Ưu tiên tính từ recipe nếu có
+    const recipeRows=D.recipes.filter(r=>r.product_id===p.id);
+    let stock=null;
+    if(recipeRows.length>0){
+      // Số phần = min của tất cả nguyên liệu trong recipe
+      stock=Math.min(...recipeRows.map(r=>{
+        const mat=D.inventory.find(i=>i.id===r.mat_id);
+        return mat&&r.mat_use>0?Math.floor(mat.qty/r.mat_use):99999;
+      }));
+    } else if(p.mat_id&&p.mat_use>0){
+      const mat=D.inventory.find(i=>i.id===p.mat_id);
+      stock=mat?Math.floor(mat.qty/p.mat_use):null;
+    }
+    const low=stock!==null&&stock<5;
+    return`<div class="prod-card" onclick="addToCart('${p.id}')" style="${low?'border-color:rgba(192,57,43,.4)':''}">
       <div class="prod-icon">${p.icon||'📦'}</div>
       <div class="prod-name">${p.name}</div>
       <div class="prod-price">${fmt(p.price)}</div>
-      <div class="prod-stock">${stock!==null?stock+' phần':'Không giới hạn'}</div>
+      <div class="prod-stock" style="color:${low?'var(--red)':stock===0?'var(--red)':'inherit'}">${stock!==null?stock+' phần':'Không giới hạn'}</div>
     </div>`;
   }).join('');
 }
