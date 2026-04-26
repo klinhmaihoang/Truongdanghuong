@@ -3863,68 +3863,107 @@ function finTab(el,f){
   renderFinance();
 }
 
+function buildAutoTxs(filterMonth){
+  // Tự động tổng hợp từ đơn hàng và học phí thực tế
+  const autoTxs=[];
+
+  // Thu từ bán lẻ (đã thanh toán, không phải HP)
+  D.orders.filter(o=>o.status==='Đã thanh toán'&&!o.id.startsWith('HP')).forEach(o=>{
+    const m=getMonthKey(o.time);
+    if(filterMonth&&m!==filterMonth) return;
+    autoTxs.push({
+      id:'auto_ord_'+o.id, type:'thu', category:'Bán lẻ sản phẩm',
+      amount:o.total||0, note:o.customer+(o.items?' — '+o.items.substring(0,40):''),
+      time:o.time||'', _auto:true, _ref:o.id
+    });
+  });
+
+  // Thu học phí (đơn HP đã thanh toán)
+  D.orders.filter(o=>o.status==='Đã thanh toán'&&o.id.startsWith('HP')).forEach(o=>{
+    const m=getMonthKey(o.time);
+    if(filterMonth&&m!==filterMonth) return;
+    autoTxs.push({
+      id:'auto_hp_'+o.id, type:'thu', category:'Học phí',
+      amount:o.total||0, note:o.customer+(o.items?' — '+o.items.substring(0,40):''),
+      time:o.time||'', _auto:true, _ref:o.id
+    });
+  });
+
+  return autoTxs;
+}
+
+function getMonthKey(timeStr){
+  if(!timeStr) return '';
+  // DD/MM/YYYY HH:mm or YYYY-MM-DD
+  const m1=(timeStr||'').match(/(\d{2})\/(\d{4})/);
+  if(m1) return m1[2]+'-'+m1[1];
+  const m2=(timeStr||'').match(/(\d{4})-(\d{2})/);
+  if(m2) return m2[1]+'-'+m2[2];
+  return '';
+}
+
 function renderFinance(){
   const monthSel=document.getElementById('fin-month-sel');
-  // Populate months
-  const months=[...new Set(D.transactions.map(t=>{
-    const m=(t.time||'').match(/(\d{2})\/(\d{4})/);
-    return m?m[2]+'-'+m[1]:'';
-  }).filter(Boolean))].sort().reverse();
+
+  // Tổng hợp auto txs + manual txs
   const curMonth=monthSel?.value||'';
+  const autoTxs=buildAutoTxs(curMonth);
+  const manualTxs=D.transactions.filter(t=>{
+    if(curMonth) return getMonthKey(t.time)===curMonth;
+    return true;
+  });
+
+  // Populate months từ cả 2 nguồn
+  const allTimes=[...D.transactions.map(t=>t.time),...D.orders.map(o=>o.time)];
+  const months=[...new Set(allTimes.map(t=>getMonthKey(t)).filter(Boolean))].sort().reverse();
   if(monthSel){
-    const opts='<option value="">Tất cả tháng</option>'+months.map(m=>{
+    monthSel.innerHTML='<option value="">Tất cả tháng</option>'+months.map(m=>{
       const [y,mo]=m.split('-');
       return`<option value="${m}" ${m===curMonth?'selected':''}>Tháng ${+mo}/${y}</option>`;
     }).join('');
-    monthSel.innerHTML=opts;
   }
 
-  let txs=D.transactions;
-  if(finFilter==='thu') txs=txs.filter(t=>t.type==='thu');
-  if(finFilter==='chi') txs=txs.filter(t=>t.type==='chi');
-  if(curMonth) txs=txs.filter(t=>{
-    const m=(t.time||'').match(/(\d{2})\/(\d{4})/);
-    return m&&m[2]+'-'+m[1]===curMonth;
-  });
+  // Gộp và lọc theo tab
+  let allTxs=[...autoTxs,...manualTxs].sort((a,b)=>(b.time||'').localeCompare(a.time||''));
+  let txs=allTxs;
+  if(finFilter==='thu') txs=allTxs.filter(t=>t.type==='thu');
+  if(finFilter==='chi') txs=allTxs.filter(t=>t.type==='chi');
 
-  const totalThu=txs.filter(t=>t.type==='thu').reduce((a,t)=>a+(t.amount||0),0);
-  const totalChi=txs.filter(t=>t.type==='chi').reduce((a,t)=>a+(t.amount||0),0);
+  // Tính tổng từ TẤT CẢ (không lọc tab) trong tháng đang chọn
+  const totalThu=allTxs.filter(t=>t.type==='thu').reduce((a,t)=>a+(t.amount||0),0);
+  const totalChi=allTxs.filter(t=>t.type==='chi').reduce((a,t)=>a+(t.amount||0),0);
   const profit=totalThu-totalChi;
 
-  const s0=document.getElementById('fin-thu');const s1=document.getElementById('fin-chi');const s2=document.getElementById('fin-profit');
+  const s0=document.getElementById('fin-thu');
+  const s1=document.getElementById('fin-chi');
+  const s2=document.getElementById('fin-profit');
   if(s0) s0.textContent=(totalThu/1000000).toFixed(1)+'M';
   if(s1) s1.textContent=(totalChi/1000000).toFixed(1)+'M';
-  if(s2){s2.textContent=(Math.abs(profit)/1000000).toFixed(1)+'M'+(profit<0?' (lỗ)':'');s2.style.color=profit>=0?'var(--green)':'var(--red)';}
+  if(s2){
+    s2.textContent=(Math.abs(profit)/1000000).toFixed(1)+'M'+(profit<0?' (lỗ)':'');
+    s2.style.color=profit>=0?'var(--green)':'var(--red)';
+  }
 
   const el=document.getElementById('fin-list');
   if(!el)return;
-  el.innerHTML=txs.length?txs.map(t=>`<tr>
+  el.innerHTML=txs.length?txs.map(t=>`<tr style="${t._auto?'opacity:.85':''}">
     <td style="font-size:11px;color:var(--muted)">${t.time||''}</td>
-    <td><span class="tag ${t.type==='thu'?'t-paid':'t-low'}">${t.type==='thu'?'💚 Thu':'🔴 Chi'}</span></td>
+    <td>
+      <span class="tag ${t.type==='thu'?'t-paid':'t-low'}">${t.type==='thu'?'💚 Thu':'🔴 Chi'}</span>
+      ${t._auto?'<span style="font-size:10px;color:var(--muted);margin-left:4px">tự động</span>':''}
+    </td>
     <td style="font-size:12px">${t.category||'—'}</td>
-    <td style="font-weight:700;color:${t.type==='thu'?'var(--green)':'var(--red)'}">${t.type==='thu'?'+':'-'}${fmt(t.amount||0)}</td>
+    <td style="font-weight:700;color:${t.type==='thu'?'var(--green)':'var(--red)'}">
+      ${t.type==='thu'?'+':'-'}${fmt(t.amount||0)}
+    </td>
     <td style="font-size:12px;color:var(--muted)">${t.note||'—'}</td>
-    <td><button class="btn btn-ghost btn-sm" style="color:var(--red);font-size:11px" onclick="deleteTransaction('${t.id}')">✕</button></td>
+    <td>${t._auto
+      ?`<a href="#" onclick="go('orders',document.querySelector('.nav button'));return false" style="font-size:11px;color:var(--teal)">Xem đơn</a>`
+      :`<button class="btn btn-ghost btn-sm" style="color:var(--red);font-size:11px" onclick="deleteTransaction('${t.id}')">✕</button>`
+    }</td>
   </tr>`).join(''):'<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--muted)">Chưa có giao dịch nào</td></tr>';
 }
 
-async function addTransaction(type){
-  const amount=+document.getElementById(type+'-amount').value;
-  if(!amount||amount<=0){notify('Nhập số tiền!',false);return;}
-  const cat=document.getElementById(type+'-cat').value;
-  const note=document.getElementById(type+'-note').value.trim();
-  const tx={id:'TX'+Date.now(),type,category:cat,amount,note,time:nowDT(),created_at:Date.now()};
-  try{
-    await sbUpsert('transactions',tx);
-    D.transactions.unshift(tx);
-    closeM('modal-add-'+type);
-    document.getElementById(type+'-amount').value='';
-    document.getElementById(type+'-note').value='';
-    renderFinance();
-    notify(`✓ Đã lưu phiếu ${type==='thu'?'thu':'chi'}: ${fmt(amount)}`);
-    tgMsg(`${type==='thu'?'💚 *Phiếu thu*':'🔴 *Phiếu chi*'}\n\n💰 ${fmt(amount)}\n📂 ${cat}${note?'\n📝 '+note:''}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
-  }catch(e){notify('Lỗi lưu: '+e.message,false);}
-}
 
 async function deleteTransaction(id){
   confirmAct('Xóa giao dịch này?','Không thể khôi phục sau khi xóa.',async()=>{
