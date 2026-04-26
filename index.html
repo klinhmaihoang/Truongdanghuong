@@ -1484,7 +1484,7 @@ const sbUpsert = async (t,d)=> {
 // ══════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════
-let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[]};
+let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[],transactions:[]};
 let cfg = {tgToken:'',tgChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',gsUrl:'https://script.google.com/macros/s/AKfycbxA0oXtRRa-l_pA-H8HbnmvvUHp9Aw7xNVV_Xfz3ixXT_QDJ4q1E795XIF-4ntDnMrq/exec'};
 let cart=[], invoice=null, selectedStudentId=null, stFilter='all', tgLog=[];
 
@@ -3854,7 +3854,7 @@ function finTab(el,f){
 }
 
 function buildAutoTxs(filterMonth){
-  // Tự động tổng hợp từ đơn hàng và học phí thực tế
+  if(!D.orders||!D.transactions) return [];
   const autoTxs=[];
 
   // Thu từ bán lẻ (đã thanh toán, không phải HP)
@@ -3893,12 +3893,13 @@ function getMonthKey(timeStr){
 }
 
 function renderFinance(){
+  if(!D.transactions) return; // Chưa load xong
   const monthSel=document.getElementById('fin-month-sel');
 
   // Tổng hợp auto txs + manual txs
   const curMonth=monthSel?.value||'';
-  const autoTxs=buildAutoTxs(curMonth);
-  const manualTxs=D.transactions.filter(t=>{
+  const autoTxs=buildAutoTxs(curMonth)||[];
+  const manualTxs=(D.transactions||[]).filter(t=>{
     if(curMonth) return getMonthKey(t.time)===curMonth;
     return true;
   });
