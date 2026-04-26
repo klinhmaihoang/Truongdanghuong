@@ -1524,7 +1524,7 @@ async function boot(){
 
   setSyncStatus(false,'Đang kết nối...');
   try{
-    const [students,inventory,products,orders,stockLog,settings,recipes,courses,customers] = await Promise.all([
+    const [students,inventory,products,orders,stockLog,settings,recipes,courses,customers,transactions] = await Promise.all([
       sbGet('students','?order=created_at.asc'),
       sbGet('inventory','?order=created_at.asc'),
       sbGet('products','?order=created_at.asc'),
@@ -1872,9 +1872,10 @@ async function autoUpdateStudentStatus(){
     gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
   }
 
-  if(unpaidReminders.length>0){
-    const lastRemindKey='tdh_remind2_'+todayStr();
+  if(unpaidReminders.length>0&&!window._remind2Sent){
+    const lastRemindKey='tdh_remind2_'+new Date().toISOString().slice(0,10);
     if(!localStorage.getItem(lastRemindKey)){
+      window._remind2Sent=true;
       localStorage.setItem(lastRemindKey,'1');
       let msg='💸 *NHẮC ĐÓNG TIỀN ĐỢT 2!*\n\n';
       unpaidReminders.forEach(({s,rest,daysToEnd})=>{
