@@ -526,6 +526,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   <div class="btn-group" style="margin-bottom:14px">
     <button class="btn btn-green btn-sm" onclick="showM('modal-add-thu')">+ Thêm phiếu thu</button>
     <button class="btn btn-red btn-sm" onclick="showM('modal-add-chi')">− Thêm phiếu chi</button>
+    <button class="btn btn-tg btn-sm" onclick="syncThuChiToSheet()">📊 Sync GG Sheet</button>
     <button class="btn btn-excel btn-sm" onclick="xlExport('finance')">📊 Excel</button>
   </div>
   <div class="card">
@@ -3520,6 +3521,18 @@ async function gsSend(data){
   }
 }
 
+async function syncThuChiToSheet(){
+  if(!cfg.gsUrl){notify('Chưa có Google Sheet URL!',false);return;}
+  notify('⏳ Đang sync Thu Chi...');
+  try{
+    const rows=gsThuChi();
+    if(!rows.length){notify('Chưa có dữ liệu thu chi!',false);return;}
+    await gsSend({sheet:'ThuChi',rows,time:nowDT()});
+    await new Promise(r=>setTimeout(r,1500));
+    notify('✅ Đã sync '+rows.length+' giao dịch lên Google Sheet!');
+  }catch(e){notify('Lỗi sync: '+e.message,false);}
+}
+
 async function gsSyncAll(){
   const url=cfg.gsUrl;
   if(!url){notify('Chưa nhập Google Sheet URL!',false);return;}
@@ -3730,6 +3743,17 @@ function xlExport(type){
     ]);
     ws['!cols']=[{wch:30},{wch:20}];
     XLSX.utils.book_append_sheet(wb,ws,'Tổng kết');
+  }
+  if(type==='finance'||type==='full'){
+    const txs=gsThuChi();
+    if(txs.length){
+      const ws=XLSX.utils.aoa_to_sheet([
+        ['ID','Loại','Danh mục','Số tiền','Ghi chú','Thời gian','Nguồn'],
+        ...txs.map(t=>[t.id,t.type,t.category,t.amount,t.note,t.time,t.auto])
+      ]);
+      ws['!cols']=[{wch:15},{wch:8},{wch:20},{wch:15},{wch:30},{wch:18},{wch:10}];
+      XLSX.utils.book_append_sheet(wb,ws,'ThuChi');
+    }
   }
   if(!wb.SheetNames.length){notify('Không có dữ liệu!',false);return;}
   const fn=`TruongDangHuong_${type}_${ds2}.xlsx`;
