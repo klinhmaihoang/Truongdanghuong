@@ -1185,6 +1185,27 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
   </div>
 </div>
 
+<!-- Edit Material -->
+<div class="overlay" id="modal-edit-mat">
+  <div class="modal">
+    <div class="modal-title">✏️ Sửa nguyên liệu</div>
+    <input type="hidden" id="em-id"/>
+    <div class="form-row">
+      <div class="fg"><label>Tên nguyên liệu *</label><input id="em-name" placeholder="VD: Trà bá tước"/></div>
+      <div class="fg"><label>Đơn vị *</label><input id="em-unit" placeholder="kg, gói, chai, lít..."/></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Tồn kho hiện tại</label><input id="em-qty" type="number" min="0" step="0.01"/></div>
+      <div class="fg"><label>Tồn kho tối thiểu</label><input id="em-min" type="number" min="0" step="0.01"/></div>
+    </div>
+    <div class="fg" style="margin-bottom:12px"><label>Giá nhập (₫/đv)</label><input id="em-cost" type="number" placeholder="50000"/></div>
+    <div class="btn-group">
+      <button class="btn btn-green btn-sm" onclick="saveEditMat()">💾 Lưu thay đổi</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-edit-mat')">Hủy</button>
+    </div>
+  </div>
+</div>
+
 <!-- Import -->
 <div class="overlay" id="modal-import">
   <div class="modal">
@@ -3255,7 +3276,7 @@ async function addMaterial(){
 
 async function importStock(){
   const id=document.getElementById('im-mat').value;
-  const qty=+document.getElementById('im-qty').value;
+  const qty=parseFloat(document.getElementById('im-qty').value)||0;
   const sup=document.getElementById('im-sup').value||'—';
   const price=+document.getElementById('im-price').value||0;
   if(!qty||qty<=0){notify('Nhập số lượng hợp lệ!',false);return;}
@@ -3278,19 +3299,22 @@ async function importStock(){
 
 async function exportStock(){
   const id=document.getElementById('ex-mat').value;
-  const qty=+document.getElementById('ex-qty').value;
-  const reason=document.getElementById('ex-reason').value||'Xuất thủ công';
+  const qty=parseFloat(document.getElementById('ex-qty').value); // dùng parseFloat thay +
+  const reason=document.getElementById('ex-reason').value.trim()||'Xuất thủ công';
   if(!qty||qty<=0){notify('Nhập số lượng!',false);return;}
   const mat=D.inventory.find(i=>i.id===id);if(!mat)return;
-  if(qty>mat.qty){notify('Không đủ tồn kho!',false);return;}
-  mat.qty=Math.round((mat.qty-qty)*100)/100;
-  await sbPatch('inventory',{qty:mat.qty},`?id=eq.${id}`);
-  const log={id:uid(),time:nowDT(),name:mat.name,type:'Xuất',qty:'-'+qty+' '+mat.unit,note:reason,created_at:Date.now()};
+  if(qty>mat.qty){notify(`Không đủ tồn kho! Còn ${mat.qty} ${mat.unit}`,false);return;}
+  const newQty=Math.round((mat.qty-qty)*1000)/1000; // làm tròn 3 chữ số
+  mat.qty=newQty;
+  await sbPatch('inventory',{qty:newQty},`?id=eq.${id}`);
+  // Lưu matId vào log để có thể hoàn tác
+  const log={id:uid(),time:nowDT(),name:mat.name,type:'Xuất',
+    qty:'-'+qty+' '+mat.unit,note:reason,mat_id:id,mat_qty:qty,created_at:Date.now()};
   await sbUpsert('stock_log',log);D.stockLog.unshift(log);
   closeM('modal-export-stock');['ex-qty','ex-reason'].forEach(id=>document.getElementById(id).value='');
-  render();notify(`Đã xuất: -${qty} ${mat.unit} ${mat.name}`);
+  render();notify(`✓ Đã xuất: ${qty} ${mat.unit} ${mat.name} (còn ${newQty})`);
   if(document.getElementById('at-import').checked)
-    tgMsg(`📤 *Xuất kho thủ công!*\n\n📦 ${mat.name}: -${qty} ${mat.unit}\n📝 Lý do: ${reason}\n🔢 Còn lại: ${mat.qty} ${mat.unit}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+    tgMsg(`📤 *Xuất kho thủ công!*\n\n📦 ${mat.name}: -${qty} ${mat.unit}\n📝 Lý do: ${reason}\n🔢 Còn lại: ${newQty} ${mat.unit}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
   gsSend({sheet:'LichSuKho',time:nowDT(),name:mat.name,type:'Xuất',qty:'-'+qty+' '+mat.unit,note:reason});
   gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
 }
@@ -3333,13 +3357,37 @@ async function saveEditLog(){
 function deleteLog(){
   const id=document.getElementById('el-id').value;
   const l=D.stockLog.find(x=>x.id===id);if(!l)return;
+  const isExport=l.type==='Xuất'||l.type==='Xuất thủ công'||l.type==='Xuất dạy học';
+  const isImport=l.type==='Nhập';
+  const matQty=l.mat_qty||parseFloat((l.qty||'0').replace(/[^0-9.]/g,''))||0;
+  const mat=l.mat_id?D.inventory.find(x=>x.id===l.mat_id):D.inventory.find(x=>x.name===l.name);
+  const restoreMsg=mat&&matQty>0
+    ?(isExport?` Sẽ hoàn lại ${matQty} ${mat.unit} vào kho.`:isImport?` Sẽ trừ lại ${matQty} ${mat.unit} khỏi kho.`:'')
+    :'';
   confirmAct(`Xóa dòng "${l.name} ${l.qty}"?`,
-    'Tồn kho sẽ KHÔNG tự động thay đổi. Nếu cần điều chỉnh kho, hãy nhập/xuất lại sau.',
+    'Xóa dòng lịch sử này.'+restoreMsg,
     async()=>{
       try{
         await sbDel('stock_log',`?id=eq.${id}`);
         D.stockLog=D.stockLog.filter(x=>x.id!==id);
-        closeM('modal-edit-log');renderStockLog();notify('Đã xóa dòng lịch sử');
+        // Hoàn lại tồn kho nếu có thể
+        if(mat&&matQty>0){
+          if(isExport){
+            mat.qty=Math.round((mat.qty+matQty)*1000)/1000;
+            await sbPatch('inventory',{qty:mat.qty},`?id=eq.${mat.id}`);
+            notify(`✓ Đã xóa log & hoàn ${matQty} ${mat.unit} ${mat.name} vào kho`);
+          } else if(isImport){
+            mat.qty=Math.max(0,Math.round((mat.qty-matQty)*1000)/1000);
+            await sbPatch('inventory',{qty:mat.qty},`?id=eq.${mat.id}`);
+            notify(`✓ Đã xóa log & trừ ${matQty} ${mat.unit} ${mat.name} khỏi kho`);
+          } else {
+            notify('Đã xóa dòng lịch sử');
+          }
+        } else {
+          notify('Đã xóa dòng lịch sử');
+        }
+        closeM('modal-edit-log');render();
+        gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
       }catch(e){notify('Lỗi: '+e.message,false);}
     });
 }
@@ -3684,6 +3732,40 @@ function scheduleDaily8am(){
   },msUntil);
 }
 
+
+
+function openEditMat(id){
+  const m=D.inventory.find(x=>x.id===id);if(!m)return;
+  document.getElementById('em-id').value=m.id;
+  document.getElementById('em-name').value=m.name||'';
+  document.getElementById('em-unit').value=m.unit||'';
+  document.getElementById('em-qty').value=m.qty||0;
+  document.getElementById('em-min').value=m.min||0;
+  document.getElementById('em-cost').value=m.cost||0;
+  showM('modal-edit-mat');
+}
+
+async function saveEditMat(){
+  const id=document.getElementById('em-id').value;
+  const m=D.inventory.find(x=>x.id===id);if(!m)return;
+  const name=document.getElementById('em-name').value.trim();
+  if(!name){notify('Nhập tên nguyên liệu!',false);return;}
+  const upd={
+    name,
+    unit:document.getElementById('em-unit').value.trim(),
+    qty:parseFloat(document.getElementById('em-qty').value)||0,
+    min:parseFloat(document.getElementById('em-min').value)||0,
+    cost:parseFloat(document.getElementById('em-cost').value)||0,
+  };
+  try{
+    await sbPatch('inventory',upd,`?id=eq.${id}`);
+    Object.assign(m,upd);
+    closeM('modal-edit-mat');
+    render();
+    notify('✓ Đã cập nhật: '+name);
+    gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
+  }catch(e){notify('Lỗi lưu: '+e.message,false);}
+}
 
 // ══════════════════════════════════════════════════
 // XUẤT KHO DẠY HỌC
