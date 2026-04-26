@@ -1083,10 +1083,14 @@ async function boot(){
     if(settings&&settings.length){
       const s=settings[0];
       cfg={
-        tgToken:s.tg_token||'',tgChatId:s.tg_chat_id||'',
-        bankAcc:s.bank_acc||'',bankId:s.bank_id||'VCB',accName:s.acc_name||'TRUONG DANG HUONG'
+        tgToken:  s.tg_token  ||cfg.tgToken ||'',
+        tgChatId: s.tg_chat_id||cfg.tgChatId||'',
+        bankAcc:  s.bank_acc  ||cfg.bankAcc ||'',
+        bankId:   s.bank_id   ||cfg.bankId  ||'VCB',
+        accName:  s.acc_name  ||cfg.accName ||'TRUONG DANG HUONG',
+        gsUrl:    s.gs_url    ||cfg.gsUrl   ||''
       };
-      saveCfgLocal(); // sync về localStorage
+      saveCfgLocal();
       applyTgUI();
     }
 
@@ -1783,12 +1787,14 @@ async function checkout(){
   const total=cart.reduce((a,c)=>a+c.price*c.qty,0);
   const id='HĐ'+String(D.orders.length+1).padStart(3,'0');
   const items=cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')).join(', ');
-  invoice={id,name,email:document.getElementById('c-email').value.trim(),
+  invoice={id,name,phone:document.getElementById('c-phone')?.value?.trim()||'',email:document.getElementById('c-email').value.trim(),
     note:document.getElementById('c-note').value.trim(),total,items,time:nowDT()};
   const bankId=cfg.bankId||'VCB';
   const accNo=cfg.bankAcc||'9704220000000000';
   const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
-  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${total}&addInfo=${encodeURIComponent(id+' '+name)}&accountName=${encodeURIComponent(accName)}`;
+  const phone=document.getElementById('c-phone')?.value?.trim()||'';
+  const qrNote=name+(phone?' '+phone:'');
+  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${total}&addInfo=${encodeURIComponent(qrNote)}&accountName=${encodeURIComponent(accName)}`;
   document.getElementById('qr-img').src=qrUrl;
   document.getElementById('qr-amount').textContent=fmt(total);
   document.getElementById('qr-bank-label').textContent=`${bankId} · ${accNo} · ${accName}`;
@@ -1921,8 +1927,8 @@ function genFeeQR(dotNum){
   const bankId=cfg.bankId||'VCB';const accNo=cfg.bankAcc||'';
   const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
   if(!accNo){notify('Chưa cấu hình số tài khoản trong Cài đặt!',false);return;}
-  const note=`Hoc phi dot ${dotNum} ${s.name}`;
-  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(note)}&accountName=${encodeURIComponent(accName)}`;
+  const qrNote=s.name+(s.phone?' '+s.phone:'');
+  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(qrNote)}&accountName=${encodeURIComponent(accName)}`;
   document.getElementById(`cf-qr-img${dotNum}`).src=qrUrl;
   document.getElementById(`cf-qr${dotNum}`).style.display='block';
 }
@@ -1992,7 +1998,9 @@ async function exportPDF(orderId){
   }
   if(!inv){notify('Không có hóa đơn!',false);return;}
   const bankId=cfg.bankId||'VCB',accNo=cfg.bankAcc||'',accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
-  const qrUrl=accNo?`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${inv.total}&addInfo=${encodeURIComponent(inv.id+' '+inv.name)}&accountName=${encodeURIComponent(accName)}`:'';
+  const invPhone=inv.phone||'';
+  const invQrNote=inv.name+(invPhone?' '+invPhone:'');
+  const qrUrl=accNo?`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${inv.total}&addInfo=${encodeURIComponent(invQrNote)}&accountName=${encodeURIComponent(accName)}`:'';
   const rows=cartData.map(c=>`
     <tr>
       <td style="padding:8px 10px;border-bottom:1px solid #f0ebe0">${c.name}</td>
