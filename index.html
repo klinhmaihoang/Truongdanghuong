@@ -840,7 +840,7 @@ async function addStudent(){
 
 // ── PRODUCTS ──
 function renderProducts(){
-  document.getElementById('prod-grid').innerHTML=D.products.map(p=>{
+  document.getElementById('prod-grid').innerHTML=D.products.filter(p=>p.price>0).map(p=>{
     const mat=D.inventory.find(i=>i.id===p.mat_id);
     const stock=mat&&p.mat_use>0?Math.floor(mat.qty/p.mat_use):null;
     return`<div class="prod-card" onclick="addToCart('${p.id}')" style="${stock!==null&&stock<5?'border-color:rgba(192,57,43,.4)':''}">
@@ -889,8 +889,8 @@ function openEditProd(id){
 async function saveProduct(){
   const id=document.getElementById('ep-id').value;
   const name=document.getElementById('ep-name').value.trim();
-  const price=+document.getElementById('ep-price').value;
-  if(!name||!price){notify('Nhập tên và giá!',false);return;}
+  const price=+document.getElementById('ep-price').value||0;
+  if(!name){notify('Nhập tên sản phẩm!',false);return;}
   const upd={name,icon:document.getElementById('ep-icon').value||'📦',price,
     cost:+document.getElementById('ep-cost').value||0,
     mat_id:document.getElementById('ep-mat').value,mat_use:+document.getElementById('ep-use').value||0};
@@ -913,8 +913,8 @@ function deleteProduct(){
 
 async function addProduct(){
   const name=document.getElementById('fp-name').value.trim();
-  const price=+document.getElementById('fp-price').value;
-  if(!name||!price){notify('Nhập tên và giá!',false);return;}
+  const price=+document.getElementById('fp-price').value||0;
+  if(!name){notify('Nhập tên sản phẩm!',false);return;}
   const p={id:uid(),name,icon:document.getElementById('fp-icon').value||'📦',price,
     cost:+document.getElementById('fp-cost').value||0,
     mat_id:document.getElementById('fp-mat').value,mat_use:+document.getElementById('fp-use').value||0,created_at:Date.now()};
