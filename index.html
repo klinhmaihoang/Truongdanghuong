@@ -1872,19 +1872,8 @@ async function autoUpdateStudentStatus(){
     gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
   }
 
-  if(unpaidReminders.length>0&&!window._remind2Sent){
-    const lastRemindKey='tdh_remind2_'+new Date().toISOString().slice(0,10);
-    if(!localStorage.getItem(lastRemindKey)){
-      window._remind2Sent=true;
-      localStorage.setItem(lastRemindKey,'1');
-      let msg='💸 *NHẮC ĐÓNG TIỀN ĐỢT 2!*\n\n';
-      unpaidReminders.forEach(({s,rest,daysToEnd})=>{
-        msg+='👤 '+s.name+'\n📚 '+(s.course||'')+'\n💰 Còn lại (70%): '+fmt(rest)+'\n🏁 Kết thúc: '+s.end_date+(daysToEnd===0?' — HÔM NAY!':' — còn '+daysToEnd+' ngày')+'\n\n';
-      });
-      msg+='_Trương Dáng Hương Academy_';
-      tgMsg(msg);
-    }
-  }
+  // Lưu vào window để checkDailyRemind() xử lý sau
+  window._pendingRemind2=unpaidReminders;
 }
 
 function render(){autoUpdateStudentStatus();renderDash();renderStudents();renderDeletedStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();renderCourses();renderCustomers();fillMatSelects();}
@@ -4000,6 +3989,21 @@ async function deleteTransaction(id){
     renderFinance();
     notify('Đã xóa giao dịch');
   });
+}
+
+
+function checkDailyRemind(){
+  const lastRemindKey='tdh_remind2_'+new Date().toISOString().slice(0,10);
+  if(localStorage.getItem(lastRemindKey)) return; // Đã nhắc hôm nay rồi
+  const reminders=window._pendingRemind2||[];
+  if(!reminders.length) return;
+  localStorage.setItem(lastRemindKey,'1');
+  let msg='💸 *NHẮC ĐÓNG TIỀN ĐỢT 2!*\n\n';
+  reminders.forEach(({s,rest,daysToEnd})=>{
+    msg+='👤 '+s.name+'\n📚 '+(s.course||'')+'\n💰 Còn lại (70%): '+fmt(rest)+'\n🏁 Kết thúc: '+s.end_date+(daysToEnd===0?' — HÔM NAY!':' — còn '+daysToEnd+' ngày')+'\n\n';
+  });
+  msg+='_Trương Dáng Hương Academy_';
+  tgMsg(msg);
 }
 
 
