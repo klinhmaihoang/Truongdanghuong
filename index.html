@@ -693,9 +693,41 @@ function sendDailyReminders() {
     <div style="display:flex;justify-content:space-between;margin-top:16px;flex-wrap:wrap;gap:8px">
       <div class="btn-group">
         <button class="btn btn-orange btn-sm" id="btn-toggle-st" onclick="toggleSt()">Đổi trạng thái</button>
-        <button class="btn btn-red btn-sm" onclick="deleteSt()">🗑 Xóa học viên</button>
+        <button class="btn btn-blue btn-sm" onclick="openEditStudent()">✏️ Sửa thông tin</button>
+        <button class="btn btn-red btn-sm" onclick="deleteSt()">🗑 Xóa</button>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-student-detail')">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Student -->
+<div class="overlay" id="modal-edit-student">
+  <div class="modal wide">
+    <div class="modal-title">✏️ Sửa thông tin học viên</div>
+    <input type="hidden" id="es-id"/>
+    <div class="form-row">
+      <div class="fg"><label>Họ tên *</label><input id="es-name" placeholder="Nguyễn Văn A"/></div>
+      <div class="fg"><label>Số điện thoại</label><input id="es-phone" placeholder="090xxxxxxx"/></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Loại học</label>
+        <select id="es-type"><option>Offline</option><option>Online</option></select></div>
+      <div class="fg"><label>Khóa học</label>
+        <select id="es-course-id"></select></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Email</label><input id="es-email" placeholder="email@example.com"/></div>
+      <div class="fg"><label>Học phí (₫)</label><input id="es-fee" type="number" placeholder="2500000"/></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Ngày bắt đầu</label><input id="es-start" type="date"/></div>
+      <div class="fg"><label>Ngày học (Offline)</label><input id="es-class-date" type="date"/></div>
+    </div>
+    <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="es-note" placeholder="Ghi chú thêm..."/></div>
+    <div class="btn-group" style="margin-top:8px">
+      <button class="btn btn-green btn-sm" onclick="saveEditStudent()">💾 Lưu thay đổi</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-edit-student')">Hủy</button>
     </div>
   </div>
 </div>
@@ -1930,6 +1962,81 @@ async function hardDeleteStudent(id){
       notify('Đã xóa vĩnh viễn: '+s.name);
     }
   );
+}
+
+function openEditStudent(){
+  const s=D.students.find(x=>x.id===selectedStudentId);if(!s)return;
+  document.getElementById('es-id').value=s.id;
+  document.getElementById('es-name').value=s.name||'';
+  document.getElementById('es-phone').value=s.phone||'';
+  document.getElementById('es-type').value=s.type||'Offline';
+  document.getElementById('es-email').value=s.email||'';
+  document.getElementById('es-fee').value=s.fee||'';
+  document.getElementById('es-note').value=s.note||'';
+  // Xử lý date
+  if(s.start){
+    const parts=s.start.split('/');
+    if(parts.length===3) document.getElementById('es-start').value=`${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+    else document.getElementById('es-start').value=s.start;
+  }
+  if(s.class_date) document.getElementById('es-class-date').value=s.class_date;
+
+  // Fill courses select
+  const courseEl=document.getElementById('es-course-id');
+  courseEl.innerHTML=D.courses.map(c=>`<option value="${c.id}" ${c.id===s.course_id?'selected':''}>${c.name}</option>`).join('');
+  if(!D.courses.length){
+    courseEl.innerHTML=`<option value="${s.course_id||''}" selected>${s.course||'Cơ bản'}</option>`;
+  }
+
+  closeM('modal-student-detail');
+  setTimeout(()=>showM('modal-edit-student'),150);
+}
+
+async function saveEditStudent(){
+  const id=document.getElementById('es-id').value;
+  const s=D.students.find(x=>x.id===id);if(!s)return;
+  const name=document.getElementById('es-name').value.trim();
+  if(!name){notify('Vui lòng nhập họ tên!',false);return;}
+
+  const courseId=document.getElementById('es-course-id').value;
+  const course=D.courses.find(c=>c.id===courseId);
+  const startRaw=document.getElementById('es-start').value;
+  // Convert YYYY-MM-DD to DD/MM/YYYY
+  let startFmt=startRaw;
+  if(startRaw&&startRaw.includes('-')){
+    const p=startRaw.split('-');
+    startFmt=`${p[2]}/${p[1]}/${p[0]}`;
+  }
+
+  const upd={
+    name,
+    phone:document.getElementById('es-phone').value,
+    type:document.getElementById('es-type').value,
+    course_id:courseId,
+    course:course?course.name:document.getElementById('es-course-id').selectedOptions[0]?.text||s.course||'',
+    email:document.getElementById('es-email').value,
+    fee:+document.getElementById('es-fee').value||s.fee||0,
+    start:startFmt,
+    class_date:document.getElementById('es-class-date').value||null,
+    note:document.getElementById('es-note').value,
+  };
+
+  try{
+    await sbPatch('students',upd,`?id=eq.${id}`);
+    Object.assign(s,upd);
+    closeM('modal-edit-student');
+    renderStudents();renderDash();
+    notify('✅ Đã cập nhật: '+name);
+    tgMsg(`✏️ *Cập nhật học viên!*
+
+👤 ${name}
+📚 ${upd.course}
+💰 ${fmt(upd.fee)}
+🕐 ${nowDT()}
+
+_Trương Dáng Hương Academy_`);
+    gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
+  }catch(e){notify('Lỗi lưu: '+e.message,false);}
 }
 
 function renderDeletedStudents(){
