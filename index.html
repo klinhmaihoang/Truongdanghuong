@@ -207,6 +207,14 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="stat" style="--accent:var(--rose)"><div class="stat-num" id="s2">0</div><div class="stat-label">Đơn hàng</div></div>
     <div class="stat" style="--accent:var(--orange)"><div class="stat-num" id="s3">0</div><div class="stat-label">Kho cảnh báo</div></div>
   </div>
+  <!-- Badge học viên chưa thu tiền -->
+  <div id="dash-unpaid-bar" style="display:none;background:linear-gradient(135deg,#fff3cd,#ffe8a0);border:1.5px solid #e67e22;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:18px">💳</span>
+      <span style="font-size:13px;font-weight:700;color:#7d4f00">Có <span id="dash-unpaid-count">0</span> học viên chưa thanh toán</span>
+    </div>
+    <button class="btn btn-sm" style="background:#e67e22;font-size:12px;padding:5px 12px" onclick="go('students',null);stTab(document.querySelector('.tab'),\'all\')">Xem ngay →</button>
+  </div>
   <div class="card">
     <div class="card-head">
       <span class="card-title">Đơn hàng gần đây</span>
@@ -246,6 +254,11 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
           <button class="btn btn-excel btn-sm" onclick="xlExport('students')">📊 Excel</button>
         </div>
       </div>
+      <!-- Tìm kiếm -->
+      <div style="margin-bottom:12px;position:relative">
+        <input id="student-search" placeholder="🔍 Tìm theo tên, SĐT, khóa học..." oninput="renderStudents()"
+          style="width:100%;padding:9px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit"/>
+      </div>
       <table><thead><tr><th>Họ tên</th><th class="hide-mobile">Khóa học</th><th>Học phí</th><th class="hide-mobile">Ngày học</th><th class="hide-mobile">Thanh toán</th><th class="hide-mobile">Trạng thái</th><th></th></tr></thead>
       <tbody id="student-list"></tbody></table>
     </div>
@@ -280,7 +293,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       </div>
       <div class="form-row" style="margin-top:12px">
         <div class="fg"><label>Tên khách *</label><input id="c-name" placeholder="Tên khách hàng"/></div>
-        <div class="fg"><label>Email</label><input id="c-email" placeholder="email@gmail.com"/></div>
+        <div class="fg"><label>Số điện thoại</label><input id="c-phone" placeholder="090xxxxxxx" type="tel"/></div>
       </div>
       <div class="fg" style="margin-bottom:10px"><label>Ghi chú</label><input id="c-note" placeholder="Ghi chú..."/></div>
       <button class="btn" style="width:100%;padding:12px;font-size:14px" onclick="checkout()">Tạo hóa đơn &amp; QR VietQR</button>
@@ -1108,16 +1121,18 @@ async function boot(){
 
 async function pollUpdates(){
   try{
-    const [students,inventory,products,orders] = await Promise.all([
+    const [students,inventory,products,orders,courses] = await Promise.all([
       sbGet('students','?order=created_at.asc'),
       sbGet('inventory','?order=created_at.asc'),
       sbGet('products','?order=created_at.asc'),
       sbGet('orders','?order=created_at.asc'),
+      sbGet('courses','?order=created_at.asc'),
     ]);
     D.students=students||D.students;
     D.inventory=inventory&&inventory.length?inventory:D.inventory;
     D.products=products&&products.length?products:D.products;
     D.orders=orders||D.orders;
+    D.courses=courses||D.courses;
     setSyncStatus(true,'Đồng bộ lúc '+nowTime());
     render();
   }catch(e){setSyncStatus(false,'Mất kết nối');}
@@ -1555,6 +1570,10 @@ function renderDash(){
   document.getElementById('s1').textContent=(rev/1000000).toFixed(1)+'M';
   document.getElementById('s2').textContent=D.orders.length;
   document.getElementById('s3').textContent=D.inventory.filter(i=>i.qty<=i.min).length;
+  // Badge học viên chưa thu tiền
+  const unpaid=D.students.filter(s=>s.status==='Đang học'&&(s.fee||0)>0&&!s.paid1);
+  const bar=document.getElementById('dash-unpaid-bar');
+  if(bar){bar.style.display=unpaid.length?'flex':'none';const el=document.getElementById('dash-unpaid-count');if(el)el.textContent=unpaid.length;}
   document.getElementById('dash-orders').innerHTML=D.orders.slice(-5).reverse().map(o=>`<tr>
     <td>${o.customer}</td><td style="font-size:12px;color:var(--muted)">${o.items}</td>
     <td style="color:var(--gold2);font-weight:700">${fmt(o.total)}</td>
@@ -1568,7 +1587,14 @@ function renderDash(){
 }
 
 function renderStudents(){
-  const list=D.students.filter(s=>stFilter==='all'||s.type.toLowerCase()===stFilter);
+  const q=(document.getElementById('student-search')?.value||'').toLowerCase().trim();
+  const list=D.students.filter(s=>{
+    if(stFilter!=='all'&&stFilter!=='courses'&&s.type.toLowerCase()!==stFilter)return false;
+    if(!q)return true;
+    const course=D.courses.find(c=>c.id===s.course_id);
+    const courseName=(course?course.name:(s.course||'')).toLowerCase();
+    return s.name.toLowerCase().includes(q)||(s.phone||'').includes(q)||courseName.includes(q);
+  });
   document.getElementById('student-list').innerHTML=list.map(s=>{
     const course=D.courses.find(c=>c.id===s.course_id);
     const courseName=course?course.name:(s.course||'—');
@@ -1882,7 +1908,7 @@ async function markPaid(){
   const order=D.orders.find(o=>o.id===invoice.id)||{id:invoice.id,customer:invoice.name,total:invoice.total};
   const lowItems=D.inventory.filter(i=>i.qty<=i.min);
   cart=[];
-  ['c-name','c-email','c-note'].forEach(id=>document.getElementById(id).value='');
+  ['c-name','c-phone','c-email','c-note'].forEach(id=>document.getElementById(id).value='');
   closeM('modal-qr');renderCart();render();
   notify('✓ Thanh toán xong! Kho đã cập nhật');
   if(document.getElementById('at-paid').checked)
@@ -2480,7 +2506,14 @@ function tgReport(type){
     msg=`📦 *KHO HÀNG*\n━━━━━━━━━\n${D.inventory.map(i=>`${i.qty<=i.min?'⚠️':i.qty<=i.min*1.5?'🟡':'✅'} *${i.name}*: ${i.qty} ${i.unit} (min: ${i.min})`).join('\n')}\n━━━━━━━━━\n🕐 ${nowDT()}\n_Trương Dáng Hương Academy_`;
   }else if(type==='students'){
     const a=D.students.filter(s=>s.status==='Đang học');
-    msg=`🎓 *HỌC VIÊN ĐANG HỌC* (${a.length})\n━━━━━━━━━\n${a.map(s=>`• ${s.name} — ${s.type} — ${s.course}`).join('\n')||'(chưa có)'}\n━━━━━━━━━\n_Trương Dáng Hương Academy_`;
+    const unpaid=a.filter(s=>(s.fee||0)>0&&!s.paid1);
+    const lines=a.map(s=>{
+      const c=D.courses.find(x=>x.id===s.course_id);
+      const cName=c?c.name:(s.course||'—');
+      const payStatus=s.fee===0?'Miễn phí':s.paid1&&(s.type==='Online'||s.paid2)?'✅ Hoàn tất':s.paid1?'⚡ Đ1 xong':s.paid2?'⚡ Đ2 xong':'❌ Chưa thu';
+      return`• ${s.name} (${s.type}) — ${cName} — ${payStatus}`;
+    }).join('\n');
+    msg=`🎓 *HỌC VIÊN ĐANG HỌC* (${a.length})\n━━━━━━━━━\n${lines||'(chưa có)'}\n━━━━━━━━━\n💳 Chưa thu tiền: ${unpaid.length} người\n🕐 ${nowDT()}\n_Trương Dáng Hương Academy_`;
   }else if(type==='revenue'){
     const paid=D.orders.filter(o=>o.status==='Đã thanh toán');
     msg=`💰 *DOANH THU*\n━━━━━━━━━\n📦 Đã thu: ${fmt(paid.reduce((a,o)=>a+(o.total||0),0))}\n🎓 Học phí (tổng): ${fmt(D.students.reduce((a,s)=>a+(s.fee||0),0))}\n📊 ${D.orders.length} đơn (${paid.length} đã TT)\n━━━━━━━━━\n_Trương Dáng Hương Academy_`;
@@ -2502,9 +2535,17 @@ function xlExport(type){
     XLSX.utils.book_append_sheet(wb,ws,'Đơn hàng');
   }
   if(type==='students'||type==='full'){
-    const ws=XLSX.utils.aoa_to_sheet([['Họ tên','SĐT','Loại','Khóa học','Email','Học phí','Ngày BĐ','Trạng thái','Ghi chú'],
-      ...D.students.map(s=>[s.name,s.phone,s.type,s.course,s.email,s.fee||0,s.start,s.status,s.note||''])]);
-    ws['!cols']=[{wch:22},{wch:14},{wch:10},{wch:18},{wch:25},{wch:12},{wch:14},{wch:14},{wch:20}];
+    const ws=XLSX.utils.aoa_to_sheet([
+      ['Họ tên','SĐT','Loại','Khóa học','Học phí','Ngày BĐ','Ngày học','Trạng thái','Đợt 1','Thời gian Đ1','Đợt 2','Thời gian Đ2','Email','Ghi chú'],
+      ...D.students.map(s=>{
+        const c=D.courses.find(x=>x.id===s.course_id);
+        return[s.name,s.phone||'',s.type,c?c.name:(s.course||''),s.fee||0,s.start||'',s.class_date||'',s.status,
+          s.paid1?'Đã thu':'Chưa thu',s.paid1_at||'',
+          s.type==='Offline'?(s.paid2?'Đã thu':'Chưa thu'):'N/A',s.paid2_at||'',
+          s.email||'',s.note||''];
+      })
+    ]);
+    ws['!cols']=[{wch:22},{wch:14},{wch:10},{wch:20},{wch:12},{wch:12},{wch:12},{wch:14},{wch:10},{wch:16},{wch:10},{wch:16},{wch:25},{wch:20}];
     XLSX.utils.book_append_sheet(wb,ws,'Học viên');
   }
   if(type==='inventory'||type==='full'){
