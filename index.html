@@ -2938,6 +2938,7 @@ function xlExport(type){
     XLSX.utils.book_append_sheet(wb,ws,'Khách hàng');
     XLSX.writeFile(wb,`KhachHang_${ds2}.xlsx`);return;
   }
+  if(type==='orders'||type==='full'){
     const ws=XLSX.utils.aoa_to_sheet([['Mã đơn','Khách hàng','Sản phẩm','Tổng tiền','Thời gian','Trạng thái'],
       ...D.orders.map(o=>[o.id,o.customer,o.items,o.total||0,o.time,o.status])]);
     ws['!cols']=[{wch:10},{wch:20},{wch:40},{wch:15},{wch:18},{wch:18}];
