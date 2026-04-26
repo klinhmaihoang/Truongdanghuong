@@ -4,15 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Trương Dáng Hương Academy</title>
-
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<!-- Excel -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<!-- jsPDF -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -28,9 +21,9 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:var(--bg);color:var(--t
 .brand-main{font-size:14.5px;font-weight:700;color:var(--gold2)}
 .brand-sub{font-size:9.5px;color:var(--muted);letter-spacing:2px;text-transform:uppercase}
 .live{width:7px;height:7px;border-radius:50%;background:var(--teal);animation:pulse 2s infinite}
-.sync-indicator{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);background:var(--card);padding:4px 10px;border-radius:20px;border:1px solid var(--border)}
-.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--red)}
-.sync-dot.connected{background:var(--teal)}
+.sync-badge{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);background:var(--card);padding:4px 10px;border-radius:20px;border:1px solid var(--border)}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--red);transition:.3s}
+.sync-dot.ok{background:var(--teal)}
 .nav{display:flex;gap:2px;margin-left:auto}
 .nav button{background:transparent;border:none;color:var(--muted);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;transition:.15s}
 .nav button.active{background:rgba(201,150,58,.15);color:var(--gold2)}
@@ -46,13 +39,13 @@ body{font-family:'Segoe UI',Tahoma,sans-serif;background:var(--bg);color:var(--t
 .card-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px}
 .card-title{font-size:14px;font-weight:600}
 .btn{background:var(--gold);color:#111;border:none;padding:7px 15px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700;transition:.15s;white-space:nowrap}
-.btn:hover{filter:brightness(1.1)}.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn:hover{filter:brightness(1.1)}
 .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
 .btn-ghost:hover{border-color:var(--gold);color:var(--gold)}
 .btn-green{background:var(--green);color:#fff}.btn-red{background:var(--red);color:#fff}
-.btn-blue{background:var(--blue);color:#fff}.btn-tg{background:#229ED9;color:#fff}
-.btn-excel{background:#1D6F42;color:#fff}.btn-pdf{background:#c0392b;color:#fff}
-.btn-orange{background:var(--orange);color:#fff}.btn-sm{padding:4px 10px;font-size:12px}
+.btn-tg{background:#229ED9;color:#fff}.btn-excel{background:#1D6F42;color:#fff}
+.btn-pdf{background:#c0392b;color:#fff}.btn-orange{background:var(--orange);color:#fff}
+.btn-sm{padding:4px 10px;font-size:12px}
 .btn-group{display:flex;gap:7px;flex-wrap:wrap;align-items:center}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);color:var(--muted);font-weight:500;font-size:11px;text-transform:uppercase;letter-spacing:.5px}
@@ -87,11 +80,11 @@ tr:hover td{background:rgba(255,255,255,.02)}
 .pf{height:5px;border-radius:20px;background:var(--teal);transition:.4s}
 .pf.warn{background:var(--orange)}.pf.danger{background:var(--red)}
 .tg-box{background:rgba(34,158,217,.07);border:1px solid rgba(34,158,217,.2);border-radius:var(--r);padding:18px;margin-bottom:14px}
-.log-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;max-height:200px;overflow-y:auto;font-size:12px;font-family:monospace;color:#aaa}
+.log-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;max-height:200px;overflow-y:auto;font-size:12px;font-family:monospace}
 .log-e{padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03)}
 .log-t{color:var(--muted);margin-right:7px}
 .log-ok{color:var(--teal)}.log-err{color:var(--red)}.log-warn{color:var(--orange)}
-.guide{background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:12.5px;color:var(--muted);line-height:1.8}
+.guide{background:var(--bg);border-radius:8px;padding:10px 14px;margin-bottom:8px;font-size:12.5px;color:var(--muted);line-height:1.8;border-left:3px solid var(--gold)}
 code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);font-size:12px}
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:100;align-items:center;justify-content:center;padding:16px}
 .overlay.show{display:flex}
@@ -114,12 +107,6 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
 .tabs{display:flex;gap:3px;background:var(--surface);border-radius:var(--r);padding:4px;width:fit-content;margin-bottom:14px}
 .tab{padding:6px 16px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);transition:.15s}
 .tab.active{background:rgba(201,150,58,.18);color:var(--gold2)}
-/* Firebase setup page */
-.setup-box{max-width:600px;margin:40px auto;background:var(--card);border:1px solid var(--border);border-radius:14px;padding:28px}
-.setup-title{font-size:20px;font-weight:700;color:var(--gold2);margin-bottom:6px}
-.setup-sub{font-size:13px;color:var(--muted);margin-bottom:22px;line-height:1.7}
-.setup-step{background:var(--bg);border-radius:8px;padding:12px 16px;margin-bottom:10px;font-size:13px;color:var(--muted);line-height:1.8;border-left:3px solid var(--gold)}
-.setup-step strong{color:var(--text)}
 @media(max-width:700px){
   .stats{grid-template-columns:repeat(2,1fr)}
   .pos-wrap,.form-row{grid-template-columns:1fr}
@@ -130,42 +117,13 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
 </head>
 <body>
 
-<!-- FIREBASE SETUP PAGE (shown when not configured) -->
-<div id="setup-page" style="display:none;padding:20px">
-  <div class="setup-box">
-    <div class="setup-title">🔥 Thiết lập Firebase — Sync đa thiết bị</div>
-    <div class="setup-sub">
-      App cần kết nối Firebase Firestore để sync dữ liệu realtime giữa 10+ thiết bị.<br>
-      Làm 1 lần duy nhất, tất cả mọi người dùng chung 1 file HTML này.
-    </div>
-    <div class="setup-step"><strong>Bước 1</strong> — Vào <a href="https://console.firebase.google.com" target="_blank" style="color:var(--teal)">console.firebase.google.com</a> → Tạo project mới (miễn phí)</div>
-    <div class="setup-step"><strong>Bước 2</strong> — Vào <strong>Build → Firestore Database</strong> → Create database → chọn <strong>Start in test mode</strong></div>
-    <div class="setup-step"><strong>Bước 3</strong> — Vào <strong>Project Settings</strong> (bánh răng) → <strong>Your apps</strong> → Add app → Web (<code>&lt;/&gt;</code>) → Copy <strong>firebaseConfig</strong></div>
-    <div class="setup-step"><strong>Bước 4</strong> — Dán vào form dưới đây → Bấm Kết nối</div>
-    <div class="setup-step" style="border-color:var(--orange)"><strong>Lưu ý</strong> — Sau khi kết nối, gửi file HTML này cho cả team. Ai mở cũng dùng chung 1 database, dữ liệu sync realtime.</div>
-    <br>
-    <div class="fg" style="margin-bottom:12px"><label>API Key</label><input id="cfg-apikey" placeholder="AIzaSy..."/></div>
-    <div class="fg" style="margin-bottom:12px"><label>Auth Domain</label><input id="cfg-domain" placeholder="your-project.firebaseapp.com"/></div>
-    <div class="fg" style="margin-bottom:12px"><label>Project ID</label><input id="cfg-project" placeholder="your-project-id"/></div>
-    <div class="fg" style="margin-bottom:18px"><label>App ID</label><input id="cfg-appid" placeholder="1:123456:web:abc123"/></div>
-    <div class="btn-group">
-      <button class="btn btn-green" onclick="connectFirebase()">🔥 Kết nối Firebase</button>
-      <button class="btn btn-ghost" onclick="useLocalMode()">Dùng tạm (lưu local, không sync)</button>
-    </div>
-    <div id="cfg-error" style="color:var(--red);font-size:12px;margin-top:10px"></div>
-  </div>
-</div>
-
-<!-- MAIN APP -->
-<div id="app-page" style="display:none">
-
 <div class="topbar">
   <div>
     <div class="brand-main">Trương Dáng Hương Academy</div>
     <div class="brand-sub">Bartender &amp; Mixology Training</div>
   </div>
   <div class="live"></div>
-  <div class="sync-indicator" id="sync-badge">
+  <div class="sync-badge">
     <span class="sync-dot" id="sync-dot"></span>
     <span id="sync-label">Đang kết nối...</span>
   </div>
@@ -247,7 +205,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
         <div class="fg"><label>Tên khách *</label><input id="c-name" placeholder="Tên khách hàng"/></div>
         <div class="fg"><label>Email</label><input id="c-email" placeholder="email@gmail.com"/></div>
       </div>
-      <div class="fg" style="margin-bottom:10px"><label>Ghi chú</label><input id="c-note" placeholder="Ghi chú đơn hàng..."/></div>
+      <div class="fg" style="margin-bottom:10px"><label>Ghi chú</label><input id="c-note" placeholder="Ghi chú..."/></div>
       <button class="btn" style="width:100%;padding:12px;font-size:14px" onclick="checkout()">Tạo hóa đơn &amp; QR VietQR</button>
     </div>
   </div>
@@ -290,7 +248,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
   <div class="btn-group" style="margin-bottom:14px">
     <button class="btn btn-tg btn-sm" onclick="tgReport('orders')">📋 Telegram</button>
     <button class="btn btn-tg btn-sm" onclick="tgReport('daily')">📈 Tổng kết TG</button>
-    <button class="btn btn-excel btn-sm" onclick="xlExport('orders')">📊 Excel đơn hàng</button>
+    <button class="btn btn-excel btn-sm" onclick="xlExport('orders')">📊 Excel</button>
     <button class="btn btn-excel btn-sm" onclick="xlExport('full')">📁 Xuất toàn bộ</button>
   </div>
   <div class="card">
@@ -300,7 +258,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
   </div>
 </div>
 
-<!-- TELEGRAM -->
+<!-- TELEGRAM & CÀI ĐẶT -->
 <div class="page" id="page-telegram">
   <div class="tg-box">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
@@ -310,7 +268,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
         <div style="font-size:12px;color:var(--muted)">Báo cáo tự động gửi về nhóm của team</div>
       </div>
       <span style="display:flex;align-items:center;gap:6px;font-size:12px">
-        <span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block" id="tg-dot"></span>
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block;transition:.3s" id="tg-dot"></span>
         <span id="tg-status" style="color:var(--muted)">Chưa kết nối</span>
       </span>
     </div>
@@ -326,7 +284,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
           <option value="MB">MB Bank</option><option value="VTB">Vietinbank (VTB)</option>
           <option value="BIDV">BIDV</option><option value="ACB">ACB</option>
           <option value="VPB">VPBank</option><option value="TPB">TPBank</option>
-          <option value="STB">Sacombank (STB)</option><option value="MSB">MSB</option>
+          <option value="STB">Sacombank</option><option value="MSB">MSB</option>
         </select>
       </div>
     </div>
@@ -370,21 +328,20 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
   </div>
 </div>
 
-</div><!-- end .main -->
-</div><!-- end #app-page -->
+</div>
 
-<!-- ════════ MODALS ════════ -->
-<!-- QR Modal -->
+<!-- ════ MODALS ════ -->
+<!-- QR -->
 <div class="overlay" id="modal-qr">
   <div class="modal" style="max-width:420px;text-align:center">
     <div class="modal-title">Thanh toán VietQR</div>
     <div class="modal-sub" id="qr-bank-label">Vietcombank · Trương Dáng Hương</div>
     <div class="qr-amount-big" id="qr-amount">0 ₫</div>
-    <div class="qr-img-wrap"><img id="qr-img" src="" alt="QR" onerror="this.src='';this.style.display='none'"/></div>
+    <div class="qr-img-wrap"><img id="qr-img" src="" alt="QR"/></div>
     <div class="qr-bank" id="qr-info"></div>
     <div class="btn-group" style="justify-content:center;margin-top:14px;flex-wrap:wrap">
       <button class="btn btn-green btn-sm" onclick="markPaid()">✓ Xác nhận đã nhận tiền</button>
-      <button class="btn btn-pdf btn-sm" onclick="exportInvoicePDF()">📄 Xuất PDF hóa đơn</button>
+      <button class="btn btn-pdf btn-sm" onclick="exportPDF()">📄 Xuất PDF hóa đơn</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-qr')">Đóng</button>
     </div>
   </div>
@@ -423,7 +380,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
     </div>
     <div class="form-row">
       <div class="fg"><label>Ngày bắt đầu</label><input id="fs-start" type="date"/></div>
-      <div class="fg"><label>Ghi chú</label><input id="fs-note" placeholder="Ghi chú thêm..."/></div>
+      <div class="fg"><label>Ghi chú</label><input id="fs-note" placeholder="Ghi chú..."/></div>
     </div>
     <div class="btn-group" style="margin-top:8px">
       <button class="btn btn-green btn-sm" onclick="addStudent()">Lưu học viên</button>
@@ -437,16 +394,14 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
   <div class="modal">
     <div class="modal-title">Thêm sản phẩm mới</div>
     <div class="form-row">
-      <div class="fg"><label>Tên sản phẩm *</label><input id="fp-name" placeholder="VD: Trà lài"/></div>
+      <div class="fg"><label>Tên sản phẩm *</label><input id="fp-name" placeholder="Trà lài"/></div>
       <div class="fg"><label>Icon (emoji)</label><input id="fp-icon" placeholder="🍵" maxlength="2"/></div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Giá bán (₫) *</label><input id="fp-price" type="number" placeholder="35000"/></div>
-      <div class="fg"><label>Nguyên liệu liên kết</label>
-        <select id="fp-mat"><option value="-1">-- Không liên kết --</option></select>
-      </div>
+      <div class="fg"><label>Nguyên liệu liên kết</label><select id="fp-mat"></select></div>
     </div>
-    <div class="fg" style="margin-bottom:12px"><label>Lượng nguyên liệu dùng/lần</label><input id="fp-use" type="number" placeholder="0.1" step="0.01"/></div>
+    <div class="fg" style="margin-bottom:12px"><label>Lượng dùng/lần</label><input id="fp-use" type="number" placeholder="0.1" step="0.01"/></div>
     <div class="btn-group">
       <button class="btn btn-green btn-sm" onclick="addProduct()">Lưu sản phẩm</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-product')">Hủy</button>
@@ -460,23 +415,23 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
     <div class="modal-title">Chỉnh sửa sản phẩm</div>
     <input type="hidden" id="ep-id"/>
     <div class="form-row">
-      <div class="fg"><label>Tên sản phẩm *</label><input id="ep-name"/></div>
+      <div class="fg"><label>Tên *</label><input id="ep-name"/></div>
       <div class="fg"><label>Icon</label><input id="ep-icon" maxlength="2"/></div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Giá bán (₫) *</label><input id="ep-price" type="number"/></div>
-      <div class="fg"><label>Nguyên liệu</label><select id="ep-mat"><option value="-1">-- Không liên kết --</option></select></div>
+      <div class="fg"><label>Nguyên liệu</label><select id="ep-mat"></select></div>
     </div>
     <div class="fg" style="margin-bottom:12px"><label>Lượng dùng/lần</label><input id="ep-use" type="number" step="0.01"/></div>
     <div class="btn-group">
       <button class="btn btn-green btn-sm" onclick="saveProduct()">Lưu thay đổi</button>
-      <button class="btn btn-red btn-sm" onclick="deleteProduct()">Xóa sản phẩm</button>
+      <button class="btn btn-red btn-sm" onclick="deleteProduct()">Xóa</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-edit-product')">Hủy</button>
     </div>
   </div>
 </div>
 
-<!-- Import Stock -->
+<!-- Import -->
 <div class="overlay" id="modal-import">
   <div class="modal">
     <div class="modal-title">Nhập kho</div>
@@ -503,9 +458,9 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
       <div class="fg"><label>Nguyên liệu</label><select id="ex-mat"></select></div>
       <div class="fg"><label>Số lượng</label><input id="ex-qty" type="number" placeholder="5" min="0.01" step="0.01"/></div>
     </div>
-    <div class="fg" style="margin-bottom:12px"><label>Lý do</label><input id="ex-reason" placeholder="VD: Dùng thử, tặng mẫu..."/></div>
+    <div class="fg" style="margin-bottom:12px"><label>Lý do</label><input id="ex-reason" placeholder="VD: Dùng thử..."/></div>
     <div class="btn-group">
-      <button class="btn btn-red btn-sm" onclick="exportStock()">Xác nhận xuất kho</button>
+      <button class="btn btn-red btn-sm" onclick="exportStock()">Xác nhận xuất</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-export-stock')">Hủy</button>
     </div>
   </div>
@@ -527,52 +482,72 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
 <div class="notif" id="notif"></div>
 
 <script>
-// ══════════════════════════════════════════════════════
-// STATE (local cache — synced from/to Firestore)
-// ══════════════════════════════════════════════════════
-let db = null;
-let localMode = false;
+// ══════════════════════════════════════════════════
+// SUPABASE CONFIG — đã nhúng sẵn
+// ══════════════════════════════════════════════════
+const SUPABASE_URL = 'https://nmfgjuurdquyrdantolv.supabase.co';
+const SUPABASE_KEY = 'sb_publishable__-hia7DhFOCOb6apeOsR5g_X_HU7DjE';
 
-const DEFAULT = {
-  students: [
-    {id:'s1',name:'Linh Nguyễn',phone:'0901234567',type:'Online',course:'Nâng cao',email:'linh@gmail.com',fee:3500000,start:'2025-04-01',status:'Đang học',note:''},
-    {id:'s2',name:'Minh Trần',phone:'0912345678',type:'Offline',course:'Cơ bản',email:'minh@gmail.com',fee:2500000,start:'2025-04-05',status:'Đang học',note:''},
-    {id:'s3',name:'Hoa Lê',phone:'0923456789',type:'Offline',course:'Chuyên nghiệp',email:'hoa@gmail.com',fee:5000000,start:'2025-03-01',status:'Hoàn thành',note:''},
-  ],
-  inventory: [
-    {id:'i0',name:'Trà lài',unit:'kg',qty:12,min:5,cost:80000},
-    {id:'i1',name:'Hồng trà',unit:'kg',qty:8,min:5,cost:70000},
-    {id:'i2',name:'Trà mix',unit:'kg',qty:3,min:4,cost:90000},
-    {id:'i3',name:'Bột sữa',unit:'gói',qty:20,min:8,cost:45000},
-  ],
-  products: [
-    {id:'p0',name:'Trà lài',icon:'🍵',price:35000,matId:'i0',matUse:0.1},
-    {id:'p1',name:'Hồng trà',icon:'🍂',price:30000,matId:'i1',matUse:0.1},
-    {id:'p2',name:'Trà mix',icon:'🫖',price:45000,matId:'i2',matUse:0.1},
-    {id:'p3',name:'Bột sữa',icon:'🥛',price:25000,matId:'i3',matUse:1},
-    {id:'p4',name:'Combo Trà+Sữa',icon:'☕',price:55000,matId:'',matUse:0},
-    {id:'p5',name:'Khóa học Online',icon:'💻',price:2500000,matId:'',matUse:0},
-  ],
-  orders: [],
-  stockLog: [],
-  settings: {tgToken:'',tgChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG'}
+// REST helper
+async function sb(method, table, data=null, filter=''){
+  const url = `${SUPABASE_URL}/rest/v1/${table}${filter}`;
+  const headers = {
+    'apikey': SUPABASE_KEY,
+    'Authorization': 'Bearer ' + SUPABASE_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': method==='POST' ? 'return=representation' : 'return=minimal'
+  };
+  if(method==='GET') headers['Prefer']='';
+  const res = await fetch(url, {method, headers, body: data ? JSON.stringify(data) : null});
+  if(method==='GET') return res.ok ? await res.json() : [];
+  return res.ok;
+}
+const sbGet  = (t,f='')     => sb('GET',t,null,f);
+const sbPost = (t,d)        => sb('POST',t,d);
+const sbPatch= (t,d,f)      => sb('PATCH',t,d,f);
+const sbDel  = (t,f)        => sb('DELETE',t,null,f);
+const sbUpsert = async (t,d)=> {
+  const res = await fetch(`${SUPABASE_URL}/rest/v1/${t}`, {
+    method:'POST',
+    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,
+      'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+    body: JSON.stringify(d)
+  });
+  return res.ok;
 };
 
-let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],settings:{...DEFAULT.settings}};
-let cart = [];
-let invoice = null;
-let selectedStudentId = null;
-let stFilter = 'all';
-let tgLog = [];
+// ══════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════
+let D = {students:[],inventory:[],products:[],orders:[],stockLog:[]};
+let cfg = {tgToken:'',tgChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG'};
+let cart=[], invoice=null, selectedStudentId=null, stFilter='all', tgLog=[];
 
-// ══════════════════════════════════════════════════════
+const DEFAULTS = {
+  inventory:[
+    {id:'i0',name:'Trà lài',unit:'kg',qty:12,min:5,cost:80000,created_at:1},
+    {id:'i1',name:'Hồng trà',unit:'kg',qty:8,min:5,cost:70000,created_at:2},
+    {id:'i2',name:'Trà mix',unit:'kg',qty:3,min:4,cost:90000,created_at:3},
+    {id:'i3',name:'Bột sữa',unit:'gói',qty:20,min:8,cost:45000,created_at:4},
+  ],
+  products:[
+    {id:'p0',name:'Trà lài',icon:'🍵',price:35000,mat_id:'i0',mat_use:0.1,created_at:1},
+    {id:'p1',name:'Hồng trà',icon:'🍂',price:30000,mat_id:'i1',mat_use:0.1,created_at:2},
+    {id:'p2',name:'Trà mix',icon:'🫖',price:45000,mat_id:'i2',mat_use:0.1,created_at:3},
+    {id:'p3',name:'Bột sữa',icon:'🥛',price:25000,mat_id:'i3',mat_use:1,created_at:4},
+    {id:'p4',name:'Combo Trà+Sữa',icon:'☕',price:55000,mat_id:'',mat_use:0,created_at:5},
+    {id:'p5',name:'Khóa học Online',icon:'💻',price:2500000,mat_id:'',mat_use:0,created_at:6},
+  ]
+};
+
+// ══════════════════════════════════════════════════
 // UTILS
-// ══════════════════════════════════════════════════════
-const fmt = n => n.toLocaleString('vi-VN')+'₫';
+// ══════════════════════════════════════════════════
+const fmt = n => (n||0).toLocaleString('vi-VN')+'₫';
 const nowTime = ()=>{const d=new Date();return [d.getHours(),d.getMinutes(),d.getSeconds()].map(x=>String(x).padStart(2,'0')).join(':')};
 const nowDT = ()=>{const d=new Date();return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`};
 const todayStr = ()=>{const d=new Date();return `${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`};
-const uid = ()=>'id'+Date.now()+Math.random().toString(36).slice(2,7);
+const uid = ()=>'id'+Date.now()+Math.random().toString(36).slice(2,6);
 
 function notify(msg,ok=true){
   const el=document.getElementById('notif');
@@ -582,152 +557,133 @@ function notify(msg,ok=true){
 function showM(id){document.getElementById(id).classList.add('show');}
 function closeM(id){document.getElementById(id).classList.remove('show');}
 document.querySelectorAll('.overlay').forEach(el=>el.addEventListener('click',e=>{if(e.target===el)el.classList.remove('show');}));
-
-function syncStatus(connected,label){
-  document.getElementById('sync-dot').className='sync-dot'+(connected?' connected':'');
+function setSyncStatus(ok,label){
+  document.getElementById('sync-dot').className='sync-dot'+(ok?' ok':'');
   document.getElementById('sync-label').textContent=label;
 }
 
-// ══════════════════════════════════════════════════════
-// FIREBASE SETUP
-// ══════════════════════════════════════════════════════
-function connectFirebase(){
-  const apiKey=document.getElementById('cfg-apikey').value.trim();
-  const authDomain=document.getElementById('cfg-domain').value.trim();
-  const projectId=document.getElementById('cfg-project').value.trim();
-  const appId=document.getElementById('cfg-appid').value.trim();
-  if(!apiKey||!projectId){
-    document.getElementById('cfg-error').textContent='Vui lòng điền đầy đủ API Key và Project ID!';return;
-  }
-  try{
-    const cfg={apiKey,authDomain,projectId,appId};
-    localStorage.setItem('tdh_firebase_cfg',JSON.stringify(cfg));
-    initFirebase(cfg);
-  }catch(e){document.getElementById('cfg-error').textContent='Lỗi: '+e.message;}
-}
+// ══════════════════════════════════════════════════
+// BOOT — load tất cả từ Supabase
+// ══════════════════════════════════════════════════
+async function boot(){
+  // Load TG config từ localStorage ngay (không cần chờ Supabase)
+  loadLocalCfg();
 
-function initFirebase(cfg){
+  setSyncStatus(false,'Đang kết nối...');
   try{
-    if(!firebase.apps.length) firebase.initializeApp(cfg);
-    db=firebase.firestore();
-    document.getElementById('setup-page').style.display='none';
-    document.getElementById('app-page').style.display='block';
-    syncStatus(false,'Đang kết nối...');
-    loadAllFromFirestore();
-  }catch(e){
-    document.getElementById('cfg-error').textContent='Firebase lỗi: '+e.message;
-    document.getElementById('setup-page').style.display='block';
-  }
-}
+    const [students,inventory,products,orders,stockLog,settings] = await Promise.all([
+      sbGet('students','?order=created_at.asc'),
+      sbGet('inventory','?order=created_at.asc'),
+      sbGet('products','?order=created_at.asc'),
+      sbGet('orders','?order=created_at.asc'),
+      sbGet('stock_log','?order=created_at.desc&limit=200'),
+      sbGet('settings','?id=eq.main'),
+    ]);
 
-function useLocalMode(){
-  localMode=true;
-  document.getElementById('setup-page').style.display='none';
-  document.getElementById('app-page').style.display='block';
-  syncStatus(false,'Local mode (không sync)');
-  D.students=[...DEFAULT.students.map(x=>({...x}))];
-  D.inventory=[...DEFAULT.inventory.map(x=>({...x}))];
-  D.products=[...DEFAULT.products.map(x=>({...x}))];
-  D.orders=[];D.stockLog=[];
-  loadSavedTgConfig();
-  render();
-}
+    D.students = students||[];
+    D.inventory = inventory&&inventory.length ? inventory : DEFAULTS.inventory;
+    D.products  = products&&products.length  ? products  : DEFAULTS.products;
+    D.orders    = orders||[];
+    D.stockLog  = stockLog||[];
 
-// ══════════════════════════════════════════════════════
-// FIRESTORE OPERATIONS
-// ══════════════════════════════════════════════════════
-async function loadAllFromFirestore(){
-  if(!db)return;
-  try{
-    // Load collections
-    const cols=['students','inventory','products','orders','stockLog'];
-    for(const col of cols){
-      const snap=await db.collection(col).orderBy('createdAt','asc').get().catch(()=>db.collection(col).get());
-      D[col]=snap.docs.map(d=>({id:d.id,...d.data()}));
+    // Seed defaults nếu inventory/products trống
+    if(!inventory||!inventory.length){
+      for(const row of DEFAULTS.inventory) await sbUpsert('inventory',row);
     }
-    // Load settings
-    const setSnap=await db.collection('settings').doc('main').get();
-    if(setSnap.exists) D.settings={...DEFAULT.settings,...setSnap.data()};
+    if(!products||!products.length){
+      for(const row of DEFAULTS.products) await sbUpsert('products',row);
+    }
 
-    // Seed defaults if empty
-    if(D.students.length===0) await seedDefaults();
+    // Load settings từ Supabase (sẽ ghi đè localStorage nếu có)
+    if(settings&&settings.length){
+      const s=settings[0];
+      cfg={
+        tgToken:s.tg_token||'',tgChatId:s.tg_chat_id||'',
+        bankAcc:s.bank_acc||'',bankId:s.bank_id||'VCB',accName:s.acc_name||'TRUONG DANG HUONG'
+      };
+      saveCfgLocal(); // sync về localStorage
+      applyTgUI();
+    }
 
-    syncStatus(true,'Đã đồng bộ — '+nowTime());
-    setupRealtimeListeners();
-    loadSavedTgConfig();
+    setSyncStatus(true,'Đã đồng bộ — '+nowTime());
     render();
+
+    // Polling realtime mỗi 15s
+    setInterval(pollUpdates, 15000);
   }catch(e){
-    syncStatus(false,'Lỗi kết nối');
-    notify('Firebase lỗi: '+e.message,false);
-    // Fallback to defaults
-    D.students=[...DEFAULT.students.map(x=>({...x}))];
-    D.inventory=[...DEFAULT.inventory.map(x=>({...x}))];
-    D.products=[...DEFAULT.products.map(x=>({...x}))];
+    setSyncStatus(false,'Lỗi kết nối');
+    notify('Không kết nối được Supabase: '+e.message,false);
     render();
   }
 }
 
-async function seedDefaults(){
-  const batch=db.batch();
-  for(const s of DEFAULT.students) batch.set(db.collection('students').doc(s.id),{...s,createdAt:Date.now()});
-  for(const i of DEFAULT.inventory) batch.set(db.collection('inventory').doc(i.id),{...i,createdAt:Date.now()});
-  for(const p of DEFAULT.products) batch.set(db.collection('products').doc(p.id),{...p,createdAt:Date.now()});
-  await batch.commit();
-  D.students=[...DEFAULT.students];D.inventory=[...DEFAULT.inventory];D.products=[...DEFAULT.products];
+async function pollUpdates(){
+  try{
+    const [students,inventory,products,orders] = await Promise.all([
+      sbGet('students','?order=created_at.asc'),
+      sbGet('inventory','?order=created_at.asc'),
+      sbGet('products','?order=created_at.asc'),
+      sbGet('orders','?order=created_at.asc'),
+    ]);
+    D.students=students||D.students;
+    D.inventory=inventory&&inventory.length?inventory:D.inventory;
+    D.products=products&&products.length?products:D.products;
+    D.orders=orders||D.orders;
+    setSyncStatus(true,'Đồng bộ lúc '+nowTime());
+    render();
+  }catch(e){setSyncStatus(false,'Mất kết nối');}
 }
 
-function setupRealtimeListeners(){
-  if(!db)return;
-  ['students','inventory','products','orders'].forEach(col=>{
-    db.collection(col).onSnapshot(snap=>{
-      D[col]=snap.docs.map(d=>({id:d.id,...d.data()}));
-      D[col].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
-      syncStatus(true,'Đã đồng bộ — '+nowTime());
-      render();
-    });
-  });
+// ══════════════════════════════════════════════════
+// LOCAL CONFIG (Telegram — không cần nhập lại sau refresh)
+// ══════════════════════════════════════════════════
+function saveCfgLocal(){localStorage.setItem('tdh_cfg',JSON.stringify(cfg));}
+function loadLocalCfg(){
+  try{
+    const s=localStorage.getItem('tdh_cfg');
+    if(s){cfg={...cfg,...JSON.parse(s)};applyTgUI();}
+  }catch(e){}
+}
+function applyTgUI(){
+  if(cfg.tgToken) document.getElementById('tg-token').value=cfg.tgToken;
+  if(cfg.tgChatId) document.getElementById('tg-chatid').value=cfg.tgChatId;
+  if(cfg.bankAcc) document.getElementById('tg-bank-acc').value=cfg.bankAcc;
+  if(cfg.bankId) document.getElementById('tg-bank-id').value=cfg.bankId;
+  if(cfg.accName) document.getElementById('tg-acc-name').value=cfg.accName;
+  if(cfg.tgToken&&cfg.tgChatId){
+    document.getElementById('tg-dot').style.background='var(--teal)';
+    document.getElementById('tg-status').textContent='Đã cấu hình';
+    document.getElementById('tg-status').style.color='var(--teal)';
+  }
 }
 
-async function fsSet(col,id,data){
-  if(localMode)return;
-  if(!db)return;
-  await db.collection(col).doc(id).set({...data,updatedAt:Date.now()},{merge:true});
-}
-async function fsDel(col,id){
-  if(localMode)return;
-  if(!db)return;
-  await db.collection(col).doc(id).delete();
-}
-async function fsAdd(col,data){
-  if(localMode)return null;
-  if(!db)return null;
-  const ref=await db.collection(col).add({...data,createdAt:Date.now()});
-  return ref.id;
-}
-
-// ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
 // NAVIGATION
-// ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
 function go(p,btn){
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
   if(btn)btn.classList.add('active');
-  populateMatSelects();
+  fillMatSelects();
 }
 function stTab(el,f){
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
   el.classList.add('active');stFilter=f;renderStudents();
 }
 
-// ══════════════════════════════════════════════════════
-// RENDER
-// ══════════════════════════════════════════════════════
-function render(){
-  renderDash();renderStudents();renderProducts();renderProductList();
-  renderInventory();renderOrders();renderStockLog();renderLog();
-  populateMatSelects();
+function fillMatSelects(){
+  const none='<option value="">-- Không liên kết --</option>';
+  const opts=none+D.inventory.map(i=>`<option value="${i.id}">${i.name}</option>`).join('');
+  const stockOpts=D.inventory.map(i=>`<option value="${i.id}">${i.name} (còn: ${i.qty} ${i.unit})</option>`).join('');
+  ['fp-mat','ep-mat'].forEach(id=>{const el=document.getElementById(id);if(el){const v=el.value;el.innerHTML=opts;el.value=v;}});
+  ['im-mat','ex-mat'].forEach(id=>{const el=document.getElementById(id);if(el){const v=el.value;el.innerHTML=stockOpts;el.value=v;}});
 }
+
+// ══════════════════════════════════════════════════
+// RENDER
+// ══════════════════════════════════════════════════
+function render(){renderDash();renderStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();fillMatSelects();}
 
 function renderDash(){
   document.getElementById('s0').textContent=D.students.filter(s=>s.status==='Đang học').length;
@@ -735,9 +691,9 @@ function renderDash(){
   document.getElementById('s1').textContent=(rev/1000000).toFixed(1)+'M';
   document.getElementById('s2').textContent=D.orders.length;
   document.getElementById('s3').textContent=D.inventory.filter(i=>i.qty<=i.min).length;
-  document.getElementById('dash-orders').innerHTML=(D.orders.slice(-5).reverse()||[]).map(o=>`<tr>
+  document.getElementById('dash-orders').innerHTML=D.orders.slice(-5).reverse().map(o=>`<tr>
     <td>${o.customer}</td><td style="font-size:12px;color:var(--muted)">${o.items}</td>
-    <td style="color:var(--gold2);font-weight:700">${fmt(o.total||0)}</td>
+    <td style="color:var(--gold2);font-weight:700">${fmt(o.total)}</td>
     <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':'t-pending'}">${o.status}</span></td>
   </tr>`).join('');
   const low=D.inventory.filter(i=>i.qty<=i.min*1.5);
@@ -753,7 +709,7 @@ function renderStudents(){
     <td><strong>${s.name}</strong><br><span style="font-size:11px;color:var(--muted)">${s.phone||''}</span></td>
     <td><span class="tag ${s.type==='Online'?'t-online':'t-offline'}">${s.type}</span></td>
     <td style="font-size:12px">${s.course}</td>
-    <td style="color:var(--gold2);font-weight:700">${fmt(s.fee||0)}</td>
+    <td style="color:var(--gold2);font-weight:700">${fmt(s.fee)}</td>
     <td style="font-size:12px;color:var(--muted)">${s.start||'—'}</td>
     <td><span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Hoàn thành'?'t-done':'t-pending'}">${s.status}</span></td>
     <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openStDetail('${s.id}')">Chi tiết →</button></td>
@@ -766,10 +722,8 @@ function openStDetail(id){
   document.getElementById('student-detail-content').innerHTML=`
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
       <div class="detail-avatar">${s.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
-      <div>
-        <div style="font-size:18px;font-weight:700">${s.name}</div>
-        <div style="font-size:13px;color:var(--muted);margin-top:2px">${s.course} · ${s.type}</div>
-      </div>
+      <div><div style="font-size:18px;font-weight:700">${s.name}</div>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px">${s.course} · ${s.type}</div></div>
       <span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Hoàn thành'?'t-done':'t-pending'}" style="margin-left:auto">${s.status}</span>
     </div>
     <div class="detail-row"><span class="detail-label">Số điện thoại</span><span>${s.phone||'—'}</span></div>
@@ -777,7 +731,7 @@ function openStDetail(id){
     <div class="detail-row"><span class="detail-label">Khóa học</span><span>${s.course}</span></div>
     <div class="detail-row"><span class="detail-label">Loại hình</span><span>${s.type}</span></div>
     <div class="detail-row"><span class="detail-label">Ngày bắt đầu</span><span>${s.start||'—'}</span></div>
-    <div class="detail-row"><span class="detail-label">Học phí</span><span style="color:var(--gold2);font-weight:700">${fmt(s.fee||0)}</span></div>
+    <div class="detail-row"><span class="detail-label">Học phí</span><span style="color:var(--gold2);font-weight:700">${fmt(s.fee)}</span></div>
     <div class="detail-row"><span class="detail-label">Ghi chú</span><span style="color:var(--muted)">${s.note||'—'}</span></div>`;
   document.getElementById('btn-toggle-st').textContent=s.status==='Đang học'?'Đánh dấu hoàn thành':'Kích hoạt lại';
   showM('modal-student-detail');
@@ -786,61 +740,43 @@ function openStDetail(id){
 async function toggleSt(){
   const s=D.students.find(x=>x.id===selectedStudentId);if(!s)return;
   s.status=s.status==='Đang học'?'Hoàn thành':'Đang học';
-  await fsSet('students',s.id,s);
-  closeM('modal-student-detail');renderStudents();renderDash();
-  notify('Đã cập nhật: '+s.name);
+  await sbPatch('students',{status:s.status},`?id=eq.${s.id}`);
+  closeM('modal-student-detail');renderStudents();renderDash();notify('Đã cập nhật: '+s.name);
 }
 
 function deleteSt(){
   const s=D.students.find(x=>x.id===selectedStudentId);if(!s)return;
   confirmAct(`Xóa học viên "${s.name}"?`,'Hành động này không thể hoàn tác.',async()=>{
+    await sbDel('students',`?id=eq.${s.id}`);
     D.students=D.students.filter(x=>x.id!==selectedStudentId);
-    await fsDel('students',selectedStudentId);
-    closeM('modal-student-detail');renderStudents();renderDash();
-    notify('Đã xóa học viên: '+s.name);
-    tgMsg(`🗑 *Học viên đã bị xóa*\n\nTên: ${s.name}\nKhóa: ${s.course}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+    closeM('modal-student-detail');renderStudents();renderDash();notify('Đã xóa: '+s.name);
+    tgMsg(`🗑 *Học viên bị xóa*\n\nTên: ${s.name}\nKhóa: ${s.course}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
   });
 }
 
 async function addStudent(){
   const n=document.getElementById('fs-name').value.trim();
   if(!n){notify('Vui lòng nhập họ tên!',false);return;}
-  const s={
-    id:uid(),name:n,phone:document.getElementById('fs-phone').value,
+  const s={id:uid(),name:n,phone:document.getElementById('fs-phone').value,
     type:document.getElementById('fs-type').value,course:document.getElementById('fs-course').value,
     email:document.getElementById('fs-email').value,fee:+document.getElementById('fs-fee').value||0,
     start:document.getElementById('fs-start').value||todayStr(),
-    note:document.getElementById('fs-note').value,status:'Đang học'
-  };
+    note:document.getElementById('fs-note').value,status:'Đang học',created_at:Date.now()};
+  await sbUpsert('students',s);
   D.students.push(s);
-  await fsSet('students',s.id,s);
   closeM('modal-add-student');
   ['fs-name','fs-phone','fs-email','fs-fee','fs-start','fs-note'].forEach(id=>document.getElementById(id).value='');
-  renderStudents();renderDash();
-  notify('Đã thêm học viên: '+n);
+  renderStudents();renderDash();notify('Đã thêm: '+n);
   if(document.getElementById('at-student').checked)
-    tgMsg(`🎓 *Học viên mới đăng ký!*\n\n👤 ${n}\n📱 ${s.type}\n📚 ${s.course}\n💰 ${fmt(s.fee)}\n📧 ${s.email||'—'}\n\n_Trương Dáng Hương Academy_`);
+    tgMsg(`🎓 *Học viên mới!*\n\n👤 ${n}\n📱 ${s.type}\n📚 ${s.course}\n💰 ${fmt(s.fee)}\n\n_Trương Dáng Hương Academy_`);
 }
 
 // ── PRODUCTS ──
-function populateMatSelects(){
-  const opts=`<option value="">-- Không liên kết --</option>`+D.inventory.map(i=>`<option value="${i.id}">${i.name}</option>`).join('');
-  ['fp-mat','ep-mat','im-mat','ex-mat'].forEach(id=>{
-    const el=document.getElementById(id);if(!el)return;
-    const prev=el.value;
-    if(id==='im-mat'||id==='ex-mat'){
-      el.innerHTML=D.inventory.map(i=>`<option value="${i.id}">${i.name} (còn: ${i.qty} ${i.unit})</option>`).join('');
-    }else{el.innerHTML=opts;}
-    el.value=prev;
-  });
-}
-
 function renderProducts(){
   document.getElementById('prod-grid').innerHTML=D.products.map(p=>{
-    const mat=D.inventory.find(i=>i.id===p.matId);
-    const stock=mat&&p.matUse>0?Math.floor(mat.qty/p.matUse):null;
-    const low=stock!==null&&stock<5;
-    return`<div class="prod-card" onclick="addToCart('${p.id}')" style="${low?'border-color:rgba(192,57,43,.4)':''}">
+    const mat=D.inventory.find(i=>i.id===p.mat_id);
+    const stock=mat&&p.mat_use>0?Math.floor(mat.qty/p.mat_use):null;
+    return`<div class="prod-card" onclick="addToCart('${p.id}')" style="${stock!==null&&stock<5?'border-color:rgba(192,57,43,.4)':''}">
       <div class="prod-icon">${p.icon||'📦'}</div>
       <div class="prod-name">${p.name}</div>
       <div class="prod-price">${fmt(p.price)}</div>
@@ -852,13 +788,13 @@ function renderProducts(){
 function renderProductList(){
   const el=document.getElementById('product-list');if(!el)return;
   el.innerHTML=D.products.map(p=>{
-    const mat=D.inventory.find(i=>i.id===p.matId);
+    const mat=D.inventory.find(i=>i.id===p.mat_id);
     return`<tr>
       <td style="font-size:22px">${p.icon||'📦'}</td>
       <td><strong>${p.name}</strong></td>
       <td style="color:var(--gold2);font-weight:700">${fmt(p.price)}</td>
       <td style="font-size:12px;color:var(--muted)">${mat?mat.name:'—'}</td>
-      <td style="font-size:12px;color:var(--muted)">${mat&&p.matUse?p.matUse+' '+mat.unit+'/lần':'—'}</td>
+      <td style="font-size:12px;color:var(--muted)">${mat&&p.mat_use?p.mat_use+' '+mat.unit+'/lần':'—'}</td>
       <td><button class="btn btn-ghost btn-sm" onclick="openEditProd('${p.id}')">✏️ Sửa</button></td>
     </tr>`;
   }).join('');
@@ -870,7 +806,7 @@ function openEditProd(id){
   document.getElementById('ep-name').value=p.name;
   document.getElementById('ep-icon').value=p.icon||'';
   document.getElementById('ep-price').value=p.price;
-  setTimeout(()=>{document.getElementById('ep-mat').value=p.matId||'';document.getElementById('ep-use').value=p.matUse||0;},50);
+  setTimeout(()=>{document.getElementById('ep-mat').value=p.mat_id||'';document.getElementById('ep-use').value=p.mat_use||0;},30);
   showM('modal-edit-product');
 }
 
@@ -879,20 +815,19 @@ async function saveProduct(){
   const name=document.getElementById('ep-name').value.trim();
   const price=+document.getElementById('ep-price').value;
   if(!name||!price){notify('Nhập tên và giá!',false);return;}
-  const p=D.products.find(x=>x.id===id);
-  Object.assign(p,{name,icon:document.getElementById('ep-icon').value||'📦',price,
-    matId:document.getElementById('ep-mat').value,matUse:+document.getElementById('ep-use').value||0});
-  await fsSet('products',id,p);
-  closeM('modal-edit-product');render();
-  notify('Đã cập nhật: '+name);
+  const upd={name,icon:document.getElementById('ep-icon').value||'📦',price,
+    mat_id:document.getElementById('ep-mat').value,mat_use:+document.getElementById('ep-use').value||0};
+  await sbPatch('products',upd,`?id=eq.${id}`);
+  const p=D.products.find(x=>x.id===id);if(p)Object.assign(p,upd);
+  closeM('modal-edit-product');render();notify('Đã cập nhật: '+name);
 }
 
 function deleteProduct(){
   const id=document.getElementById('ep-id').value;
   const p=D.products.find(x=>x.id===id);if(!p)return;
-  confirmAct(`Xóa sản phẩm "${p.name}"?`,'Sản phẩm sẽ bị xóa khỏi danh sách bán hàng.',async()=>{
+  confirmAct(`Xóa sản phẩm "${p.name}"?`,'',async()=>{
+    await sbDel('products',`?id=eq.${id}`);
     D.products=D.products.filter(x=>x.id!==id);
-    await fsDel('products',id);
     closeM('modal-edit-product');render();notify('Đã xóa: '+p.name);
   });
 }
@@ -902,9 +837,8 @@ async function addProduct(){
   const price=+document.getElementById('fp-price').value;
   if(!name||!price){notify('Nhập tên và giá!',false);return;}
   const p={id:uid(),name,icon:document.getElementById('fp-icon').value||'📦',price,
-    matId:document.getElementById('fp-mat').value,matUse:+document.getElementById('fp-use').value||0};
-  D.products.push(p);
-  await fsSet('products',p.id,p);
+    mat_id:document.getElementById('fp-mat').value,mat_use:+document.getElementById('fp-use').value||0,created_at:Date.now()};
+  await sbUpsert('products',p);D.products.push(p);
   closeM('modal-add-product');
   ['fp-name','fp-icon','fp-price','fp-use'].forEach(id=>document.getElementById(id).value='');
   render();notify('Đã thêm: '+name);
@@ -937,31 +871,24 @@ function chgQty(i,d){cart[i].qty+=d;if(cart[i].qty<=0)cart.splice(i,1);renderCar
 function checkout(){
   if(!cart.length){notify('Giỏ hàng trống!',false);return;}
   const name=document.getElementById('c-name').value.trim()||'Khách lẻ';
-  const email=document.getElementById('c-email').value.trim();
-  const note=document.getElementById('c-note').value.trim();
   const total=cart.reduce((a,c)=>a+c.price*c.qty,0);
   const id='HĐ'+String(D.orders.length+1).padStart(3,'0');
   const items=cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')).join(', ');
-  invoice={id,name,email,note,total,items,time:nowDT()};
-
-  const cfg=D.settings;
+  invoice={id,name,email:document.getElementById('c-email').value.trim(),
+    note:document.getElementById('c-note').value.trim(),total,items,time:nowDT()};
   const bankId=cfg.bankId||'VCB';
   const accNo=cfg.bankAcc||'9704220000000000';
   const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
-  const addInfo=encodeURIComponent(id+' '+name);
-  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${total}&addInfo=${addInfo}&accountName=${encodeURIComponent(accName)}&template=compact2`;
-
+  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${total}&addInfo=${encodeURIComponent(id+' '+name)}&accountName=${encodeURIComponent(accName)}`;
   document.getElementById('qr-img').src=qrUrl;
-  document.getElementById('qr-img').style.display='block';
   document.getElementById('qr-amount').textContent=fmt(total);
   document.getElementById('qr-bank-label').textContent=`${bankId} · ${accNo} · ${accName}`;
   document.getElementById('qr-info').innerHTML=`
     <div><span>Mã đơn</span><span style="color:var(--gold2)">${id}</span></div>
     <div><span>Khách hàng</span><span>${name}</span></div>
     <div><span>Nội dung CK</span><span style="color:var(--teal)">${id} ${name}</span></div>
-    <div><span>Số tiền</span><span style="color:var(--gold2);font-size:15px">${fmt(total)}</span></div>
-    ${note?`<div><span>Ghi chú</span><span>${note}</span></div>`:''}`;
-
+    <div><span>Số tiền</span><span style="color:var(--gold2)">${fmt(total)}</span></div>
+    ${invoice.note?`<div><span>Ghi chú</span><span>${invoice.note}</span></div>`:''}`;
   showM('modal-qr');
   if(document.getElementById('at-sale').checked)
     tgMsg(`🛒 *Đơn hàng mới!*\n\nMã: \`${id}\`\n👤 ${name}\n🛍️ ${items}\n💰 ${fmt(total)}\n⏳ Chờ thanh toán\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
@@ -970,147 +897,99 @@ function checkout(){
 async function markPaid(){
   if(!invoice)return;
   const ts=nowDT();
-  // Deduct inventory
-  cart.forEach(c=>{
+  for(const c of cart){
     const p=D.products.find(x=>x.id===c.pid);
-    if(p&&p.matId&&p.matUse>0){
-      const mat=D.inventory.find(i=>i.id===p.matId);
+    if(p&&p.mat_id&&p.mat_use>0){
+      const mat=D.inventory.find(i=>i.id===p.mat_id);
       if(mat){
-        mat.qty=Math.max(0,Math.round((mat.qty-p.matUse*c.qty)*100)/100);
-        fsSet('inventory',mat.id,mat);
+        mat.qty=Math.max(0,Math.round((mat.qty-p.mat_use*c.qty)*100)/100);
+        await sbPatch('inventory',{qty:mat.qty},`?id=eq.${mat.id}`);
       }
     }
-  });
+  }
   const order={id:invoice.id,customer:invoice.name,email:invoice.email||'',items:invoice.items,
-    total:invoice.total,time:ts,note:invoice.note||'',status:'Đã thanh toán'};
+    total:invoice.total,time:ts,note:invoice.note||'',status:'Đã thanh toán',created_at:Date.now()};
+  await sbUpsert('orders',order);
   D.orders.push(order);
-  await fsSet('orders',order.id,order);
-
   const lowItems=D.inventory.filter(i=>i.qty<=i.min);
   cart=[];
-  document.getElementById('c-name').value='';document.getElementById('c-email').value='';document.getElementById('c-note').value='';
+  ['c-name','c-email','c-note'].forEach(id=>document.getElementById(id).value='');
   closeM('modal-qr');renderCart();render();
-  notify('✓ Thanh toán xong! Kho đã cập nhật tự động');
+  notify('✓ Thanh toán xong! Kho đã cập nhật');
   if(document.getElementById('at-paid').checked)
     tgMsg(`✅ *Thanh toán thành công!*\n\nMã: \`${order.id}\`\n👤 ${order.customer}\n💰 ${fmt(order.total)}\n📦 Kho đã cập nhật tự động\n🕐 ${ts}\n\n_Trương Dáng Hương Academy_`);
   if(lowItems.length&&document.getElementById('at-stock').checked)
     setTimeout(()=>tgMsg(`⚠️ *CẢNH BÁO KHO!*\n\n${lowItems.map(i=>`• ${i.name}: còn ${i.qty} ${i.unit}`).join('\n')}\n\n➡️ Cần nhập thêm nguyên liệu!\n\n_Trương Dáng Hương Academy_`),1000);
 }
 
-// ══════════════════════════════════════════════════════
-// PDF HÓA ĐƠN
-// ══════════════════════════════════════════════════════
-async function exportInvoicePDF(){
-  if(!invoice){notify('Không có hóa đơn!',false);return;}
-  if(typeof jspdf==='undefined'&&typeof window.jspdf==='undefined'){notify('Thư viện PDF chưa tải!',false);return;}
-
+// ── PDF ──
+async function exportPDF(orderId){
+  if(!window.jspdf){notify('Thư viện PDF chưa tải!',false);return;}
+  let inv=invoice;
+  let cartData=cart;
+  if(orderId){
+    const o=D.orders.find(x=>x.id===orderId);if(!o)return;
+    inv={id:o.id,name:o.customer,email:o.email||'',items:o.items,total:o.total,time:o.time,note:o.note||''};
+    cartData=o.items.split(',').map(s=>{
+      const m=s.trim().match(/^(.+?)(?:\s+x(\d+))?$/);if(!m)return null;
+      const name=m[1].trim();const qty=+(m[2]||1);
+      const p=D.products.find(x=>x.name===name)||{name,price:0};
+      return{pid:p.id||'',name,price:p.price||0,qty};
+    }).filter(Boolean);
+  }
+  if(!inv){notify('Không có hóa đơn!',false);return;}
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({unit:'mm',format:'a5',orientation:'portrait'});
-  const cfg=D.settings;
   const W=doc.internal.pageSize.getWidth();
-  const bankId=cfg.bankId||'VCB';
-  const accNo=cfg.bankAcc||'9704220000000000';
+  const bankId=cfg.bankId||'VCB',accNo=cfg.bankAcc||'9704220000000000';
   const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
-
-  // Header background
-  doc.setFillColor(13,13,20);
-  doc.rect(0,0,W,35,'F');
-
-  // Academy name
-  doc.setTextColor(232,185,106);
-  doc.setFontSize(14);doc.setFont('helvetica','bold');
+  doc.setFillColor(13,13,20);doc.rect(0,0,W,35,'F');
+  doc.setTextColor(232,185,106);doc.setFontSize(14);doc.setFont('helvetica','bold');
   doc.text('TRUONG DANG HUONG ACADEMY',W/2,12,{align:'center'});
   doc.setFontSize(8);doc.setTextColor(170,160,150);
   doc.text('BARTENDER & MIXOLOGY TRAINING',W/2,18,{align:'center'});
   doc.setFontSize(9);doc.setTextColor(45,212,160);
   doc.text('HOA DON BAN HANG',W/2,26,{align:'center'});
-
-  // Invoice info
-  doc.setTextColor(50,50,50);
-  doc.setFontSize(9);doc.setFont('helvetica','normal');
   let y=42;
-  const lineH=7;
   doc.setFillColor(248,246,240);doc.rect(5,37,W-10,32,'F');
-  doc.setFont('helvetica','bold');doc.setTextColor(180,130,50);
-  doc.text('THONG TIN HOA DON',10,y);
-  y+=lineH;
+  doc.setFont('helvetica','bold');doc.setTextColor(180,130,50);doc.text('THONG TIN HOA DON',10,y);y+=7;
   doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);
-  doc.text('Ma don hang:',10,y);doc.setFont('helvetica','bold');doc.text(invoice.id,55,y);
-  y+=lineH;
-  doc.setFont('helvetica','normal');
-  doc.text('Khach hang:',10,y);doc.text(invoice.name,55,y);
-  y+=lineH;
-  doc.text('Thoi gian:',10,y);doc.text(invoice.time,55,y);
-  if(invoice.note){y+=lineH;doc.text('Ghi chu:',10,y);doc.text(invoice.note,55,y);}
-
-  // Items table
+  doc.text('Ma don:',10,y);doc.setFont('helvetica','bold');doc.text(inv.id,50,y);y+=7;
+  doc.setFont('helvetica','normal');doc.text('Khach hang:',10,y);doc.text(inv.name,50,y);y+=7;
+  doc.text('Thoi gian:',10,y);doc.text(inv.time,50,y);
+  if(inv.note){y+=7;doc.text('Ghi chu:',10,y);doc.text(inv.note,50,y);}
   y+=12;
   doc.setFillColor(201,150,58);doc.rect(5,y-5,W-10,8,'F');
   doc.setTextColor(255,255,255);doc.setFont('helvetica','bold');doc.setFontSize(8);
-  doc.text('SAN PHAM',10,y);doc.text('SL',W-40,y,{align:'center'});doc.text('THANH TIEN',W-8,y,{align:'right'});
-
-  y+=3;
-  doc.setTextColor(50,50,50);doc.setFont('helvetica','normal');
-  cart.forEach((c,i)=>{
-    y+=7;
-    if(i%2===0){doc.setFillColor(252,250,245);doc.rect(5,y-5,W-10,7,'F');}
-    doc.text(c.name.substring(0,28),10,y);
-    doc.text(String(c.qty),W-40,y,{align:'center'});
+  doc.text('SAN PHAM',10,y);doc.text('SL',W-38,y,{align:'center'});doc.text('THANH TIEN',W-8,y,{align:'right'});
+  y+=3;doc.setTextColor(50,50,50);doc.setFont('helvetica','normal');
+  cartData.forEach((c,i)=>{
+    y+=7;if(i%2===0){doc.setFillColor(252,250,245);doc.rect(5,y-5,W-10,7,'F');}
+    doc.text(c.name.substring(0,30),10,y);doc.text(String(c.qty),W-38,y,{align:'center'});
     doc.text(fmt(c.price*c.qty),W-8,y,{align:'right'});
   });
-
-  // Total
-  y+=10;
-  doc.setFillColor(232,185,106);doc.rect(5,y-5,W-10,10,'F');
+  y+=10;doc.setFillColor(232,185,106);doc.rect(5,y-5,W-10,10,'F');
   doc.setTextColor(20,20,20);doc.setFont('helvetica','bold');doc.setFontSize(11);
-  doc.text('TONG CONG:',10,y+1);
-  doc.text(fmt(invoice.total),W-8,y+1,{align:'right'});
-
-  // VietQR section
-  y+=18;
-  doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(180,130,50);
-  doc.text('THANH TOAN CHUYEN KHOAN (VIETQR)',W/2,y,{align:'center'});
-  y+=5;
+  doc.text('TONG CONG:',10,y+1);doc.text(fmt(inv.total),W-8,y+1,{align:'right'});
+  y+=18;doc.setFontSize(9);doc.setFont('helvetica','bold');doc.setTextColor(180,130,50);
+  doc.text('THANH TOAN CHUYEN KHOAN (VIETQR)',W/2,y,{align:'center'});y+=5;
   doc.setFont('helvetica','normal');doc.setTextColor(50,50,50);doc.setFontSize(8);
-  doc.text(`Ngan hang: ${bankId}   So TK: ${accNo}`,W/2,y,{align:'center'});
-  y+=5;
-  doc.text(`Chu TK: ${accName}`,W/2,y,{align:'center'});
-  y+=5;
-  doc.text(`Noi dung CK: ${invoice.id} ${invoice.name}`,W/2,y,{align:'center'});
-
-  // Fetch & embed QR image
+  doc.text(`NH: ${bankId}   STK: ${accNo}`,W/2,y,{align:'center'});y+=5;
+  doc.text(`Chu TK: ${accName}`,W/2,y,{align:'center'});y+=5;
+  doc.text(`ND: ${inv.id} ${inv.name}`,W/2,y,{align:'center'});
   try{
-    const addInfo=encodeURIComponent(invoice.id+' '+invoice.name);
-    const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${invoice.total}&addInfo=${addInfo}&accountName=${encodeURIComponent(accName)}`;
-    const imgData=await fetchImageAsBase64(qrUrl);
-    if(imgData){
-      y+=5;
-      const qrSize=48;
-      doc.addImage(imgData,'PNG',(W-qrSize)/2,y,qrSize,qrSize);
-      y+=qrSize+5;
-    }
-  }catch(e){y+=5;doc.text('[QR Code - Quet de chuyen khoan]',W/2,y,{align:'center'});y+=8;}
-
-  // Footer
+    const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${inv.total}&addInfo=${encodeURIComponent(inv.id+' '+inv.name)}&accountName=${encodeURIComponent(accName)}`;
+    const imgData=await new Promise(res=>{
+      const img=new Image();img.crossOrigin='anonymous';
+      img.onload=()=>{const c=document.createElement('canvas');c.width=img.width;c.height=img.height;c.getContext('2d').drawImage(img,0,0);res(c.toDataURL('image/png'));};
+      img.onerror=()=>res(null);img.src=qrUrl;
+    });
+    if(imgData){y+=5;const qs=48;doc.addImage(imgData,'PNG',(W-qs)/2,y,qs,qs);y+=qs+5;}
+  }catch(e){}
   doc.setFontSize(7.5);doc.setTextColor(130,130,130);
   doc.text('Cam on quy khach! Truong Dang Huong Academy',W/2,y+5,{align:'center'});
-
-  doc.save(`HoaDon_${invoice.id}_${invoice.name.replace(/\s/g,'_')}.pdf`);
-  notify('✓ Đã xuất PDF hóa đơn: '+invoice.id);
-}
-
-async function fetchImageAsBase64(url){
-  return new Promise((resolve)=>{
-    const img=new Image();img.crossOrigin='anonymous';
-    img.onload=()=>{
-      const canvas=document.createElement('canvas');
-      canvas.width=img.width;canvas.height=img.height;
-      canvas.getContext('2d').drawImage(img,0,0);
-      resolve(canvas.toDataURL('image/png'));
-    };
-    img.onerror=()=>resolve(null);
-    img.src=url;
-  });
+  doc.save(`HoaDon_${inv.id}.pdf`);
+  notify('✓ Đã xuất PDF: '+inv.id);
 }
 
 // ── ORDERS ──
@@ -1120,12 +999,12 @@ function renderOrders(){
     <td style="font-weight:700;color:var(--gold2)">${o.id}</td>
     <td>${o.customer}</td>
     <td style="font-size:12px;color:var(--muted)">${o.items}</td>
-    <td style="font-weight:700">${fmt(o.total||0)}</td>
+    <td style="font-weight:700">${fmt(o.total)}</td>
     <td style="font-size:12px;color:var(--muted)">${o.time}</td>
     <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':'t-pending'}">${o.status}</span></td>
     <td class="btn-group">
       ${o.status!=='Đã thanh toán'?`<button class="btn btn-green btn-sm" onclick="directPay('${o.id}')">Thu tiền</button>`:''}
-      <button class="btn btn-pdf btn-sm" onclick="reexportPDF('${o.id}')">📄 PDF</button>
+      <button class="btn btn-pdf btn-sm" onclick="exportPDF('${o.id}')">📄 PDF</button>
     </td>
   </tr>`).join('');
 }
@@ -1133,25 +1012,9 @@ function renderOrders(){
 async function directPay(id){
   const o=D.orders.find(x=>x.id===id);if(!o)return;
   o.status='Đã thanh toán';
-  await fsSet('orders',id,o);
+  await sbPatch('orders',{status:'Đã thanh toán'},`?id=eq.${id}`);
   render();notify('✓ Đã xác nhận thanh toán đơn '+id);
   tgMsg(`✅ *Thu tiền!*\n\nMã: \`${o.id}\`\n👤 ${o.customer}\n💰 ${fmt(o.total)}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
-}
-
-async function reexportPDF(id){
-  const o=D.orders.find(x=>x.id===id);if(!o)return;
-  // Reconstruct invoice-like object for PDF
-  invoice={id:o.id,name:o.customer,email:o.email||'',items:o.items,total:o.total,time:o.time,note:o.note||''};
-  // Reconstruct cart from items string
-  cart=o.items.split(',').map(s=>{
-    const m=s.trim().match(/^(.+?)(?:\s+x(\d+))?$/);
-    if(!m)return null;
-    const name=m[1].trim();const qty=+(m[2]||1);
-    const p=D.products.find(x=>x.name===name)||{name,price:0};
-    return{pid:p.id||'',name,price:p.price||0,qty};
-  }).filter(Boolean);
-  await exportInvoicePDF();
-  invoice=null;cart=[];
 }
 
 // ── INVENTORY ──
@@ -1167,12 +1030,10 @@ function renderInventory(){
       <td><strong style="color:${col}">${item.qty}</strong></td>
       <td style="color:var(--muted)">${item.min}</td>
       <td style="width:120px"><div class="pb"><div class="pf ${cls}" style="width:${pct}%"></div></div></td>
-      <td><button class="btn btn-ghost btn-sm" onclick="quickImport('${item.id}')">Nhập nhanh</button></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="document.getElementById('im-mat').value='${item.id}';showM('modal-import')">Nhập nhanh</button></td>
     </tr>`;
   }).join('');
 }
-
-function quickImport(id){document.getElementById('im-mat').value=id;showM('modal-import');}
 
 async function importStock(){
   const id=document.getElementById('im-mat').value;
@@ -1182,14 +1043,14 @@ async function importStock(){
   if(!qty||qty<=0){notify('Nhập số lượng hợp lệ!',false);return;}
   const mat=D.inventory.find(i=>i.id===id);if(!mat)return;
   mat.qty=Math.round((mat.qty+qty)*100)/100;
-  await fsSet('inventory',id,mat);
-  const log={id:uid(),time:nowDT(),name:mat.name,type:'Nhập',qty:'+'+qty+' '+mat.unit,note:sup+(price?' ('+fmt(price)+'/đv)':'')};
-  D.stockLog.unshift(log);
-  await fsSet('stockLog',log.id,log);
+  await sbPatch('inventory',{qty:mat.qty},`?id=eq.${id}`);
+  const log={id:uid(),time:nowDT(),name:mat.name,type:'Nhập',qty:'+'+qty+' '+mat.unit,
+    note:sup+(price?' ('+fmt(price)+'/đv)':''),created_at:Date.now()};
+  await sbUpsert('stock_log',log);D.stockLog.unshift(log);
   closeM('modal-import');['im-qty','im-sup','im-price'].forEach(id=>document.getElementById(id).value='');
   render();notify(`Đã nhập: +${qty} ${mat.unit} ${mat.name}`);
   if(document.getElementById('at-import').checked)
-    tgMsg(`📦 *Nhập kho!*\n\n${mat.name}: +${qty} ${mat.unit}\nNCC: ${sup}${price?'\nGiá: '+fmt(price)+'/đv':''}\nTồn: ${mat.qty} ${mat.unit}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+    tgMsg(`📦 *Nhập kho!*\n\n${mat.name}: +${qty} ${mat.unit}\nNCC: ${sup}\nTồn: ${mat.qty} ${mat.unit}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
 }
 
 async function exportStock(){
@@ -1200,9 +1061,9 @@ async function exportStock(){
   const mat=D.inventory.find(i=>i.id===id);if(!mat)return;
   if(qty>mat.qty){notify('Không đủ tồn kho!',false);return;}
   mat.qty=Math.round((mat.qty-qty)*100)/100;
-  await fsSet('inventory',id,mat);
-  const log={id:uid(),time:nowDT(),name:mat.name,type:'Xuất',qty:'-'+qty+' '+mat.unit,note:reason};
-  D.stockLog.unshift(log);await fsSet('stockLog',log.id,log);
+  await sbPatch('inventory',{qty:mat.qty},`?id=eq.${id}`);
+  const log={id:uid(),time:nowDT(),name:mat.name,type:'Xuất',qty:'-'+qty+' '+mat.unit,note:reason,created_at:Date.now()};
+  await sbUpsert('stock_log',log);D.stockLog.unshift(log);
   closeM('modal-export-stock');['ex-qty','ex-reason'].forEach(id=>document.getElementById(id).value='');
   render();notify(`Đã xuất: -${qty} ${mat.unit} ${mat.name}`);
 }
@@ -1210,47 +1071,28 @@ async function exportStock(){
 function renderStockLog(){
   const el=document.getElementById('stock-log');if(!el)return;
   el.innerHTML=D.stockLog.length?D.stockLog.map(l=>`<tr>
-    <td style="font-size:12px;color:var(--muted)">${l.time}</td>
-    <td>${l.name}</td>
+    <td style="font-size:12px;color:var(--muted)">${l.time}</td><td>${l.name}</td>
     <td><span class="tag ${l.type==='Nhập'?'t-paid':'t-pending'}">${l.type}</span></td>
     <td style="font-weight:700;color:${l.type==='Nhập'?'var(--teal)':'var(--orange)'}">${l.qty}</td>
     <td style="font-size:12px;color:var(--muted)">${l.note}</td>
   </tr>`).join(''):'<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:16px;font-size:12px">Chưa có lịch sử</td></tr>';
 }
 
-// ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
 // TELEGRAM
-// ══════════════════════════════════════════════════════
-function loadSavedTgConfig(){
-  // Merge localStorage cache into D.settings (fast, works before Firestore loads)
-  try{
-    const cached=localStorage.getItem('tdh_tg_cfg');
-    if(cached){const c=JSON.parse(cached);D.settings={...D.settings,...c};}
-  }catch(e){}
-  const s=D.settings||{};
-  if(s.tgToken)document.getElementById('tg-token').value=s.tgToken;
-  if(s.tgChatId)document.getElementById('tg-chatid').value=s.tgChatId;
-  if(s.bankAcc)document.getElementById('tg-bank-acc').value=s.bankAcc;
-  if(s.bankId)document.getElementById('tg-bank-id').value=s.bankId;
-  if(s.accName)document.getElementById('tg-acc-name').value=s.accName;
-  if(s.tgToken&&s.tgChatId){
-    document.getElementById('tg-dot').style.background='var(--teal)';
-    document.getElementById('tg-status').textContent='Đã cấu hình';
-    document.getElementById('tg-status').style.color='var(--teal)';
-  }
-}
-
+// ══════════════════════════════════════════════════
 async function saveTg(){
   const t=document.getElementById('tg-token').value.trim();
   const c=document.getElementById('tg-chatid').value.trim();
   if(!t||!c){notify('Nhập đầy đủ Token và Chat ID!',false);return;}
-  D.settings={...D.settings,tgToken:t,tgChatId:c,
+  cfg={tgToken:t,tgChatId:c,
     bankAcc:document.getElementById('tg-bank-acc').value.trim(),
     bankId:document.getElementById('tg-bank-id').value,
     accName:document.getElementById('tg-acc-name').value.trim()||'TRUONG DANG HUONG'};
-  // Save to localStorage so it survives refresh without re-entering
-  localStorage.setItem('tdh_tg_cfg',JSON.stringify(D.settings));
-  await fsSet('settings','main',D.settings);
+  saveCfgLocal();
+  // Lưu lên Supabase để sync cho cả team
+  await sbUpsert('settings',{id:'main',tg_token:t,tg_chat_id:c,
+    bank_acc:cfg.bankAcc,bank_id:cfg.bankId,acc_name:cfg.accName});
   try{
     const r=await fetch(`https://api.telegram.org/bot${t}/getMe`);
     const d=await r.json();
@@ -1259,15 +1101,15 @@ async function saveTg(){
       document.getElementById('tg-status').textContent='@'+d.result.username;
       document.getElementById('tg-status').style.color='var(--teal)';
       notify('✓ Kết nối thành công @'+d.result.username);
-      tgMsg(`🎉 *Kết nối thành công!*\n\n🏫 *Trương Dáng Hương Academy*\n\nBáo cáo tự động đã được bật:\n✅ Đơn hàng | ✅ Thanh toán | ✅ Kho | ✅ Học viên\n\n🔥 Sync Firebase đang hoạt động!\n_Chào mừng team!_ 🍵`);
+      tgMsg(`🎉 *Kết nối thành công!*\n\n🏫 *Trương Dáng Hương Academy*\n✅ Sync Supabase đang hoạt động!\n✅ Telegram Bot đã kết nối!\n\n_Chào mừng team!_ 🍵`);
     }else notify('Token không hợp lệ',false);
   }catch(e){notify('Không kết nối được Telegram',false);}
 }
 
 function clearTg(){
-  D.settings={...D.settings,tgToken:'',tgChatId:''};
-  fsSet('settings','main',D.settings);
-  localStorage.removeItem('tdh_tg_cfg');
+  cfg={...cfg,tgToken:'',tgChatId:''};
+  saveCfgLocal();
+  sbUpsert('settings',{id:'main',tg_token:'',tg_chat_id:''});
   ['tg-token','tg-chatid'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('tg-dot').style.background='var(--red)';
   document.getElementById('tg-status').textContent='Chưa kết nối';
@@ -1276,8 +1118,7 @@ function clearTg(){
 }
 
 async function tgMsg(text){
-  const t=D.settings.tgToken||document.getElementById('tg-token').value.trim();
-  const c=D.settings.tgChatId||document.getElementById('tg-chatid').value.trim();
+  const t=cfg.tgToken, c=cfg.tgChatId;
   const entry={time:nowTime(),text:text.split('\n')[0].replace(/[*`]/g,''),ok:false,err:''};
   if(!t||!c){entry.text='[Chưa cấu hình] '+entry.text;addLog(entry);return;}
   try{
@@ -1286,13 +1127,11 @@ async function tgMsg(text){
       body:JSON.stringify({chat_id:c,text,parse_mode:'Markdown'})
     });
     const d=await r.json();
-    entry.ok=d.ok;
-    entry.text=(d.ok?'✓ Đã gửi: ':'✗ Lỗi: ')+entry.text;
+    entry.ok=d.ok;entry.text=(d.ok?'✓ Đã gửi: ':'✗ Lỗi: ')+entry.text;
     if(!d.ok)entry.err=d.description||'';
   }catch(e){entry.text='✗ Lỗi mạng: '+entry.text;entry.err=e.message;}
   addLog(entry);
 }
-
 function addLog(e){tgLog.unshift(e);if(tgLog.length>100)tgLog.pop();renderLog();}
 function renderLog(){
   const el=document.getElementById('tg-log');if(!el)return;
@@ -1303,17 +1142,16 @@ function renderLog(){
   </div>`).join(''):'<div class="log-e"><span style="color:var(--muted)">Chưa có hoạt động...</span></div>';
 }
 function clearLog(){tgLog=[];renderLog();}
-
 function tgReport(type){
   let msg='';
-  if(type==='test') msg=`🤖 *Test OK!*\n\n*Trương Dáng Hương Academy*\n🕐 ${nowDT()}\n✅ Hệ thống hoạt động bình thường`;
+  if(type==='test') msg=`🤖 *Test OK!*\n\n*Trương Dáng Hương Academy*\n🔥 Supabase sync: hoạt động\n🕐 ${nowDT()}\n✅ Hệ thống bình thường`;
   else if(type==='daily'){
     const paid=D.orders.filter(o=>o.status==='Đã thanh toán');
     const rev=paid.reduce((a,o)=>a+(o.total||0),0);
     msg=`📈 *BÁO CÁO NGÀY ${todayStr()}*\n━━━━━━━━━\n💰 Doanh thu: ${fmt(rev)}\n✅ Đơn đã thu: ${paid.length}\n⏳ Đơn chờ: ${D.orders.length-paid.length}\n🎓 HV đang học: ${D.students.filter(s=>s.status==='Đang học').length}\n━━━━━━━━━\n📦 Kho:\n${D.inventory.map(i=>`${i.qty<=i.min?'⚠️':i.qty<=i.min*1.5?'🟡':'✅'} ${i.name}: ${i.qty} ${i.unit}`).join('\n')}\n━━━━━━━━━\n_Trương Dáng Hương Academy_`;
   }else if(type==='orders'){
     const list=D.orders.slice(-8).reverse().map(o=>`${o.status==='Đã thanh toán'?'✅':'⏳'} \`${o.id}\` ${o.customer} — ${fmt(o.total||0)}`).join('\n');
-    msg=`📋 *ĐƠN HÀNG GẦN NHẤT*\n━━━━━━━━━\n${list||'(chưa có đơn)'}\n━━━━━━━━━\nTổng: ${D.orders.length} đơn\n_Trương Dáng Hương Academy_`;
+    msg=`📋 *ĐƠN HÀNG GẦN NHẤT*\n━━━━━━━━━\n${list||'(chưa có)'}\n━━━━━━━━━\nTổng: ${D.orders.length}\n_Trương Dáng Hương Academy_`;
   }else if(type==='inventory'){
     msg=`📦 *KHO HÀNG*\n━━━━━━━━━\n${D.inventory.map(i=>`${i.qty<=i.min?'⚠️':i.qty<=i.min*1.5?'🟡':'✅'} *${i.name}*: ${i.qty} ${i.unit} (min: ${i.min})`).join('\n')}\n━━━━━━━━━\n🕐 ${nowDT()}\n_Trương Dáng Hương Academy_`;
   }else if(type==='students'){
@@ -1321,19 +1159,18 @@ function tgReport(type){
     msg=`🎓 *HỌC VIÊN ĐANG HỌC* (${a.length})\n━━━━━━━━━\n${a.map(s=>`• ${s.name} — ${s.type} — ${s.course}`).join('\n')||'(chưa có)'}\n━━━━━━━━━\n_Trương Dáng Hương Academy_`;
   }else if(type==='revenue'){
     const paid=D.orders.filter(o=>o.status==='Đã thanh toán');
-    const rev=paid.reduce((a,o)=>a+(o.total||0),0);
-    msg=`💰 *DOANH THU*\n━━━━━━━━━\n📦 Đã thu: ${fmt(rev)}\n🎓 Học phí (tổng): ${fmt(D.students.reduce((a,s)=>a+(s.fee||0),0))}\n📊 ${D.orders.length} đơn (${paid.length} đã TT)\n━━━━━━━━━\n🕐 ${nowDT()}\n_Trương Dáng Hương Academy_`;
+    msg=`💰 *DOANH THU*\n━━━━━━━━━\n📦 Đã thu: ${fmt(paid.reduce((a,o)=>a+(o.total||0),0))}\n🎓 Học phí (tổng): ${fmt(D.students.reduce((a,s)=>a+(s.fee||0),0))}\n📊 ${D.orders.length} đơn (${paid.length} đã TT)\n━━━━━━━━━\n_Trương Dáng Hương Academy_`;
   }
   if(msg)tgMsg(msg);
 }
 
-// ══════════════════════════════════════════════════════
-// EXCEL EXPORT
-// ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// EXCEL
+// ══════════════════════════════════════════════════
 function xlExport(type){
   if(typeof XLSX==='undefined'){notify('Thư viện Excel chưa tải!',false);return;}
   const wb=XLSX.utils.book_new();
-  const ds=new Date();const dateStr=`${ds.getDate()}-${ds.getMonth()+1}-${ds.getFullYear()}`;
+  const ds=new Date();const ds2=`${ds.getDate()}-${ds.getMonth()+1}-${ds.getFullYear()}`;
   if(type==='orders'||type==='full'){
     const ws=XLSX.utils.aoa_to_sheet([['Mã đơn','Khách hàng','Sản phẩm','Tổng tiền','Thời gian','Trạng thái'],
       ...D.orders.map(o=>[o.id,o.customer,o.items,o.total||0,o.time,o.status])]);
@@ -1360,8 +1197,7 @@ function xlExport(type){
   }
   if(type==='full'){
     const paid=D.orders.filter(o=>o.status==='Đã thanh toán');
-    const ws=XLSX.utils.aoa_to_sheet([
-      ['TRƯƠNG DÁNG HƯƠNG ACADEMY'],['Ngày xuất',todayStr()],[''],
+    const ws=XLSX.utils.aoa_to_sheet([['TRƯƠNG DÁNG HƯƠNG ACADEMY'],['Ngày xuất',todayStr()],[''],
       ['Chỉ số','Giá trị'],
       ['Doanh thu đã thu',paid.reduce((a,o)=>a+(o.total||0),0)],
       ['Tổng đơn',D.orders.length],['Đã thanh toán',paid.length],
@@ -1373,15 +1209,14 @@ function xlExport(type){
     XLSX.utils.book_append_sheet(wb,ws,'Tổng kết');
   }
   if(!wb.SheetNames.length){notify('Không có dữ liệu!',false);return;}
-  const fn=`TruongDangHuong_${type}_${dateStr}.xlsx`;
-  XLSX.writeFile(wb,fn);
-  notify(`✓ Đã xuất: ${fn}`);
+  const fn=`TruongDangHuong_${type}_${ds2}.xlsx`;
+  XLSX.writeFile(wb,fn);notify(`✓ Đã xuất: ${fn}`);
   tgMsg(`📊 *Xuất Excel!*\nFile: \`${fn}\`\n🕐 ${nowDT()}\n_Trương Dáng Hương Academy_`);
 }
 
-// ══════════════════════════════════════════════════════
-// CONFIRM DIALOG
-// ══════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// CONFIRM
+// ══════════════════════════════════════════════════
 function confirmAct(title,msg,cb){
   document.getElementById('cfm-title').textContent=title;
   document.getElementById('cfm-msg').textContent=msg;
@@ -1389,18 +1224,10 @@ function confirmAct(title,msg,cb){
   showM('modal-confirm');
 }
 
-// ══════════════════════════════════════════════════════
-// BOOT
-// ══════════════════════════════════════════════════════
-(function init(){
-  // Load TG config from localStorage immediately (before Firestore)
-  loadSavedTgConfig();
-  const saved=localStorage.getItem('tdh_firebase_cfg');
-  if(saved){
-    try{initFirebase(JSON.parse(saved));return;}catch(e){}
-  }
-  document.getElementById('setup-page').style.display='block';
-})();
+// ══════════════════════════════════════════════════
+// START
+// ══════════════════════════════════════════════════
+boot();
 </script>
 </body>
 </html>
