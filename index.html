@@ -114,33 +114,64 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 .tab{padding:6px 16px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);transition:.15s}
 .tab.active{background:rgba(201,150,58,.18);color:var(--gold2)}
 @media(max-width:700px){
+  /* Layout */
   .stats{grid-template-columns:repeat(2,1fr)}
   .pos-wrap{grid-template-columns:1fr}
   .form-row{grid-template-columns:1fr}
   .prod-grid{grid-template-columns:repeat(2,1fr)}
-  .main{padding:12px 12px 80px}
-  .card{padding:14px 12px}
-  /* Ẩn topbar nav trên mobile */
+  .main{padding:10px 10px 80px}
+  .card{padding:12px 10px;overflow-x:auto}
+  /* Dashboard 2 col → 1 col */
+  #page-dashboard > div[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
+  /* Topbar */
   .topbar .nav{display:none}
   .sync-badge{display:none}
   .live{display:none}
-  .topbar{padding:0 14px;height:54px}
-  .brand-main{font-size:14px}
-  /* Bottom navigation bar */
-  .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#FF8C00,#FFA500);z-index:60;box-shadow:0 -2px 12px rgba(255,140,0,.3);height:62px;align-items:center;justify-content:space-around;padding:0 4px}
-  .bottom-nav-btn{display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:none;color:rgba(255,255,255,.7);font-size:9px;font-weight:600;padding:6px 4px;border-radius:10px;cursor:pointer;min-width:40px;transition:.15s;font-family:inherit}
-  .bottom-nav-btn .bn-icon{font-size:18px;line-height:1}
+  .topbar{padding:0 12px;height:52px}
+  .brand-main{font-size:13px}
+  .brand-sub{display:none}
+  /* Bottom nav */
+  .bottom-nav{display:flex;position:fixed;bottom:0;left:0;right:0;background:linear-gradient(135deg,#FF8C00,#FFA500);z-index:60;box-shadow:0 -2px 12px rgba(255,140,0,.3);height:62px;align-items:center;justify-content:space-around;padding:0 2px}
+  .bottom-nav-btn{display:flex;flex-direction:column;align-items:center;gap:1px;background:none;border:none;color:rgba(255,255,255,.7);font-size:8px;font-weight:600;padding:5px 3px;border-radius:8px;cursor:pointer;min-width:36px;transition:.15s;font-family:inherit}
+  .bottom-nav-btn .bn-icon{font-size:17px;line-height:1}
   .bottom-nav-btn.active{color:#fff;background:rgba(255,255,255,.22)}
-  /* Table responsive */
-  table{font-size:12px}
-  th{font-size:10px;padding:6px 7px}
-  td{padding:7px 7px}
-  /* Stats smaller */
-  .stat-num{font-size:22px}
-  /* Bán hàng layout */
-  .cart-box{margin-top:14px}
-  /* Ẩn cột không cần thiết trên mobile */
+  /* Tables */
+  table{font-size:12px;min-width:100%}
+  th{font-size:10px;padding:6px 8px;white-space:nowrap}
+  td{padding:7px 8px;white-space:nowrap}
   .hide-mobile{display:none!important}
+  /* Stats */
+  .stat-num{font-size:20px}
+  .stat-label{font-size:10px}
+  /* Modal */
+  .modal{width:96%!important;max-width:96%!important;margin:8px auto;padding:16px 14px!important}
+  .modal-title{font-size:16px!important}
+  /* Buttons */
+  .btn-sm{font-size:11px;padding:5px 8px}
+  .btn-group{flex-wrap:wrap;gap:5px!important}
+  /* Tabs */
+  .tabs{overflow-x:auto;-webkit-overflow-scrolling:touch;flex-wrap:nowrap;padding-bottom:2px}
+  .tab{white-space:nowrap;flex-shrink:0;font-size:12px;padding:7px 10px}
+  /* Forms */
+  .fg input,.fg select{font-size:14px;padding:9px 11px}
+  input[type="text"],input[type="number"],input[type="date"],input[type="email"],select{font-size:14px}
+  /* POS cart */
+  .cart-box{margin-top:12px}
+  .cart-item-row{flex-wrap:wrap;gap:4px}
+  /* Card head */
+  .card-head{flex-wrap:wrap;gap:6px}
+  .card-title{font-size:13px}
+  /* Student rows - show essential only */
+  #student-list td:nth-child(2){max-width:80px;overflow:hidden;text-overflow:ellipsis}
+  /* Orders search */
+  #order-search{width:100%;box-sizing:border-box}
+  /* Detail modal rows */
+  .detail-row{flex-direction:column;gap:2px;padding:8px 0}
+  .detail-label{font-size:11px;color:var(--muted)}
+  /* Unpaid table on dashboard */
+  #dash-unpaid-rows td:nth-child(3),#dash-unpaid-rows td:nth-child(4){display:none}
+  /* Stats orders */
+  #page-orders .stats{grid-template-columns:repeat(3,1fr)}
 }
 @media(min-width:701px){
   .bottom-nav{display:none}
@@ -411,6 +442,10 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
   </div>
 
+  <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <input id="order-search" placeholder="🔍 Tìm mã đơn, tên khách, sản phẩm..." oninput="filterOrders()"
+      style="flex:1;min-width:200px;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit"/>
+  </div>
   <div class="btn-group" style="margin-bottom:14px">
     <button class="btn btn-tg btn-sm" onclick="tgReport('orders')">📋 Telegram</button>
     <button class="btn btn-tg btn-sm" onclick="tgReport('daily')">📈 Tổng kết TG</button>
@@ -476,8 +511,28 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   <!-- Tabs báo cáo -->
   <div class="tabs" style="margin-bottom:16px">
     <div class="tab active" onclick="rpTab(this,'sales')">🛒 Bán hàng</div>
+    <div class="tab" onclick="rpTab(this,'monthly')">📅 Theo tháng</div>
     <div class="tab" onclick="rpTab(this,'inventory')">📦 Xuất nhập kho</div>
     <div class="tab" onclick="rpTab(this,'students')">🎓 Học viên</div>
+  </div>
+
+  <!-- THEO THÁNG -->
+  <div id="rp-monthly" style="display:none">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">📅 Doanh thu theo tháng</span>
+        <select id="rp-year-sel" onchange="renderMonthly()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);font-size:13px;font-family:inherit"></select>
+      </div>
+      <table>
+        <thead><tr><th>Tháng</th><th>Bán lẻ</th><th>Học phí</th><th>Tổng</th><th>Số đơn</th></tr></thead>
+        <tbody id="monthly-rows"></tbody>
+      </table>
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:10px">Biểu đồ doanh thu</div>
+        <div id="monthly-chart" style="display:flex;align-items:flex-end;gap:6px;height:120px;padding:0 4px"></div>
+        <div id="monthly-chart-labels" style="display:flex;gap:6px;margin-top:4px"></div>
+      </div>
+    </div>
   </div>
 
   <!-- BÁN HÀNG -->
@@ -602,6 +657,17 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px"><input type="checkbox" id="at-sale" checked style="accent-color:var(--gold);width:15px;height:15px"> Báo khi có đơn hàng mới</label>
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px"><input type="checkbox" id="at-paid" checked style="accent-color:var(--gold);width:15px;height:15px"> Báo khi thanh toán xong</label>
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px"><input type="checkbox" id="at-stock" checked style="accent-color:var(--gold);width:15px;height:15px"> Cảnh báo khi kho xuống thấp</label>
+      <!-- Auto 8am daily reminder -->
+      <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
+        <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:10px">⏰ Nhắc tự động hàng ngày</div>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;margin-bottom:8px">
+          <input type="checkbox" id="at-daily-remind" style="accent-color:var(--gold);width:15px;height:15px"> Gửi báo cáo tóm tắt lúc 8h sáng mỗi ngày
+        </label>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:10px;padding:8px 12px;background:var(--bg2);border-radius:8px">
+          ℹ️ Báo cáo gồm: học viên đang học, đơn chờ thu tiền, kho sắp hết. Cần để tab app mở 8h sáng, hoặc set trigger trong <strong>Google Apps Script</strong> để chạy kể cả khi đóng app.
+        </div>
+        <button class="btn btn-tg btn-sm" onclick="sendDailyReport()">📊 Gửi báo cáo ngay để test</button>
+      </div>
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px"><input type="checkbox" id="at-student" checked style="accent-color:var(--gold);width:15px;height:15px"> Báo khi thêm/sửa/xóa học viên</label>
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px"><input type="checkbox" id="at-import" checked style="accent-color:var(--gold);width:15px;height:15px"> Báo khi nhập/xuất kho</label>
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px"><input type="checkbox" id="at-mat" checked style="accent-color:var(--gold);width:15px;height:15px"> Báo khi thêm/sửa/xóa nguyên liệu</label>
@@ -1719,12 +1785,74 @@ async function addPointsFromOrder(customerName,phone,amount){
 // BÁO CÁO
 // ══════════════════════════════════════════════════
 let rpCurrent='sales';
+
+function renderMonthly(){
+  const yearSel=document.getElementById('rp-year-sel');
+  // Populate years
+  const years=[...new Set(D.orders.map(o=>{
+    const t=o.time||'';
+    const m=t.match(/(\d{4})/);
+    return m?+m[1]:new Date().getFullYear();
+  }))].sort((a,b)=>b-a);
+  if(!years.length) years.push(new Date().getFullYear());
+  const currentYear=yearSel.value?+yearSel.value:years[0];
+  if(!yearSel.value||!years.includes(+yearSel.value)){
+    yearSel.innerHTML=years.map(y=>`<option value="${y}" ${y===currentYear?'selected':''}>${y}</option>`).join('');
+  }
+
+  // Group by month
+  const months=Array.from({length:12},(_,i)=>i+1);
+  const rows=months.map(m=>{
+    const pad=String(m).padStart(2,'0');
+    const monthOrders=D.orders.filter(o=>{
+      const t=o.time||'';
+      // Support DD/MM/YYYY and YYYY-MM-DD
+      return (t.includes('/'+pad+'/'+currentYear)||t.includes(currentYear+'-'+pad))&&o.status==='Đã thanh toán';
+    });
+    const retail=monthOrders.filter(o=>!o.id.startsWith('HP')).reduce((a,o)=>a+(o.total||0),0);
+    const tuition=monthOrders.filter(o=>o.id.startsWith('HP')).reduce((a,o)=>a+(o.total||0),0);
+    const total=retail+tuition;
+    const count=monthOrders.length;
+    return{m,retail,tuition,total,count};
+  });
+
+  const maxTotal=Math.max(...rows.map(r=>r.total),1);
+
+  // Table
+  document.getElementById('monthly-rows').innerHTML=rows.map(r=>`<tr style="${r.total>0?'':'opacity:.4'}">
+    <td style="font-weight:700">Tháng ${r.m}</td>
+    <td style="color:var(--teal)">${r.retail>0?fmt(r.retail):'—'}</td>
+    <td style="color:var(--rose)">${r.tuition>0?fmt(r.tuition):'—'}</td>
+    <td style="font-weight:800;color:${r.total>0?'var(--brand)':'var(--muted)'}">${r.total>0?fmt(r.total):'—'}</td>
+    <td style="color:var(--muted);font-size:12px">${r.count>0?r.count+' đơn':'—'}</td>
+  </tr>`).join('');
+
+  // Bar chart
+  const chartEl=document.getElementById('monthly-chart');
+  const labelEl=document.getElementById('monthly-chart-labels');
+  if(chartEl){
+    chartEl.innerHTML=rows.map(r=>{
+      const h=r.total>0?Math.max(8,Math.round((r.total/maxTotal)*110)):4;
+      const isNow=r.m===new Date().getMonth()+1&&currentYear===new Date().getFullYear();
+      return`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+        ${r.total>0?`<span style="font-size:9px;color:var(--muted)">${(r.total/1000000).toFixed(1)}M</span>`:''}
+        <div style="width:100%;height:${h}px;background:${isNow?'var(--brand)':r.total>0?'var(--teal)':'var(--border)'};border-radius:4px 4px 0 0;transition:.3s"></div>
+      </div>`;
+    }).join('');
+    labelEl.innerHTML=rows.map(r=>`<div style="flex:1;text-align:center;font-size:9px;color:var(--muted)">T${r.m}</div>`).join('');
+  }
+}
+
 function rpTab(el,tab){
   document.querySelectorAll('#page-reports .tab').forEach(x=>x.classList.remove('active'));
   el.classList.add('active');
-  ['sales','inventory','students'].forEach(t=>document.getElementById('rp-'+t).style.display=t===tab?'block':'none');
+  ['sales','monthly','inventory','students'].forEach(t=>{
+    const el=document.getElementById('rp-'+t);
+    if(el) el.style.display=t===tab?'block':'none';
+  });
   rpCurrent=tab;
-  renderReports();
+  if(tab==='monthly') renderMonthly();
+  else renderReports();
 }
 
 function syncBottomNav(btn){
@@ -2066,7 +2194,22 @@ function openStDetail(id){
     <div class="detail-row"><span class="detail-label">Học phí</span><span style="color:var(--brand);font-weight:700">${fee===0?'Miễn phí':fmt(fee)}</span></div>
     ${fee>0?`<div class="detail-row"><span class="detail-label">Đợt 1 (30%)</span><span>${s.paid1?`<span class="tag t-paid">✓ Đã thu ${fmt(dep)}</span> <small style="color:var(--muted)">${s.paid1_at||''}</small>`:`<span class="tag t-low">Chưa thu — ${fmt(dep)}</span>`}</span></div>`:''}
     ${fee>0?`<div class="detail-row"><span class="detail-label">Đợt 2 (70%)</span><span>${s.paid2?`<span class="tag t-paid">✓ Đã thu ${fmt(rest)}</span> <small style="color:var(--muted)">${s.paid2_at||''}</small>`:`<span class="tag t-pending">Chưa thu — ${fmt(rest)}</span>`}</span></div>`:''}
-    <div class="detail-row"><span class="detail-label">Ghi chú</span><span style="color:var(--muted)">${s.note||'—'}</span></div>`;
+    <div class="detail-row"><span class="detail-label">Ghi chú</span><span style="color:var(--muted)">${s.note||'—'}</span></div>
+    \${(()=>{
+      const hist=[];const fee=s.fee||0;
+      const dep=s.type==='Online'?fee:Math.round(fee*0.3);
+      const rest=s.type==='Online'?0:fee-dep;
+      if(s.paid1)hist.push({label:s.type==='Online'?'Toan bo':'Dot 1 (30%)',amt:dep,time:s.paid1_at||''});
+      if(s.paid2)hist.push({label:'Dot 2 (70%)',amt:rest,time:s.paid2_at||''});
+      if(!hist.length)return '';
+      return '<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">'
+        +'<div style="font-size:12px;font-weight:700;color:var(--brown);margin-bottom:8px">📋 Lịch sử đóng tiền</div>'
+        +hist.map(h=>'<div style="display:flex;justify-content:space-between;align-items:center;background:var(--bg2);border-radius:8px;padding:8px 12px;margin-bottom:5px">'
+          +'<div><div style="font-size:12px;font-weight:600">✅ '+h.label+'</div>'
+          +(h.time?'<div style="font-size:11px;color:var(--muted)">'+h.time+'</div>':'')
+          +'</div><span style="font-weight:700;color:var(--green)">'+fmt(h.amt)+'</span></div>').join('')
+        +'</div>';
+    })()}`;
   const _stLabels={'Chưa học':'▶️ Chuyển → Đang học','Đang học':'✅ Chuyển → Học xong','Học xong':'↩️ Chuyển → Đang học','Hoàn thành':'↩️ Chuyển → Đang học'};
   document.getElementById('btn-toggle-st').textContent=_stLabels[s.status]||'Đổi trạng thái';
   showM('modal-student-detail');
@@ -2477,6 +2620,42 @@ async function markPaid(){
 // ══════════════════════════════════════════════════
 // ORDERS — TAB / RENDER
 // ══════════════════════════════════════════════════
+function filterOrders(){
+  const q=(document.getElementById('order-search')?.value||'').toLowerCase().trim();
+  if(!q){renderOrders();return;}
+  const filtered=D.orders.filter(o=>
+    o.id.toLowerCase().includes(q)||
+    o.customer.toLowerCase().includes(q)||
+    (o.items||'').toLowerCase().includes(q)
+  );
+  // Render filtered into current active panel
+  const retailFiltered=filtered.filter(o=>!o.id.startsWith('HP')&&o.status!=='Đã hủy'&&o.status!=='Chờ thanh toán');
+  const elR=document.getElementById('retail-orders');
+  if(elR&&document.getElementById('panel-retail-orders').style.display!=='none'){
+    elR.innerHTML=retailFiltered.slice().reverse().map(o=>`<tr>
+      <td style="font-weight:700;color:var(--brand)">${o.id}</td>
+      <td>${o.customer}</td>
+      <td style="font-size:12px;color:var(--muted)">${o.items}</td>
+      <td style="font-weight:700">${fmt(o.total||0)}</td>
+      <td style="font-size:12px;color:var(--muted)">${o.time}</td>
+      <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':'t-pending'}">${o.status}</span></td>
+      <td><button class="btn btn-pdf btn-sm" onclick="exportPDF('${o.id}')">📄 PDF</button></td>
+    </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--muted)">Không tìm thấy kết quả</td></tr>';
+  }
+  const elA=document.getElementById('all-orders');
+  if(elA&&document.getElementById('panel-all-orders').style.display!=='none'){
+    elA.innerHTML=filtered.slice().reverse().map(o=>`<tr>
+      <td style="font-weight:700;color:var(--brand)">${o.id}</td>
+      <td>${o.customer}</td>
+      <td style="font-size:12px;color:var(--muted)">${o.items}</td>
+      <td style="font-weight:700">${fmt(o.total||0)}</td>
+      <td style="font-size:12px;color:var(--muted)">${o.time}</td>
+      <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':o.status==='Chờ thanh toán'?'t-pending':'t-done'}">${o.status}</span></td>
+      <td></td>
+    </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--muted)">Không tìm thấy kết quả</td></tr>';
+  }
+}
+
 function ordTab(el,type){
   document.querySelectorAll('#page-orders .tab').forEach(x=>x.classList.remove('active'));
   el.classList.add('active');
@@ -3095,6 +3274,62 @@ function confirmAct(title,msg,cb){
 // ══════════════════════════════════════════════════
 // START
 // ══════════════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// BÁO CÁO TỰ ĐỘNG 8H SÁNG
+// ══════════════════════════════════════════════════
+function sendDailyReport(){
+  const active=D.students.filter(s=>s.status==='Đang học'&&!s.deleted_at);
+  const unpaid=D.students.filter(s=>!s.deleted_at&&(s.fee||0)>0&&!s.paid1);
+  const pending=D.orders.filter(o=>o.status==='Chờ thanh toán'&&!o.id.startsWith('HP'));
+  const low=D.inventory.filter(i=>i.qty<=i.min);
+  const today=todayStr();
+  const todayOrders=D.orders.filter(o=>o.status==='Đã thanh toán'&&!o.id.startsWith('HP')&&(o.time||'').includes(today));
+  const todayRev=todayOrders.reduce((a,o)=>a+(o.total||0),0);
+
+  let msg='🌅 *BÁO CÁO SÁNG — '+today+'*\n';
+  msg+='━━━━━━━━━━━━━━━━\n\n';
+  msg+='🎓 *HỌC VIÊN*\n';
+  msg+='• Đang học: '+active.length+' người\n';
+  if(unpaid.length) msg+='• ⚠️ Chưa thu học phí: '+unpaid.length+' người\n';
+  if(todayRev>0){
+    msg+='\n🛍️ *HÔM NAY*\n';
+    msg+='• Đơn bán: '+todayOrders.length+'\n';
+    msg+='• Doanh thu: '+fmt(todayRev)+'\n';
+  }
+  if(pending.length){
+    msg+='\n⏳ *ĐƠN CHỜNG THU ('+pending.length+')*\n';
+    pending.slice(0,5).forEach(o=>{msg+='• '+o.id+' — '+o.customer+' — '+fmt(o.total||0)+'\n';});
+    if(pending.length>5) msg+='• ...và '+(pending.length-5)+' đơn khác\n';
+  }
+  if(low.length){
+    msg+='\n⚠️ *KHO SẪP HỬT*\n';
+    low.forEach(i=>{msg+='• '+i.name+': còn '+i.qty+' '+i.unit+'\n';});
+  }
+  msg+='\n━━━━━━━━━━━━━━━━\n';
+  msg+='🕐 '+nowDT()+'\n_Trương Dáng Hương Academy_';
+  tgMsg(msg);
+  notify('Đã gửi báo cáo qua Telegram!');
+}
+
+// Schedule auto 8am report
+function scheduleDaily8am(){
+  if(!document.getElementById('at-daily-remind')?.checked) return;
+  const now=new Date();
+  const next8am=new Date();
+  next8am.setHours(8,0,0,0);
+  if(now>=next8am) next8am.setDate(next8am.getDate()+1);
+  const msUntil=next8am-now;
+  console.log('[Auto] Báo cáo tự động lúc 8h, còn '+Math.round(msUntil/60000)+' phút');
+  setTimeout(()=>{
+    sendDailyReport();
+    // Lặp lại mỗi 24h
+    setInterval(()=>{
+      if(document.getElementById('at-daily-remind')?.checked) sendDailyReport();
+    },24*60*60*1000);
+  },msUntil);
+}
+
+
 boot();
 </script>
 </body>
