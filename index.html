@@ -964,6 +964,9 @@ function sendDailyReminders() {
         <button class="btn btn-green btn-sm" onclick="markFeePaid(1)">✓ Xác nhận đã thu đợt 1</button>
         <button class="btn btn-sm" onclick="genFeeQR(1)">🔄 Tạo QR đợt 1</button>
       </div>
+      <div id="cf-undo1" style="margin-top:6px">
+        <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);font-size:11px" onclick="undoFeePaid(1)">↩️ Hoàn tác thu đợt 1</button>
+      </div>
       <div id="cf-qr1" style="display:none;text-align:center;margin-top:10px">
         <img id="cf-qr-img1" src="" style="width:140px;height:140px;border-radius:8px;border:2px solid var(--brand)"/>
       </div>
@@ -979,6 +982,9 @@ function sendDailyReminders() {
       <div class="btn-group" id="cf-btn2">
         <button class="btn btn-green btn-sm" onclick="markFeePaid(2)">✓ Xác nhận đã thu đợt 2</button>
         <button class="btn btn-sm" onclick="genFeeQR(2)">🔄 Tạo QR đợt 2</button>
+      </div>
+      <div id="cf-undo2" style="margin-top:6px">
+        <button class="btn btn-ghost btn-sm" style="color:var(--red);border-color:var(--red);font-size:11px" onclick="undoFeePaid(2)">↩️ Hoàn tác thu đợt 2</button>
       </div>
       <div id="cf-qr2" style="display:none;text-align:center;margin-top:10px">
         <img id="cf-qr-img2" src="" style="width:140px;height:140px;border-radius:8px;border:2px solid var(--brand)"/>
@@ -2187,6 +2193,53 @@ function genFeeQR(dotNum){
   const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(qrNote)}&accountName=${encodeURIComponent(accName)}`;
   document.getElementById(`cf-qr-img${dotNum}`).src=qrUrl;
   document.getElementById(`cf-qr${dotNum}`).style.display='block';
+}
+
+async function undoFeePaid(dotNum){
+  const id=document.getElementById('cf-student-id').value;
+  const s=D.students.find(x=>x.id===id);if(!s)return;
+  const isOnline=s.type==='Online';
+  const fee=s.fee||0;
+  const dep=isOnline?fee:Math.round(fee*0.3);
+  const rest=isOnline?0:fee-dep;
+  const amount=dotNum===1?dep:rest;
+  const dotLabel=isOnline?'toàn bộ':`đợt ${dotNum}`;
+
+  confirmAct(
+    `Hoàn tác thu tiền ${dotLabel}?`,
+    `Sẽ xóa ${fmt(amount)} khỏi lịch sử và đánh dấu chưa thanh toán.`,
+    async()=>{
+      try{
+        const upd=dotNum===1
+          ?{paid1:false,paid1_at:null}
+          :{paid2:false,paid2_at:null};
+        await sbPatch('students',upd,`?id=eq.${id}`);
+        Object.assign(s,upd);
+
+        // Xóa đơn hàng HP tương ứng
+        const orderPrefix='HP';
+        const relatedOrders=D.orders.filter(o=>
+          o.customer===s.name &&
+          o.id.startsWith(orderPrefix) &&
+          o.items.includes(dotNum===1?(isOnline?'Online':'đợt 1'):'đợt 2')
+        );
+        for(const o of relatedOrders){
+          await sbDel('orders',`?id=eq.${o.id}`);
+          D.orders=D.orders.filter(x=>x.id!==o.id);
+        }
+
+        // Cập nhật modal
+        document.getElementById(`cf-paid${dotNum}-badge`).style.display='none';
+        document.getElementById(`cf-btn${dotNum}`).style.display='flex';
+        document.getElementById(`cf-qr${dotNum}`).style.display='none';
+
+        notify(`↩️ Đã hoàn tác thu tiền ${dotLabel}: ${fmt(amount)}`);
+        tgMsg(`↩️ *Hoàn tác thu học phí!*\n\n👤 ${s.name}\n📚 ${s.course||'—'}\n💵 ${fmt(amount)} — ${dotLabel}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+        gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
+        renderStudents();renderOrders();renderDash();
+      }catch(e){notify('Lỗi: '+e.message,false);}
+    }
+  );
 }
 
 async function markFeePaid(dotNum){
