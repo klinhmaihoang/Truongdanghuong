@@ -182,7 +182,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
         <button class="btn btn-excel btn-sm" onclick="xlExport('students')">📊 Excel</button>
       </div>
     </div>
-    <table><thead><tr><th>Họ tên</th><th>Loại</th><th>Khóa học</th><th>Học phí</th><th>Ngày BĐ</th><th>Trạng thái</th><th></th><th></th></tr></thead>
+    <table><thead><tr><th>Họ tên</th><th>Loại</th><th>Khóa học</th><th>Học phí</th><th>Ngày BĐ</th><th>Trạng thái</th><th></th></tr></thead>
     <tbody id="student-list"></tbody></table>
   </div>
 </div>
@@ -218,7 +218,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
       <span class="card-title">Danh sách hàng hóa &amp; giá bán</span>
       <button class="btn btn-sm" onclick="showM('modal-add-product')">+ Thêm sản phẩm</button>
     </div>
-    <table><thead><tr><th>Icon</th><th>Tên sản phẩm</th><th>Giá bán (₫)</th><th>Nguyên liệu</th><th>Mức dùng/lần</th><th></th></tr></thead>
+    <table><thead><tr><th>Icon</th><th>Tên sản phẩm</th><th>Giá bán (₫)</th><th>Giá nhập (₫)</th><th>Lợi nhuận</th><th>Nguyên liệu</th><th>Mức dùng/lần</th><th></th></tr></thead>
     <tbody id="product-list"></tbody></table>
   </div>
 </div>
@@ -399,9 +399,12 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
     </div>
     <div class="form-row">
       <div class="fg"><label>Giá bán (₫) *</label><input id="fp-price" type="number" placeholder="35000"/></div>
-      <div class="fg"><label>Nguyên liệu liên kết</label><select id="fp-mat"></select></div>
+      <div class="fg"><label>Giá nhập / giá vốn (₫)</label><input id="fp-cost" type="number" placeholder="20000"/></div>
     </div>
-    <div class="fg" style="margin-bottom:12px"><label>Lượng dùng/lần</label><input id="fp-use" type="number" placeholder="0.1" step="0.01"/></div>
+    <div class="form-row">
+      <div class="fg"><label>Nguyên liệu liên kết</label><select id="fp-mat"></select></div>
+      <div class="fg"><label>Lượng dùng/lần</label><input id="fp-use" type="number" placeholder="0.1" step="0.01"/></div>
+    </div>
     <div class="btn-group">
       <button class="btn btn-green btn-sm" onclick="addProduct()">Lưu sản phẩm</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-product')">Hủy</button>
@@ -420,9 +423,12 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
     </div>
     <div class="form-row">
       <div class="fg"><label>Giá bán (₫) *</label><input id="ep-price" type="number"/></div>
-      <div class="fg"><label>Nguyên liệu</label><select id="ep-mat"></select></div>
+      <div class="fg"><label>Giá nhập / giá vốn (₫)</label><input id="ep-cost" type="number" placeholder="0"/></div>
     </div>
-    <div class="fg" style="margin-bottom:12px"><label>Lượng dùng/lần</label><input id="ep-use" type="number" step="0.01"/></div>
+    <div class="form-row">
+      <div class="fg"><label>Nguyên liệu</label><select id="ep-mat"></select></div>
+      <div class="fg"><label>Lượng dùng/lần</label><input id="ep-use" type="number" step="0.01"/></div>
+    </div>
     <div class="btn-group">
       <button class="btn btn-green btn-sm" onclick="saveProduct()">Lưu thay đổi</button>
       <button class="btn btn-red btn-sm" onclick="deleteProduct()">Xóa</button>
@@ -462,32 +468,6 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
     <div class="btn-group">
       <button class="btn btn-red btn-sm" onclick="exportStock()">Xác nhận xuất</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-export-stock')">Hủy</button>
-    </div>
-  </div>
-</div>
-
-<!-- Thu học phí -->
-<div class="overlay" id="modal-collect-fee">
-  <div class="modal" style="max-width:420px;text-align:center">
-    <div class="modal-title">💰 Thu học phí</div>
-    <input type="hidden" id="cf-student-id"/>
-    <div style="margin:14px 0 6px;font-size:15px;font-weight:700" id="cf-student-name"></div>
-    <div style="font-size:12px;color:var(--muted);margin-bottom:14px" id="cf-student-info"></div>
-    <div class="fg" style="margin-bottom:12px;text-align:left">
-      <label>Số tiền thu (₫)</label>
-      <input id="cf-amount" type="number" placeholder="2500000" style="font-size:18px;font-weight:700;color:var(--gold2)"/>
-    </div>
-    <div class="fg" style="margin-bottom:14px;text-align:left">
-      <label>Ghi chú</label>
-      <input id="cf-note" placeholder="VD: Học phí tháng 5, đặt cọc..."/>
-    </div>
-    <div class="qr-amount-big" id="cf-qr-amount" style="font-size:22px">0 ₫</div>
-    <div class="qr-img-wrap"><img id="cf-qr-img" src="" alt="QR" style="max-width:180px"/></div>
-    <div class="qr-bank" id="cf-qr-info" style="text-align:left"></div>
-    <div class="btn-group" style="justify-content:center;margin-top:14px;flex-wrap:wrap">
-      <button class="btn btn-sm" onclick="genFeeQR()">🔄 Tạo QR</button>
-      <button class="btn btn-green btn-sm" onclick="markFeePaid()">✓ Xác nhận đã thu</button>
-      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-collect-fee')">Đóng</button>
     </div>
   </div>
 </div>
@@ -562,6 +542,7 @@ const DEFAULTS = {
     {id:'p2',name:'Trà mix',icon:'🫖',price:45000,mat_id:'i2',mat_use:0.1,created_at:3},
     {id:'p3',name:'Bột sữa',icon:'🥛',price:25000,mat_id:'i3',mat_use:1,created_at:4},
     {id:'p4',name:'Combo Trà+Sữa',icon:'☕',price:55000,mat_id:'',mat_use:0,created_at:5},
+    {id:'p5',name:'Khóa học Online',icon:'💻',price:2500000,mat_id:'',mat_use:0,created_at:6},
   ]
 };
 
@@ -738,52 +719,7 @@ function renderStudents(){
     <td style="font-size:12px;color:var(--muted)">${s.start||'—'}</td>
     <td><span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Hoàn thành'?'t-done':'t-pending'}">${s.status}</span></td>
     <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openStDetail('${s.id}')">Chi tiết →</button></td>
-    <td><button class="btn btn-green btn-sm" onclick="event.stopPropagation();collectFee('${s.id}')">💰 Thu học phí</button></td>
   </tr>`).join('');
-}
-
-function collectFee(id){
-  const s=D.students.find(x=>x.id===id);if(!s)return;
-  document.getElementById('cf-student-id').value=id;
-  document.getElementById('cf-student-name').textContent=s.name;
-  document.getElementById('cf-student-info').textContent=s.course+' · '+s.type;
-  document.getElementById('cf-amount').value=s.fee||'';
-  document.getElementById('cf-note').value='';
-  document.getElementById('cf-qr-img').src='';
-  document.getElementById('cf-qr-amount').textContent='0 ₫';
-  document.getElementById('cf-qr-info').innerHTML='';
-  showM('modal-collect-fee');
-}
-
-function genFeeQR(){
-  const id=document.getElementById('cf-student-id').value;
-  const s=D.students.find(x=>x.id===id);if(!s)return;
-  const amount=+document.getElementById('cf-amount').value||0;
-  if(!amount){notify('Nhập số tiền cần thu!',false);return;}
-  const note=document.getElementById('cf-note').value||'Hoc phi '+s.name;
-  const bankId=cfg.bankId||'VCB';
-  const accNo=cfg.bankAcc||'';
-  const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
-  if(!accNo){notify('Chưa cấu hình số tài khoản trong Cài đặt!',false);return;}
-  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(note)}&accountName=${encodeURIComponent(accName)}`;
-  document.getElementById('cf-qr-img').src=qrUrl;
-  document.getElementById('cf-qr-amount').textContent=fmt(amount);
-  document.getElementById('cf-qr-info').innerHTML=`
-    <div><span>Học viên</span><span style="font-weight:600">${s.name}</span></div>
-    <div><span>Ngân hàng</span><span>${bankId} · ${accNo}</span></div>
-    <div><span>Nội dung CK</span><span style="color:var(--teal)">${note}</span></div>`;
-}
-
-async function markFeePaid(){
-  const id=document.getElementById('cf-student-id').value;
-  const s=D.students.find(x=>x.id===id);if(!s)return;
-  const amount=+document.getElementById('cf-amount').value||s.fee||0;
-  const note=document.getElementById('cf-note').value||'Học phí';
-  const order={id:'HP'+Date.now(),customer:s.name,email:s.email||'',
-    items:note+' — '+s.course,total:amount,time:nowDT(),note:s.type,status:'Đã thanh toán',created_at:Date.now()};
-  await sbUpsert('orders',order);D.orders.push(order);
-  closeM('modal-collect-fee');render();notify('✓ Đã thu học phí: '+s.name);
-  tgMsg(`🎓 *Thu học phí!*\n\n👤 ${s.name}\n📚 ${s.course} (${s.type})\n💰 ${fmt(amount)}\n📝 ${note}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
 }
 
 function openStDetail(id){
@@ -843,7 +779,7 @@ async function addStudent(){
 
 // ── PRODUCTS ──
 function renderProducts(){
-  document.getElementById('prod-grid').innerHTML=D.products.filter(p=>p.type!=='course').map(p=>{
+  document.getElementById('prod-grid').innerHTML=D.products.map(p=>{
     const mat=D.inventory.find(i=>i.id===p.mat_id);
     const stock=mat&&p.mat_use>0?Math.floor(mat.qty/p.mat_use):null;
     return`<div class="prod-card" onclick="addToCart('${p.id}')" style="${stock!==null&&stock<5?'border-color:rgba(192,57,43,.4)':''}">
@@ -859,10 +795,15 @@ function renderProductList(){
   const el=document.getElementById('product-list');if(!el)return;
   el.innerHTML=D.products.map(p=>{
     const mat=D.inventory.find(i=>i.id===p.mat_id);
+    const cost=p.cost||0;
+    const profit=cost>0?p.price-cost:null;
+    const profitColor=profit===null?'var(--muted)':profit>0?'var(--teal)':'var(--red)';
     return`<tr>
       <td style="font-size:22px">${p.icon||'📦'}</td>
       <td><strong>${p.name}</strong></td>
       <td style="color:var(--gold2);font-weight:700">${fmt(p.price)}</td>
+      <td style="font-weight:600">${cost>0?fmt(cost):'<span style="color:var(--muted)">—</span>'}</td>
+      <td style="font-weight:700;color:${profitColor}">${profit===null?'—':fmt(profit)}</td>
       <td style="font-size:12px;color:var(--muted)">${mat?mat.name:'—'}</td>
       <td style="font-size:12px;color:var(--muted)">${mat&&p.mat_use?p.mat_use+' '+mat.unit+'/lần':'—'}</td>
       <td><button class="btn btn-ghost btn-sm" onclick="openEditProd('${p.id}')">✏️ Sửa</button></td>
@@ -876,6 +817,7 @@ function openEditProd(id){
   document.getElementById('ep-name').value=p.name;
   document.getElementById('ep-icon').value=p.icon||'';
   document.getElementById('ep-price').value=p.price;
+  document.getElementById('ep-cost').value=p.cost||'';
   setTimeout(()=>{document.getElementById('ep-mat').value=p.mat_id||'';document.getElementById('ep-use').value=p.mat_use||0;},30);
   showM('modal-edit-product');
 }
@@ -886,6 +828,7 @@ async function saveProduct(){
   const price=+document.getElementById('ep-price').value;
   if(!name||!price){notify('Nhập tên và giá!',false);return;}
   const upd={name,icon:document.getElementById('ep-icon').value||'📦',price,
+    cost:+document.getElementById('ep-cost').value||0,
     mat_id:document.getElementById('ep-mat').value,mat_use:+document.getElementById('ep-use').value||0};
   await sbPatch('products',upd,`?id=eq.${id}`);
   const p=D.products.find(x=>x.id===id);if(p)Object.assign(p,upd);
@@ -907,10 +850,11 @@ async function addProduct(){
   const price=+document.getElementById('fp-price').value;
   if(!name||!price){notify('Nhập tên và giá!',false);return;}
   const p={id:uid(),name,icon:document.getElementById('fp-icon').value||'📦',price,
+    cost:+document.getElementById('fp-cost').value||0,
     mat_id:document.getElementById('fp-mat').value,mat_use:+document.getElementById('fp-use').value||0,created_at:Date.now()};
   await sbUpsert('products',p);D.products.push(p);
   closeM('modal-add-product');
-  ['fp-name','fp-icon','fp-price','fp-use'].forEach(id=>document.getElementById(id).value='');
+  ['fp-name','fp-icon','fp-price','fp-cost','fp-use'].forEach(id=>document.getElementById(id).value='');
   render();notify('Đã thêm: '+name);
 }
 
