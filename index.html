@@ -200,6 +200,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <button onclick="go('orders',this)">Đơn hàng</button>
     <button onclick="go('customers',this)">👥 Khách hàng</button>
     <button onclick="go('reports',this)" style="color:var(--teal)">📊 Báo cáo</button>
+      <button onclick="go('finance',this)" style="color:var(--green)">💵 Thu chi</button>
     <button onclick="go('telegram',this)" style="color:#5bc8f0">⚡ Telegram</button>
   </div>
 </div>
@@ -226,6 +227,9 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   </button>
   <button class="bottom-nav-btn" onclick="go('reports',this);syncBottomNav(this)">
     <span class="bn-icon">📊</span>Báo cáo
+  </button>
+  <button class="bottom-nav-btn" onclick="go('finance',this);syncBottomNav(this)">
+    <span class="bn-icon">💵</span>Thu chi
   </button>
   <button class="bottom-nav-btn" onclick="go('telegram',this);syncBottomNav(this)">
     <span class="bn-icon">⚡</span>Cài đặt
@@ -379,7 +383,8 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   <div class="btn-group" style="margin-bottom:14px">
     <button class="btn btn-sm" onclick="showM('modal-add-mat')">+ Thêm nguyên liệu</button>
     <button class="btn btn-green btn-sm" onclick="showM('modal-import')">📥 Nhập kho</button>
-    <button class="btn btn-ghost btn-sm" onclick="showM('modal-export-stock')">- Xuất thủ công</button>
+    <button class="btn btn-orange btn-sm" onclick="showM('modal-export-teaching')">📚 Xuất dạy học</button>
+    <button class="btn btn-ghost btn-sm" onclick="showM('modal-export-stock')">📤 Xuất thủ công</button>
     <button class="btn btn-tg btn-sm" onclick="tgReport('inventory')">📦 Telegram</button>
     <button class="btn btn-excel btn-sm" onclick="xlExport('inventory')">📊 Excel</button>
   </div>
@@ -506,6 +511,83 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 </div>
 
 <!-- BÁO CÁO -->
+<!-- THU CHI -->
+<div class="page" id="page-finance">
+  <div class="tabs">
+    <div class="tab active" onclick="finTab(this,'all')">Tất cả</div>
+    <div class="tab" onclick="finTab(this,'thu')">💚 Thu</div>
+    <div class="tab" onclick="finTab(this,'chi')">🔴 Chi</div>
+  </div>
+  <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+    <div class="stat" style="--accent:var(--green)"><div class="stat-num" id="fin-thu">0</div><div class="stat-label">Tổng thu (₫)</div></div>
+    <div class="stat" style="--accent:var(--red)"><div class="stat-num" id="fin-chi">0</div><div class="stat-label">Tổng chi (₫)</div></div>
+    <div class="stat"><div class="stat-num" id="fin-profit">0</div><div class="stat-label">Lợi nhuận (₫)</div></div>
+  </div>
+  <div class="btn-group" style="margin-bottom:14px">
+    <button class="btn btn-green btn-sm" onclick="showM('modal-add-thu')">+ Thêm phiếu thu</button>
+    <button class="btn btn-red btn-sm" onclick="showM('modal-add-chi')">− Thêm phiếu chi</button>
+    <button class="btn btn-excel btn-sm" onclick="xlExport('finance')">📊 Excel</button>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title" id="fin-table-title">Tất cả giao dịch</span>
+      <select id="fin-month-sel" onchange="renderFinance()" style="padding:5px 8px;border-radius:6px;border:1px solid var(--border);font-size:12px;font-family:inherit;background:var(--bg2)">
+        <option value="">Tất cả tháng</option>
+      </select>
+    </div>
+    <table><thead><tr><th>Thời gian</th><th>Loại</th><th>Danh mục</th><th>Số tiền</th><th>Ghi chú</th><th></th></tr></thead>
+    <tbody id="fin-list"></tbody></table>
+  </div>
+</div>
+
+<!-- Phiếu thu -->
+<div class="overlay" id="modal-add-thu">
+  <div class="modal">
+    <div class="modal-title">💚 Thêm phiếu thu</div>
+    <div class="form-row">
+      <div class="fg"><label>Số tiền (₫)</label><input id="thu-amount" type="number" placeholder="500000"/></div>
+      <div class="fg"><label>Danh mục</label>
+        <select id="thu-cat">
+          <option>Học phí</option>
+          <option>Bán lẻ sản phẩm</option>
+          <option>Dịch vụ tư vấn</option>
+          <option>Thu khác</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="thu-note" placeholder="VD: Thu học phí Nguyễn Văn A..."/></div>
+    <div class="btn-group">
+      <button class="btn btn-green btn-sm" onclick="addTransaction('thu')">💾 Lưu phiếu thu</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-thu')">Hủy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Phiếu chi -->
+<div class="overlay" id="modal-add-chi">
+  <div class="modal">
+    <div class="modal-title">🔴 Thêm phiếu chi</div>
+    <div class="form-row">
+      <div class="fg"><label>Số tiền (₫)</label><input id="chi-amount" type="number" placeholder="500000"/></div>
+      <div class="fg"><label>Danh mục</label>
+        <select id="chi-cat">
+          <option>Mua nguyên liệu</option>
+          <option>Chi phí vận hành</option>
+          <option>Lương nhân viên</option>
+          <option>Marketing</option>
+          <option>Thiết bị dụng cụ</option>
+          <option>Chi khác</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="chi-note" placeholder="VD: Mua rượu, chanh..."/></div>
+    <div class="btn-group">
+      <button class="btn btn-red btn-sm" onclick="addTransaction('chi')">💾 Lưu phiếu chi</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-chi')">Hủy</button>
+    </div>
+  </div>
+</div>
+
 <div class="page" id="page-reports">
 
   <!-- Tabs báo cáo -->
@@ -1138,6 +1220,25 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
   </div>
 </div>
 
+<!-- Xuất kho dạy học -->
+<div class="overlay" id="modal-export-teaching">
+  <div class="modal wide">
+    <div class="modal-title">📚 Xuất kho dạy học</div>
+    <div class="form-row">
+      <div class="fg"><label>Khóa học / Buổi học</label><input id="et-lesson" placeholder="VD: Khóa Tổng hợp — Buổi 1"/></div>
+      <div class="fg"><label>Số học viên</label><input id="et-students" type="number" placeholder="5" min="1" value="1"/></div>
+    </div>
+    <div style="font-size:13px;font-weight:600;color:var(--brown);margin:12px 0 8px">Nguyên liệu xuất:</div>
+    <div id="et-items-list" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px"></div>
+    <button class="btn btn-ghost btn-sm" onclick="addTeachingItem()" style="margin-bottom:14px;width:100%">+ Thêm nguyên liệu</button>
+    <div class="fg" style="margin-bottom:12px"><label>Ghi chú thêm</label><input id="et-note" placeholder="Ghi chú..."/></div>
+    <div class="btn-group">
+      <button class="btn btn-orange btn-sm" onclick="exportTeaching()">✓ Xác nhận xuất dạy học</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-export-teaching')">Hủy</button>
+    </div>
+  </div>
+</div>
+
 <!-- Sửa lịch sử kho -->
 <div class="overlay" id="modal-edit-log">
   <div class="modal">
@@ -1460,13 +1561,14 @@ async function boot(){
 
 async function pollUpdates(){
   try{
-    const [students,inventory,products,orders,courses,customers] = await Promise.all([
+    const [students,inventory,products,orders,courses,customers,transactions] = await Promise.all([
       sbGet('students','?order=created_at.asc'),
       sbGet('inventory','?order=created_at.asc'),
       sbGet('products','?order=created_at.asc'),
       sbGet('orders','?order=created_at.asc'),
       sbGet('courses','?order=created_at.asc'),
       sbGet('customers','?order=created_at.asc'),
+      sbGet('transactions','?order=created_at.desc&limit=500'),
     ]);
     D.students=students||D.students;
     D.inventory=inventory&&inventory.length?inventory:D.inventory;
@@ -1474,6 +1576,7 @@ async function pollUpdates(){
     D.orders=orders||D.orders;
     D.courses=courses||D.courses;
     D.customers=customers||D.customers;
+    D.transactions=transactions||D.transactions;
     setSyncStatus(true,'Đồng bộ lúc '+nowTime());
     render();
   }catch(e){setSyncStatus(false,'Mất kết nối');}
@@ -1981,6 +2084,7 @@ function go(p,btn){
   });
   fillMatSelects();
   if(p==='reports')renderReports();
+  if(p==='finance')renderFinance();
 }
 
 function renderReports(){
@@ -3578,6 +3682,173 @@ function scheduleDaily8am(){
       if(document.getElementById('at-daily-remind')?.checked) sendDailyReport();
     },24*60*60*1000);
   },msUntil);
+}
+
+
+// ══════════════════════════════════════════════════
+// XUẤT KHO DẠY HỌC
+// ══════════════════════════════════════════════════
+function openExportTeaching(){
+  const list=document.getElementById('et-items-list');
+  list.innerHTML='';
+  addTeachingItem();
+  showM('modal-export-teaching');
+}
+
+function addTeachingItem(){
+  const list=document.getElementById('et-items-list');
+  const idx=list.children.length;
+  const opts=D.inventory.map(m=>`<option value="${m.id}">${m.name} (còn ${m.qty} ${m.unit})</option>`).join('');
+  const row=document.createElement('div');
+  row.className='form-row';
+  row.style.cssText='align-items:center;gap:8px';
+  row.innerHTML=`
+    <div class="fg"><select class="et-mat">${opts}</select></div>
+    <div class="fg" style="max-width:100px"><input class="et-qty" type="number" placeholder="Số lượng" min="0.01" step="0.01"/></div>
+    <button class="btn btn-ghost btn-sm" style="padding:6px 10px;flex-shrink:0" onclick="this.parentElement.remove()">✕</button>`;
+  list.appendChild(row);
+}
+
+async function exportTeaching(){
+  const lesson=document.getElementById('et-lesson').value.trim();
+  const numSt=+document.getElementById('et-students').value||1;
+  const note=document.getElementById('et-note').value.trim();
+  const rows=document.querySelectorAll('#et-items-list .form-row');
+  if(!rows.length){notify('Chưa thêm nguyên liệu!',false);return;}
+
+  const items=[];
+  for(const row of rows){
+    const matId=row.querySelector('.et-mat').value;
+    const qty=+row.querySelector('.et-qty').value;
+    if(!matId||!qty){notify('Điền đủ thông tin nguyên liệu!',false);return;}
+    const mat=D.inventory.find(x=>x.id===matId);
+    if(!mat){notify('Không tìm thấy nguyên liệu!',false);return;}
+    if(mat.qty<qty){notify(`Kho không đủ: ${mat.name} (còn ${mat.qty} ${mat.unit})`,false);return;}
+    items.push({mat,qty});
+  }
+
+  // Trừ kho và ghi log
+  const ts=nowDT();
+  const logNote=(lesson?lesson+' — ':'')+numSt+' học viên'+(note?' — '+note:'');
+  try{
+    for(const {mat,qty} of items){
+      mat.qty=Math.max(0,Math.round((mat.qty-qty)*100)/100);
+      await sbPatch('inventory',{qty:mat.qty},`?id=eq.${mat.id}`);
+      const log={id:'SL'+Date.now()+Math.random().toString(36).slice(2,5),
+        time:ts,name:mat.name,type:'Xuất dạy học',qty,note:logNote,created_at:Date.now()};
+      await sbUpsert('stock_log',log);
+      D.stockLog.unshift(log);
+      // Ghi phiếu chi nguyên liệu
+      const cost=(mat.cost||0)*qty;
+      if(cost>0){
+        const tx={id:'TX'+Date.now()+Math.random().toString(36).slice(2,5),
+          type:'chi',category:'Mua nguyên liệu',amount:cost,
+          note:`Xuất dạy học: ${mat.name} x${qty} — ${logNote}`,
+          time:ts,created_at:Date.now()};
+        await sbUpsert('transactions',tx);
+        D.transactions.unshift(tx);
+      }
+      await new Promise(r=>setTimeout(r,150));
+    }
+    closeM('modal-export-teaching');
+    document.getElementById('et-lesson').value='';
+    document.getElementById('et-students').value='1';
+    document.getElementById('et-note').value='';
+    document.getElementById('et-items-list').innerHTML='';
+    render();
+    const summary=items.map(({mat,qty})=>`${mat.name}: ${qty} ${mat.unit}`).join(', ');
+    notify(`✓ Đã xuất dạy học: ${summary}`);
+    tgMsg(`📚 *Xuất kho dạy học!*\n\n📝 ${lesson||'Buổi học'}\n👥 ${numSt} học viên\n📦 ${summary}\n🕐 ${ts}\n\n_Trương Dáng Hương Academy_`);
+    gsSend({sheet:'TonKho',rows:D.inventory,time:ts});
+    gsSend({sheet:'LichSuKho',...D.stockLog[0]});
+  }catch(e){notify('Lỗi xuất kho: '+e.message,false);}
+}
+
+// ══════════════════════════════════════════════════
+// THU CHI
+// ══════════════════════════════════════════════════
+let finFilter='all';
+
+function finTab(el,f){
+  document.querySelectorAll('#page-finance .tab').forEach(x=>x.classList.remove('active'));
+  el.classList.add('active');
+  finFilter=f;
+  const titles={all:'Tất cả giao dịch',thu:'Phiếu thu',chi:'Phiếu chi'};
+  const el2=document.getElementById('fin-table-title');
+  if(el2) el2.textContent=titles[f]||'';
+  renderFinance();
+}
+
+function renderFinance(){
+  const monthSel=document.getElementById('fin-month-sel');
+  // Populate months
+  const months=[...new Set(D.transactions.map(t=>{
+    const m=(t.time||'').match(/(\d{2})\/(\d{4})/);
+    return m?m[2]+'-'+m[1]:'';
+  }).filter(Boolean))].sort().reverse();
+  const curMonth=monthSel?.value||'';
+  if(monthSel){
+    const opts='<option value="">Tất cả tháng</option>'+months.map(m=>{
+      const [y,mo]=m.split('-');
+      return`<option value="${m}" ${m===curMonth?'selected':''}>Tháng ${+mo}/${y}</option>`;
+    }).join('');
+    monthSel.innerHTML=opts;
+  }
+
+  let txs=D.transactions;
+  if(finFilter==='thu') txs=txs.filter(t=>t.type==='thu');
+  if(finFilter==='chi') txs=txs.filter(t=>t.type==='chi');
+  if(curMonth) txs=txs.filter(t=>{
+    const m=(t.time||'').match(/(\d{2})\/(\d{4})/);
+    return m&&m[2]+'-'+m[1]===curMonth;
+  });
+
+  const totalThu=txs.filter(t=>t.type==='thu').reduce((a,t)=>a+(t.amount||0),0);
+  const totalChi=txs.filter(t=>t.type==='chi').reduce((a,t)=>a+(t.amount||0),0);
+  const profit=totalThu-totalChi;
+
+  const s0=document.getElementById('fin-thu');const s1=document.getElementById('fin-chi');const s2=document.getElementById('fin-profit');
+  if(s0) s0.textContent=(totalThu/1000000).toFixed(1)+'M';
+  if(s1) s1.textContent=(totalChi/1000000).toFixed(1)+'M';
+  if(s2){s2.textContent=(Math.abs(profit)/1000000).toFixed(1)+'M'+(profit<0?' (lỗ)':'');s2.style.color=profit>=0?'var(--green)':'var(--red)';}
+
+  const el=document.getElementById('fin-list');
+  if(!el)return;
+  el.innerHTML=txs.length?txs.map(t=>`<tr>
+    <td style="font-size:11px;color:var(--muted)">${t.time||''}</td>
+    <td><span class="tag ${t.type==='thu'?'t-paid':'t-low'}">${t.type==='thu'?'💚 Thu':'🔴 Chi'}</span></td>
+    <td style="font-size:12px">${t.category||'—'}</td>
+    <td style="font-weight:700;color:${t.type==='thu'?'var(--green)':'var(--red)'}">${t.type==='thu'?'+':'-'}${fmt(t.amount||0)}</td>
+    <td style="font-size:12px;color:var(--muted)">${t.note||'—'}</td>
+    <td><button class="btn btn-ghost btn-sm" style="color:var(--red);font-size:11px" onclick="deleteTransaction('${t.id}')">✕</button></td>
+  </tr>`).join(''):'<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--muted)">Chưa có giao dịch nào</td></tr>';
+}
+
+async function addTransaction(type){
+  const amount=+document.getElementById(type+'-amount').value;
+  if(!amount||amount<=0){notify('Nhập số tiền!',false);return;}
+  const cat=document.getElementById(type+'-cat').value;
+  const note=document.getElementById(type+'-note').value.trim();
+  const tx={id:'TX'+Date.now(),type,category:cat,amount,note,time:nowDT(),created_at:Date.now()};
+  try{
+    await sbUpsert('transactions',tx);
+    D.transactions.unshift(tx);
+    closeM('modal-add-'+type);
+    document.getElementById(type+'-amount').value='';
+    document.getElementById(type+'-note').value='';
+    renderFinance();
+    notify(`✓ Đã lưu phiếu ${type==='thu'?'thu':'chi'}: ${fmt(amount)}`);
+    tgMsg(`${type==='thu'?'💚 *Phiếu thu*':'🔴 *Phiếu chi*'}\n\n💰 ${fmt(amount)}\n📂 ${cat}${note?'\n📝 '+note:''}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+  }catch(e){notify('Lỗi lưu: '+e.message,false);}
+}
+
+async function deleteTransaction(id){
+  confirmAct('Xóa giao dịch này?','Không thể khôi phục sau khi xóa.',async()=>{
+    await sbDel('transactions',`?id=eq.${id}`);
+    D.transactions=D.transactions.filter(x=>x.id!==id);
+    renderFinance();
+    notify('Đã xóa giao dịch');
+  });
 }
 
 
