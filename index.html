@@ -2953,6 +2953,126 @@ function remindAllPending(){
 }
 
 
+// ══════════════════════════════════════════════════
+// THU HỌC PHÍ
+// ══════════════════════════════════════════════════
+function collectFee(id){
+  const s=D.students.find(x=>x.id===id);if(!s)return;
+  const fee=s.fee||0;
+  const isOnline=s.type==='Online';
+  const dep=isOnline?fee:Math.round(fee*0.3);
+  const rest=isOnline?0:fee-dep;
+
+  document.getElementById('cf-student-id').value=id;
+  document.getElementById('cf-student-name').textContent=s.name;
+  const course=D.courses.find(c=>c.id===s.course_id);
+  document.getElementById('cf-student-info').textContent=(course?course.name:(s.course||''))+(s.class_date?' · Ngày học: '+s.class_date:'')+' · '+s.type;
+
+  const lbl1=document.getElementById('cf-box1-label');
+  if(lbl1) lbl1.textContent=isOnline?'💻 Thanh toán toàn bộ (Online)':'Đợt 1 — 30% học phí';
+
+  document.getElementById('cf-amount1').textContent=fmt(isOnline?fee:dep);
+  document.getElementById('cf-paid1-badge').style.display=s.paid1?'inline-block':'none';
+  document.getElementById('cf-btn1').style.display=s.paid1?'none':'flex';
+  document.getElementById('cf-qr1').style.display='none';
+
+  const box2=document.getElementById('cf-box2');
+  if(box2) box2.style.display=isOnline?'none':'block';
+  if(!isOnline){
+    document.getElementById('cf-amount2').textContent=fmt(rest);
+    document.getElementById('cf-paid2-badge').style.display=s.paid2?'inline-block':'none';
+    document.getElementById('cf-btn2').style.display=s.paid2?'none':'flex';
+    document.getElementById('cf-qr2').style.display='none';
+  }
+  showM('modal-collect-fee');
+}
+
+function genFeeQR(dotNum){
+  const id=document.getElementById('cf-student-id').value;
+  const s=D.students.find(x=>x.id===id);if(!s)return;
+  const fee=s.fee||0;
+  const isOnline=s.type==='Online';
+  const dep=isOnline?fee:Math.round(fee*0.3);
+  const rest=isOnline?0:fee-dep;
+  const amount=dotNum===1?dep:rest;
+  const label=isOnline?'Hoc phi Online':'Hoc phi dot '+dotNum;
+  const bankId=cfg.bankId||'VCB';
+  const accNo=cfg.bankAcc||'';
+  const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
+  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(label+' '+s.name)}&accountName=${encodeURIComponent(accName)}`;
+  const qrEl=document.getElementById(`cf-qr${dotNum}`);
+  if(qrEl){
+    qrEl.innerHTML=`<img src="${qrUrl}" style="width:180px;border-radius:8px;margin-top:8px"/>
+      <div style="font-size:11px;color:var(--muted);margin-top:4px">${bankId} · ${accNo}</div>`;
+    qrEl.style.display='block';
+  }
+}
+
+async function markFeePaid(dotNum){
+  const id=document.getElementById('cf-student-id').value;
+  const s=D.students.find(x=>x.id===id);if(!s)return;
+  const isOnline=s.type==='Online';
+  const fee=s.fee||0;
+  const dep=isOnline?fee:Math.round(fee*0.3);
+  const rest=isOnline?0:fee-dep;
+  const amount=dotNum===1?dep:rest;
+  const ts=nowDT();
+  const upd=dotNum===1?{paid1:true,paid1_at:ts}:{paid2:true,paid2_at:ts};
+  try{
+    await sbPatch('students',upd,`?id=eq.${id}`);
+    Object.assign(s,upd);
+    document.getElementById(`cf-paid${dotNum}-badge`).style.display='inline-block';
+    document.getElementById(`cf-btn${dotNum}`).style.display='none';
+    document.getElementById(`cf-qr${dotNum}`).style.display='none';
+    const label=isOnline?'Học phí (Online)':`Học phí đợt ${dotNum}`;
+    const order={id:'HP'+Date.now(),customer:s.name,email:s.email||'',
+      items:`${label} — ${s.course||''}`,total:amount,
+      time:ts,note:isOnline?'Online — 1 lần':`Đợt ${dotNum}/2`,
+      status:'Đã thanh toán',created_at:Date.now()};
+    await sbUpsert('orders',order);
+    D.orders.push(order);
+    notify(`✓ Đã thu ${isOnline?'toàn bộ':'đợt '+dotNum}: ${fmt(amount)}`);
+    tgMsg(`💰 *Thu học phí!*\n\n👤 ${s.name}\n📚 ${s.course||'—'}\n💵 ${fmt(amount)} — ${label}\n🕐 ${ts}\n\n_Trương Dáng Hương Academy_`);
+    renderStudents();renderOrders();renderDash();
+    gsSend({sheet:'HocVien',rows:gsStudents(),time:ts});
+  }catch(e){notify('Lỗi: '+e.message,false);}
+}
+
+async function undoFeePaid(dotNum){
+  const id=document.getElementById('cf-student-id').value;
+  const s=D.students.find(x=>x.id===id);if(!s)return;
+  const isOnline=s.type==='Online';
+  const fee=s.fee||0;
+  const dep=isOnline?fee:Math.round(fee*0.3);
+  const rest=isOnline?0:fee-dep;
+  const amount=dotNum===1?dep:rest;
+  const dotLabel=isOnline?'toàn bộ':`đợt ${dotNum}`;
+  confirmAct(
+    `Hoàn tác thu tiền ${dotLabel}?`,
+    `Sẽ xóa ${fmt(amount)} khỏi lịch sử và đánh dấu chưa thanh toán.`,
+    async()=>{
+      const upd=dotNum===1?{paid1:false,paid1_at:null}:{paid2:false,paid2_at:null};
+      await sbPatch('students',upd,`?id=eq.${id}`);
+      Object.assign(s,upd);
+      const relatedOrders=D.orders.filter(o=>
+        o.customer===s.name&&o.id.startsWith('HP')&&
+        (o.items||'').includes(dotNum===1?(isOnline?'Online':'đợt 1'):'đợt 2')
+      );
+      for(const o of relatedOrders){
+        await sbDel('orders',`?id=eq.${o.id}`);
+        D.orders=D.orders.filter(x=>x.id!==o.id);
+      }
+      document.getElementById(`cf-paid${dotNum}-badge`).style.display='none';
+      document.getElementById(`cf-btn${dotNum}`).style.display='flex';
+      document.getElementById(`cf-qr${dotNum}`).style.display='none';
+      notify(`↩️ Đã hoàn tác thu tiền ${dotLabel}: ${fmt(amount)}`);
+      renderStudents();renderOrders();renderDash();
+      gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
+    }
+  );
+}
+
+
 async function directPay(id){
   const o=D.orders.find(x=>x.id===id);if(!o)return;
   o.status='Đã thanh toán';
