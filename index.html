@@ -1307,7 +1307,10 @@ async function checkout(){
     status:'Chờ thanh toán',created_at:Date.now()};
   try{
     await sbUpsert('orders',pendingOrder);
-    D.orders.push(pendingOrder);
+    // Reload orders từ Supabase để đảm bảo đồng bộ
+    const freshOrders=await sbGet('orders','?order=created_at.asc');
+    if(freshOrders&&freshOrders.length) D.orders=freshOrders;
+    else D.orders.push(pendingOrder);
     renderOrders();renderDash();
   }catch(e){console.warn('Lưu đơn chờ lỗi:',e.message);}
   if(document.getElementById('at-sale').checked)
