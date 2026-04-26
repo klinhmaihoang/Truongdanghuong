@@ -231,18 +231,36 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="tab active" onclick="stTab(this,'all')">Tất cả</div>
     <div class="tab" onclick="stTab(this,'online')">Online</div>
     <div class="tab" onclick="stTab(this,'offline')">Offline</div>
+    <div class="tab" onclick="stTab(this,'courses')">📚 Khóa học</div>
   </div>
-  <div class="card">
-    <div class="card-head">
-      <span class="card-title">Danh sách học viên</span>
-      <div class="btn-group">
-        <button class="btn btn-sm" onclick="showM('modal-add-student')">+ Thêm học viên</button>
-        <button class="btn btn-tg btn-sm" onclick="tgReport('students')">→ Telegram</button>
-        <button class="btn btn-excel btn-sm" onclick="xlExport('students')">📊 Excel</button>
+
+  <!-- Danh sách học viên -->
+  <div id="panel-students">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Danh sách học viên</span>
+        <div class="btn-group">
+          <button class="btn btn-sm" onclick="showM('modal-add-student')">+ Thêm học viên</button>
+          <button class="btn btn-tg btn-sm" onclick="tgReport('students')">→ Telegram</button>
+          <button class="btn btn-tg btn-sm" onclick="checkReminders()">🔔 Kiểm tra nhắc nhở</button>
+          <button class="btn btn-excel btn-sm" onclick="xlExport('students')">📊 Excel</button>
+        </div>
       </div>
+      <table><thead><tr><th>Họ tên</th><th class="hide-mobile">Khóa học</th><th>Học phí</th><th class="hide-mobile">Ngày học</th><th class="hide-mobile">Thanh toán</th><th class="hide-mobile">Trạng thái</th><th></th></tr></thead>
+      <tbody id="student-list"></tbody></table>
     </div>
-    <table><thead><tr><th>Họ tên</th><th class="hide-mobile">Loại</th><th class="hide-mobile">Khóa học</th><th>Học phí</th><th class="hide-mobile">Ngày BĐ</th><th class="hide-mobile">Trạng thái</th><th></th></tr></thead>
-    <tbody id="student-list"></tbody></table>
+  </div>
+
+  <!-- Quản lý khóa học -->
+  <div id="panel-courses" style="display:none">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Danh sách khóa học</span>
+        <button class="btn btn-sm" onclick="showM('modal-add-course')">+ Thêm khóa học</button>
+      </div>
+      <table><thead><tr><th>Tên khóa học</th><th>Loại</th><th>Học phí</th><th>Trạng thái</th><th></th></tr></thead>
+      <tbody id="course-list"></tbody></table>
+    </div>
   </div>
 </div>
 
@@ -466,7 +484,44 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
     <div class="btn-group" style="margin-top:10px">
       <button class="btn btn-excel btn-sm" onclick="gsSyncAll()">📊 Sync toàn bộ → Google Sheet</button>
+      <button class="btn btn-tg btn-sm" onclick="checkReminders()">🔔 Kiểm tra nhắc nhở ngay</button>
     </div>
+  </div>
+  <div class="card" style="border-color:rgba(255,140,0,.3)">
+    <div class="card-head"><span class="card-title">⏰ Nhắc nhở tự động hàng ngày (Google Apps Script)</span></div>
+    <div class="guide">Để Telegram nhận nhắc nhở tự động mỗi ngày <strong>dù app không mở</strong>, thêm đoạn code này vào Google Apps Script (cùng file Sheet):</div>
+    <div style="background:var(--bg);border-radius:8px;padding:12px;font-size:11px;font-family:monospace;color:var(--brown);overflow-x:auto;margin-bottom:8px;border:1px solid var(--border)">
+function sendDailyReminders() {<br>
+&nbsp;&nbsp;const TG_TOKEN = 'YOUR_BOT_TOKEN';<br>
+&nbsp;&nbsp;const CHAT_ID = 'YOUR_CHAT_ID';<br>
+&nbsp;&nbsp;const ss = SpreadsheetApp.getActiveSpreadsheet();<br>
+&nbsp;&nbsp;const sh = ss.getSheetByName('HocVien');<br>
+&nbsp;&nbsp;if(!sh) return;<br>
+&nbsp;&nbsp;const data = sh.getDataRange().getValues();<br>
+&nbsp;&nbsp;const today = new Date(); today.setHours(0,0,0,0);<br>
+&nbsp;&nbsp;const msgs = [];<br>
+&nbsp;&nbsp;data.slice(1).forEach(row => {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;const [name,,type,,fee,start,status,,phone,,,class_date,paid1,,paid2] = row;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if(status !== 'Đang học' || !fee) return;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;const dep = Math.round(fee * 0.3);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;const rest = fee - dep;<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if(class_date) {<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;const cd = new Date(class_date); cd.setHours(0,0,0,0);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;const diff = Math.round((cd-today)/(86400000));<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(diff===7) msgs.push(`📅 Còn 7 ngày tới ngày học!\n👤 ${name}\n🗓 ${class_date}\n💰 Cần cọc: ${dep.toLocaleString()}đ`);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(diff===3) msgs.push(`⏰ Còn 3 ngày tới ngày học!\n👤 ${name}\n🗓 ${class_date}`);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(diff===1) msgs.push(`🔔 NGÀY MAI LÀ NGÀY HỌC!\n👤 ${name}`);<br>
+&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+&nbsp;&nbsp;&nbsp;&nbsp;if(paid1 && !paid2) msgs.push(`💸 Nhắc đợt 2!\n👤 ${name}\n💵 Còn lại: ${rest.toLocaleString()}đ`);<br>
+&nbsp;&nbsp;});<br>
+&nbsp;&nbsp;msgs.forEach(m => UrlFetchApp.fetch(<br>
+&nbsp;&nbsp;&nbsp;&nbsp;`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`,<br>
+&nbsp;&nbsp;&nbsp;&nbsp;{method:'post',payload:{chat_id:CHAT_ID,text:m}}<br>
+&nbsp;&nbsp;));<br>
+}
+    </div>
+    <div class="guide"><strong style="color:var(--brand)">B1</strong> — Thay YOUR_BOT_TOKEN và YOUR_CHAT_ID</div>
+    <div class="guide"><strong style="color:var(--brand)">B2</strong> — Apps Script → <strong>Triggers</strong> → Add trigger → chọn <code>sendDailyReminders</code> → Time-driven → Day timer → 8:00-9:00 AM</div>
   </div>
   <div class="card">
     <div class="card-head"><span class="card-title">Nhật ký gửi</span><button class="btn btn-ghost btn-sm" onclick="clearLog()">Xóa log</button></div>
@@ -524,8 +579,8 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <div class="fg"><label>Số điện thoại</label><input id="fs-phone" placeholder="090xxxxxxx"/></div>
     </div>
     <div class="form-row">
-      <div class="fg"><label>Loại học</label><select id="fs-type"><option>Offline</option><option>Online</option></select></div>
-      <div class="fg"><label>Khóa học</label><select id="fs-course"><option>Cơ bản</option><option>Nâng cao</option><option>Chuyên nghiệp</option></select></div>
+      <div class="fg"><label>Loại học</label><select id="fs-type" onchange="toggleClassDate()"><option>Offline</option><option>Online</option></select></div>
+      <div class="fg"><label>Khóa học</label><select id="fs-course-id"></select></div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Email</label><input id="fs-email" placeholder="email@example.com"/></div>
@@ -533,11 +588,62 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
     <div class="form-row">
       <div class="fg"><label>Ngày bắt đầu</label><input id="fs-start" type="date"/></div>
-      <div class="fg"><label>Ghi chú</label><input id="fs-note" placeholder="Ghi chú..."/></div>
+      <div class="fg" id="fg-class-date"><label>📅 Ngày học (Offline)</label><input id="fs-class-date" type="date"/></div>
     </div>
+    <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="fs-note" placeholder="Ghi chú..."/></div>
     <div class="btn-group" style="margin-top:8px">
       <button class="btn btn-green btn-sm" onclick="addStudent()">Lưu học viên</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-student')">Hủy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Course -->
+<div class="overlay" id="modal-add-course">
+  <div class="modal">
+    <div class="modal-title">+ Thêm khóa học</div>
+    <div class="form-row">
+      <div class="fg"><label>Tên khóa học *</label><input id="fc-name" placeholder="VD: Bartender cơ bản"/></div>
+      <div class="fg"><label>Loại</label><select id="fc-type"><option>Offline</option><option>Online</option><option>Cả hai</option></select></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Học phí (₫)</label><input id="fc-fee" type="number" placeholder="2500000"/></div>
+      <div class="fg" style="justify-content:flex-end;padding-top:20px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600">
+          <input type="checkbox" id="fc-free" style="accent-color:var(--brand);width:16px;height:16px" onchange="document.getElementById('fc-fee').disabled=this.checked;if(this.checked)document.getElementById('fc-fee').value=0">
+          Khóa học miễn phí
+        </label>
+      </div>
+    </div>
+    <div class="btn-group" style="margin-top:8px">
+      <button class="btn btn-green btn-sm" onclick="addCourse()">Lưu khóa học</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-course')">Hủy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Course -->
+<div class="overlay" id="modal-edit-course">
+  <div class="modal">
+    <div class="modal-title">✏️ Chỉnh sửa khóa học</div>
+    <input type="hidden" id="ec-id"/>
+    <div class="form-row">
+      <div class="fg"><label>Tên khóa học *</label><input id="ec-name"/></div>
+      <div class="fg"><label>Loại</label><select id="ec-type"><option>Offline</option><option>Online</option><option>Cả hai</option></select></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Học phí (₫)</label><input id="ec-fee" type="number"/></div>
+      <div class="fg" style="justify-content:flex-end;padding-top:20px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600">
+          <input type="checkbox" id="ec-free" style="accent-color:var(--brand);width:16px;height:16px" onchange="document.getElementById('ec-fee').disabled=this.checked;if(this.checked)document.getElementById('ec-fee').value=0">
+          Miễn phí
+        </label>
+      </div>
+    </div>
+    <div class="btn-group" style="margin-top:8px">
+      <button class="btn btn-green btn-sm" onclick="saveEditCourse()">Lưu thay đổi</button>
+      <button class="btn btn-red btn-sm" onclick="deleteCourse()">🗑 Xóa</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-edit-course')">Hủy</button>
     </div>
   </div>
 </div>
@@ -718,6 +824,53 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   </div>
 </div>
 
+<!-- Thu học phí 2 đợt -->
+<div class="overlay" id="modal-collect-fee">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-title">💰 Thu học phí</div>
+    <input type="hidden" id="cf-student-id"/>
+    <div style="background:var(--brand-light);border-radius:10px;padding:12px 14px;margin-bottom:14px">
+      <div style="font-size:15px;font-weight:800;color:var(--brown)" id="cf-student-name"></div>
+      <div style="font-size:12px;color:var(--muted);margin-top:2px" id="cf-student-info"></div>
+    </div>
+
+    <!-- Đợt 1: 30% -->
+    <div style="border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px" id="cf-box1">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-weight:700;color:var(--brown)">Đợt 1 — 30% học phí</div>
+        <span id="cf-paid1-badge" style="display:none" class="tag t-paid">✓ Đã thu</span>
+      </div>
+      <div style="font-size:20px;font-weight:800;color:var(--brand);margin-bottom:8px" id="cf-amount1">0₫</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">📌 Cọc trước ngày học 1 tuần</div>
+      <div class="btn-group" id="cf-btn1">
+        <button class="btn btn-green btn-sm" onclick="markFeePaid(1)">✓ Xác nhận đã thu đợt 1</button>
+        <button class="btn btn-sm" onclick="genFeeQR(1)">🔄 Tạo QR đợt 1</button>
+      </div>
+      <div id="cf-qr1" style="display:none;text-align:center;margin-top:10px">
+        <img id="cf-qr-img1" src="" style="width:140px;height:140px;border-radius:8px;border:2px solid var(--brand)"/>
+      </div>
+    </div>
+
+    <!-- Đợt 2: 70% -->
+    <div style="border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px" id="cf-box2">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div style="font-weight:700;color:var(--brown)">Đợt 2 — 70% còn lại</div>
+        <span id="cf-paid2-badge" style="display:none" class="tag t-paid">✓ Đã thu</span>
+      </div>
+      <div style="font-size:20px;font-weight:800;color:var(--brand);margin-bottom:8px" id="cf-amount2">0₫</div>
+      <div class="btn-group" id="cf-btn2">
+        <button class="btn btn-green btn-sm" onclick="markFeePaid(2)">✓ Xác nhận đã thu đợt 2</button>
+        <button class="btn btn-sm" onclick="genFeeQR(2)">🔄 Tạo QR đợt 2</button>
+      </div>
+      <div id="cf-qr2" style="display:none;text-align:center;margin-top:10px">
+        <img id="cf-qr-img2" src="" style="width:140px;height:140px;border-radius:8px;border:2px solid var(--brand)"/>
+      </div>
+    </div>
+
+    <button class="btn btn-ghost btn-sm" style="width:100%" onclick="closeM('modal-collect-fee')">Đóng</button>
+  </div>
+</div>
+
 <!-- Confirm -->
 <div class="overlay" id="modal-confirm">
   <div class="modal" style="max-width:360px;text-align:center">
@@ -781,7 +934,7 @@ const sbUpsert = async (t,d)=> {
 // ══════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════
-let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[]};
+let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[]};
 let cfg = {tgToken:'',tgChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',gsUrl:'https://script.google.com/macros/s/AKfycbz33rZTxDqdH0cy4f1eaCkYFBD9PnMdmr8fTnhx2bMTsFSS9TjMcZ0uNx6_a122VVZG/exec'};
 let cart=[], invoice=null, selectedStudentId=null, stFilter='all', tgLog=[];
 
@@ -821,7 +974,7 @@ async function boot(){
 
   setSyncStatus(false,'Đang kết nối...');
   try{
-    const [students,inventory,products,orders,stockLog,settings,recipes] = await Promise.all([
+    const [students,inventory,products,orders,stockLog,settings,recipes,courses] = await Promise.all([
       sbGet('students','?order=created_at.asc'),
       sbGet('inventory','?order=created_at.asc'),
       sbGet('products','?order=created_at.asc'),
@@ -829,6 +982,7 @@ async function boot(){
       sbGet('stock_log','?order=created_at.desc&limit=200'),
       sbGet('settings','?id=eq.main'),
       sbGet('recipes','?order=created_at.asc'),
+      sbGet('courses','?order=created_at.asc'),
     ]);
 
     D.students = students||[];
@@ -837,6 +991,7 @@ async function boot(){
     D.orders    = orders||[];
     D.stockLog  = stockLog||[];
     D.recipes   = recipes||[];
+    D.courses   = courses||[];
 
     // Seed defaults nếu inventory/products trống
     if(!inventory||!inventory.length){
@@ -915,7 +1070,29 @@ function applyTgUI(){
 // ══════════════════════════════════════════════════
 function stTab(el,f){
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-  el.classList.add('active');stFilter=f;renderStudents();
+  el.classList.add('active');
+  stFilter=f;
+  if(f==='courses'){
+    document.getElementById('panel-students').style.display='none';
+    document.getElementById('panel-courses').style.display='block';
+    renderCourses();
+  } else {
+    document.getElementById('panel-students').style.display='block';
+    document.getElementById('panel-courses').style.display='none';
+    renderStudents();
+  }
+}
+
+function toggleClassDate(){
+  const type=document.getElementById('fs-type').value;
+  document.getElementById('fg-class-date').style.display=type==='Offline'?'flex':'none';
+}
+
+function fillCourseSelects(){
+  const opts=D.courses.length
+    ? D.courses.map(c=>`<option value="${c.id}">${c.name}${c.is_free?' (Miễn phí)':' — '+fmt(c.fee)}</option>`).join('')
+    : '<option value="">-- Chưa có khóa học --</option>';
+  ['fs-course-id'].forEach(id=>{const el=document.getElementById(id);if(el){const v=el.value;el.innerHTML=opts;el.value=v;}});
 }
 
 function fillMatSelects(){
@@ -924,12 +1101,116 @@ function fillMatSelects(){
   const stockOpts=D.inventory.map(i=>`<option value="${i.id}">${i.name} (còn: ${i.qty} ${i.unit})</option>`).join('');
   ['fp-mat','ep-mat'].forEach(id=>{const el=document.getElementById(id);if(el){const v=el.value;el.innerHTML=opts;el.value=v;}});
   ['im-mat','ex-mat'].forEach(id=>{const el=document.getElementById(id);if(el){const v=el.value;el.innerHTML=stockOpts;el.value=v;}});
+  fillCourseSelects();
+}
+
+// ══════════════════════════════════════════════════
+// COURSES
+// ══════════════════════════════════════════════════
+function renderCourses(){
+  const el=document.getElementById('course-list');if(!el)return;
+  el.innerHTML=D.courses.length?D.courses.map(c=>`<tr>
+    <td><strong>${c.name}</strong></td>
+    <td><span class="tag ${c.type==='Online'?'t-online':c.type==='Cả hai'?'t-pending':'t-offline'}">${c.type}</span></td>
+    <td style="color:var(--brand);font-weight:700">${c.is_free?'<span class="tag t-paid">Miễn phí</span>':fmt(c.fee)}</td>
+    <td><span class="tag t-paid">Đang mở</span></td>
+    <td><button class="btn btn-ghost btn-sm" onclick="openEditCourse('${c.id}')">✏️ Sửa</button></td>
+  </tr>`).join('')
+  :'<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:16px">Chưa có khóa học — thêm khóa học đầu tiên!</td></tr>';
+}
+
+async function addCourse(){
+  const name=document.getElementById('fc-name').value.trim();
+  if(!name){notify('Nhập tên khóa học!',false);return;}
+  const is_free=document.getElementById('fc-free').checked;
+  const c={id:uid(),name,type:document.getElementById('fc-type').value,
+    fee:is_free?0:+document.getElementById('fc-fee').value||0,
+    is_free,created_at:Date.now()};
+  try{
+    await sbUpsert('courses',c);
+    D.courses.push(c);
+    closeM('modal-add-course');
+    ['fc-name','fc-fee'].forEach(id=>document.getElementById(id).value='');
+    document.getElementById('fc-free').checked=false;
+    renderCourses();fillCourseSelects();
+    notify('Đã thêm khóa học: '+name);
+  }catch(e){notify('Lỗi: '+e.message,false);}
+}
+
+function openEditCourse(id){
+  const c=D.courses.find(x=>x.id===id);if(!c)return;
+  document.getElementById('ec-id').value=id;
+  document.getElementById('ec-name').value=c.name;
+  document.getElementById('ec-type').value=c.type||'Offline';
+  document.getElementById('ec-fee').value=c.fee||0;
+  document.getElementById('ec-free').checked=c.is_free||false;
+  document.getElementById('ec-fee').disabled=c.is_free||false;
+  showM('modal-edit-course');
+}
+
+async function saveEditCourse(){
+  const id=document.getElementById('ec-id').value;
+  const name=document.getElementById('ec-name').value.trim();
+  if(!name){notify('Nhập tên khóa học!',false);return;}
+  const is_free=document.getElementById('ec-free').checked;
+  const upd={name,type:document.getElementById('ec-type').value,
+    fee:is_free?0:+document.getElementById('ec-fee').value||0,is_free};
+  try{
+    await sbPatch('courses',upd,`?id=eq.${id}`);
+    const c=D.courses.find(x=>x.id===id);if(c)Object.assign(c,upd);
+    closeM('modal-edit-course');renderCourses();fillCourseSelects();
+    notify('Đã cập nhật khóa học: '+name);
+  }catch(e){notify('Lỗi: '+e.message,false);}
+}
+
+function deleteCourse(){
+  const id=document.getElementById('ec-id').value;
+  const c=D.courses.find(x=>x.id===id);if(!c)return;
+  confirmAct(`Xóa khóa học "${c.name}"?`,'Học viên đang học khóa này sẽ không bị ảnh hưởng.',async()=>{
+    try{
+      await sbDel('courses',`?id=eq.${id}`);
+      D.courses=D.courses.filter(x=>x.id!==id);
+      closeM('modal-edit-course');renderCourses();fillCourseSelects();
+      notify('Đã xóa khóa học');
+    }catch(e){notify('Lỗi: '+e.message,false);}
+  });
+}
+
+// ══════════════════════════════════════════════════
+// REMINDERS — Kiểm tra & gửi nhắc nhở
+// ══════════════════════════════════════════════════
+async function checkReminders(){
+  const today=new Date();today.setHours(0,0,0,0);
+  const msgs=[];
+
+  D.students.filter(s=>s.status==='Đang học').forEach(s=>{
+    const fee=s.fee||0;
+    const dep=Math.round(fee*0.3);
+    const rest=fee-dep;
+
+    // Nhắc ngày học sắp tới (offline)
+    if(s.class_date){
+      const classDay=new Date(s.class_date);classDay.setHours(0,0,0,0);
+      const diff=Math.round((classDay-today)/(1000*60*60*24));
+      if(diff===7)msgs.push(`📅 *Nhắc lịch học!*\n\n👤 ${s.name}\n📚 ${s.course||'—'}\n🗓 Còn *7 ngày* tới ngày học: ${s.class_date}\n💰 Cần cọc đợt 1: ${fmt(dep)}\n\n_Trương Dáng Hương Academy_`);
+      else if(diff===3)msgs.push(`⏰ *Sắp tới ngày học!*\n\n👤 ${s.name}\n🗓 Còn *3 ngày*: ${s.class_date}\n${!s.paid1?`❌ Chưa cọc đợt 1: ${fmt(dep)}`:'✅ Đã cọc đợt 1'}\n\n_Trương Dáng Hương Academy_`);
+      else if(diff===1)msgs.push(`🔔 *NGÀY MAI LÀ NGÀY HỌC!*\n\n👤 ${s.name}\n🗓 ${s.class_date}\n${!s.paid1?`❌ Chưa cọc đợt 1: ${fmt(dep)}`:'✅ Đã cọc đợt 1'}\n\n_Trương Dáng Hương Academy_`);
+    }
+
+    // Nhắc thanh toán
+    if(fee>0&&s.paid1&&!s.paid2)
+      msgs.push(`💸 *Nhắc thanh toán đợt 2!*\n\n👤 ${s.name}\n📚 ${s.course||'—'}\n✅ Đã thu đợt 1: ${fmt(dep)}\n⏳ Còn lại đợt 2: ${fmt(rest)}\n\n_Trương Dáng Hương Academy_`);
+  });
+
+  if(msgs.length===0){notify('✓ Không có nhắc nhở nào hôm nay');return;}
+  for(const m of msgs)await tgMsg(m);
+  notify(`✓ Đã gửi ${msgs.length} nhắc nhở lên Telegram`);
 }
 
 // ══════════════════════════════════════════════════
 // RENDER
 // ══════════════════════════════════════════════════
-function render(){renderDash();renderStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();fillMatSelects();}
+function render(){renderDash();renderStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();renderCourses();fillMatSelects();}
 
 // ══════════════════════════════════════════════════
 // BÁO CÁO
@@ -1176,33 +1457,61 @@ function renderDash(){
 
 function renderStudents(){
   const list=D.students.filter(s=>stFilter==='all'||s.type.toLowerCase()===stFilter);
-  document.getElementById('student-list').innerHTML=list.map(s=>`<tr style="cursor:pointer" onclick="openStDetail('${s.id}')">
-    <td><strong>${s.name}</strong><br><span style="font-size:11px;color:var(--muted)">${s.phone||''}</span></td>
-    <td class="hide-mobile"><span class="tag ${s.type==='Online'?'t-online':'t-offline'}">${s.type}</span></td>
-    <td class="hide-mobile" style="font-size:12px">${s.course}</td>
-    <td style="color:var(--gold2);font-weight:700">${fmt(s.fee)}</td>
-    <td class="hide-mobile" style="font-size:12px;color:var(--muted)">${s.start||'—'}</td>
-    <td class="hide-mobile"><span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Hoàn thành'?'t-done':'t-pending'}">${s.status}</span></td>
-    <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openStDetail('${s.id}')">Chi tiết →</button></td>
-  </tr>`).join('');
+  document.getElementById('student-list').innerHTML=list.map(s=>{
+    const course=D.courses.find(c=>c.id===s.course_id);
+    const courseName=course?course.name:(s.course||'—');
+    const fee=s.fee||0;
+    const dep=Math.round(fee*0.3);
+    const paid1Tag=s.paid1?'<span class="tag t-paid" style="font-size:10px">✓Đ1</span>':'<span class="tag t-low" style="font-size:10px">Đ1</span>';
+    const paid2Tag=fee>0?(s.paid2?'<span class="tag t-paid" style="font-size:10px">✓Đ2</span>':'<span class="tag t-pending" style="font-size:10px">Đ2</span>'):'';
+    const today=new Date();today.setHours(0,0,0,0);
+    let classTag='';
+    if(s.class_date){
+      const classDay=new Date(s.class_date);classDay.setHours(0,0,0,0);
+      const diff=Math.round((classDay-today)/(1000*60*60*24));
+      classTag=diff<0?`<span style="color:var(--muted);font-size:11px">Đã học</span>`
+        :diff===0?`<span class="tag t-low" style="font-size:10px">Hôm nay!</span>`
+        :diff<=3?`<span class="tag t-low" style="font-size:10px">Còn ${diff}N</span>`
+        :diff<=7?`<span class="tag t-pending" style="font-size:10px">Còn ${diff}N</span>`
+        :`<span style="font-size:11px;color:var(--muted)">${s.class_date}</span>`;
+    }
+    return`<tr style="cursor:pointer" onclick="openStDetail('${s.id}')">
+      <td><strong>${s.name}</strong><br><span style="font-size:11px;color:var(--muted)">${s.phone||''}</span></td>
+      <td class="hide-mobile" style="font-size:12px">${courseName}</td>
+      <td style="color:var(--brand);font-weight:700">${fee===0?'<span class="tag t-paid">Miễn phí</span>':fmt(fee)}</td>
+      <td class="hide-mobile">${classTag||'<span style="color:var(--muted)">—</span>'}</td>
+      <td class="hide-mobile"><div style="display:flex;gap:4px">${paid1Tag}${paid2Tag}</div></td>
+      <td class="hide-mobile"><span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Hoàn thành'?'t-done':'t-pending'}">${s.status}</span></td>
+      <td class="btn-group" style="gap:4px">
+        <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openStDetail('${s.id}')">Chi tiết</button>
+        ${fee>0?`<button class="btn btn-green btn-sm" onclick="event.stopPropagation();collectFee('${s.id}')">💰</button>`:''}
+      </td>
+    </tr>`;
+  }).join('');
 }
 
 function openStDetail(id){
   const s=D.students.find(x=>x.id===id);if(!s)return;
   selectedStudentId=id;
+  const course=D.courses.find(c=>c.id===s.course_id);
+  const courseName=course?course.name:(s.course||'—');
+  const fee=s.fee||0;const dep=Math.round(fee*0.3);const rest=fee-dep;
   document.getElementById('student-detail-content').innerHTML=`
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
       <div class="detail-avatar">${s.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
       <div><div style="font-size:18px;font-weight:700">${s.name}</div>
-      <div style="font-size:13px;color:var(--muted);margin-top:2px">${s.course} · ${s.type}</div></div>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px">${courseName} · ${s.type}</div></div>
       <span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Hoàn thành'?'t-done':'t-pending'}" style="margin-left:auto">${s.status}</span>
     </div>
     <div class="detail-row"><span class="detail-label">Số điện thoại</span><span>${s.phone||'—'}</span></div>
     <div class="detail-row"><span class="detail-label">Email</span><span>${s.email||'—'}</span></div>
-    <div class="detail-row"><span class="detail-label">Khóa học</span><span>${s.course}</span></div>
+    <div class="detail-row"><span class="detail-label">Khóa học</span><span>${courseName}</span></div>
     <div class="detail-row"><span class="detail-label">Loại hình</span><span>${s.type}</span></div>
     <div class="detail-row"><span class="detail-label">Ngày bắt đầu</span><span>${s.start||'—'}</span></div>
-    <div class="detail-row"><span class="detail-label">Học phí</span><span style="color:var(--gold2);font-weight:700">${fmt(s.fee)}</span></div>
+    ${s.class_date?`<div class="detail-row"><span class="detail-label">📅 Ngày học</span><span style="font-weight:700;color:var(--brand)">${s.class_date}</span></div>`:''}
+    <div class="detail-row"><span class="detail-label">Học phí</span><span style="color:var(--brand);font-weight:700">${fee===0?'Miễn phí':fmt(fee)}</span></div>
+    ${fee>0?`<div class="detail-row"><span class="detail-label">Đợt 1 (30%)</span><span>${s.paid1?`<span class="tag t-paid">✓ Đã thu ${fmt(dep)}</span> <small style="color:var(--muted)">${s.paid1_at||''}</small>`:`<span class="tag t-low">Chưa thu — ${fmt(dep)}</span>`}</span></div>`:''}
+    ${fee>0?`<div class="detail-row"><span class="detail-label">Đợt 2 (70%)</span><span>${s.paid2?`<span class="tag t-paid">✓ Đã thu ${fmt(rest)}</span> <small style="color:var(--muted)">${s.paid2_at||''}</small>`:`<span class="tag t-pending">Chưa thu — ${fmt(rest)}</span>`}</span></div>`:''}
     <div class="detail-row"><span class="detail-label">Ghi chú</span><span style="color:var(--muted)">${s.note||'—'}</span></div>`;
   document.getElementById('btn-toggle-st').textContent=s.status==='Đang học'?'Đánh dấu hoàn thành':'Kích hoạt lại';
   showM('modal-student-detail');
@@ -1231,19 +1540,26 @@ function deleteSt(){
 async function addStudent(){
   const n=document.getElementById('fs-name').value.trim();
   if(!n){notify('Vui lòng nhập họ tên!',false);return;}
+  const courseId=document.getElementById('fs-course-id').value;
+  const course=D.courses.find(c=>c.id===courseId);
+  const type=document.getElementById('fs-type').value;
+  const feeVal=+document.getElementById('fs-fee').value||(course&&!course.is_free?course.fee:0);
   const s={id:uid(),name:n,phone:document.getElementById('fs-phone').value,
-    type:document.getElementById('fs-type').value,course:document.getElementById('fs-course').value,
-    email:document.getElementById('fs-email').value,fee:+document.getElementById('fs-fee').value||0,
+    type,course_id:courseId,course:course?course.name:'',
+    email:document.getElementById('fs-email').value,fee:feeVal,
     start:document.getElementById('fs-start').value||todayStr(),
-    note:document.getElementById('fs-note').value,status:'Đang học',created_at:Date.now()};
+    class_date:type==='Offline'?(document.getElementById('fs-class-date').value||null):null,
+    note:document.getElementById('fs-note').value,
+    paid1:false,paid1_at:null,paid2:false,paid2_at:null,
+    status:'Đang học',created_at:Date.now()};
   try{
     await sbUpsert('students',s);
     D.students.push(s);
     closeM('modal-add-student');
-    ['fs-name','fs-phone','fs-email','fs-fee','fs-start','fs-note'].forEach(id=>document.getElementById(id).value='');
+    ['fs-name','fs-phone','fs-email','fs-fee','fs-start','fs-class-date','fs-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     renderStudents();renderDash();notify('Đã thêm: '+n);
     if(document.getElementById('at-student').checked)
-      tgMsg(`🎓 *Học viên mới!*\n\n👤 ${n}\n📱 ${s.type}\n📚 ${s.course}\n💰 ${fmt(s.fee)}\n\n_Trương Dáng Hương Academy_`);
+      tgMsg(`🎓 *Học viên mới!*\n\n👤 ${n}\n📱 ${type}\n📚 ${course?course.name:'—'}\n💰 ${feeVal===0?'Miễn phí':fmt(feeVal)}\n${s.class_date?`🗓 Ngày học: ${s.class_date}\n`:''}\n_Trương Dáng Hương Academy_`);
     gsSend({sheet:'HocVien',rows:D.students,time:nowDT()});
   }catch(e){notify('Lưu thất bại: '+e.message,false);}
 }
@@ -1487,6 +1803,67 @@ async function saveEditOrder(){
     const o=D.orders.find(x=>x.id===id);if(o)Object.assign(o,upd);
     closeM('modal-edit-order');render();notify('Đã cập nhật đơn hàng '+id);
     tgMsg(`✏️ *Cập nhật đơn hàng!*\n\nMã: \`${id}\`\n👤 ${upd.customer}\n💰 ${fmt(upd.total)}\n📊 ${upd.status}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+  }catch(e){notify('Lỗi: '+e.message,false);}
+}
+
+// ── THU HỌC PHÍ 2 ĐỢT ──
+function collectFee(id){
+  const s=D.students.find(x=>x.id===id);if(!s)return;
+  const fee=s.fee||0;const dep=Math.round(fee*0.3);const rest=fee-dep;
+  document.getElementById('cf-student-id').value=id;
+  document.getElementById('cf-student-name').textContent=s.name;
+  const course=D.courses.find(c=>c.id===s.course_id);
+  document.getElementById('cf-student-info').textContent=(course?course.name:(s.course||''))+(s.class_date?` · Ngày học: ${s.class_date}`:'');
+  document.getElementById('cf-amount1').textContent=fmt(dep);
+  document.getElementById('cf-amount2').textContent=fmt(rest);
+  // Đợt 1
+  document.getElementById('cf-paid1-badge').style.display=s.paid1?'inline-block':'none';
+  document.getElementById('cf-btn1').style.display=s.paid1?'none':'flex';
+  document.getElementById('cf-qr1').style.display='none';
+  // Đợt 2
+  document.getElementById('cf-paid2-badge').style.display=s.paid2?'inline-block':'none';
+  document.getElementById('cf-btn2').style.display=s.paid2?'none':'flex';
+  document.getElementById('cf-qr2').style.display='none';
+  showM('modal-collect-fee');
+}
+
+function genFeeQR(dotNum){
+  const id=document.getElementById('cf-student-id').value;
+  const s=D.students.find(x=>x.id===id);if(!s)return;
+  const fee=s.fee||0;const dep=Math.round(fee*0.3);const rest=fee-dep;
+  const amount=dotNum===1?dep:rest;
+  if(!amount){notify('Học phí bằng 0!',false);return;}
+  const bankId=cfg.bankId||'VCB';const accNo=cfg.bankAcc||'';
+  const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
+  if(!accNo){notify('Chưa cấu hình số tài khoản trong Cài đặt!',false);return;}
+  const note=`Hoc phi dot ${dotNum} ${s.name}`;
+  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(note)}&accountName=${encodeURIComponent(accName)}`;
+  document.getElementById(`cf-qr-img${dotNum}`).src=qrUrl;
+  document.getElementById(`cf-qr${dotNum}`).style.display='block';
+}
+
+async function markFeePaid(dotNum){
+  const id=document.getElementById('cf-student-id').value;
+  const s=D.students.find(x=>x.id===id);if(!s)return;
+  const fee=s.fee||0;const dep=Math.round(fee*0.3);const rest=fee-dep;
+  const amount=dotNum===1?dep:rest;
+  const ts=nowDT();
+  const upd=dotNum===1?{paid1:true,paid1_at:ts}:{paid2:true,paid2_at:ts};
+  try{
+    await sbPatch('students',upd,`?id=eq.${id}`);
+    Object.assign(s,upd);
+    document.getElementById(`cf-paid${dotNum}-badge`).style.display='inline-block';
+    document.getElementById(`cf-btn${dotNum}`).style.display='none';
+    document.getElementById(`cf-qr${dotNum}`).style.display='none';
+    notify(`✓ Đã thu đợt ${dotNum}: ${fmt(amount)}`);
+    // Ghi vào đơn hàng
+    const order={id:'HP'+Date.now(),customer:s.name,email:s.email||'',
+      items:`Học phí đợt ${dotNum} — ${s.course||''}`,total:amount,
+      time:ts,note:`Đợt ${dotNum}/${2}`,status:'Đã thanh toán',created_at:Date.now()};
+    await sbUpsert('orders',order);D.orders.push(order);renderOrders();renderDash();
+    tgMsg(`💰 *Thu học phí đợt ${dotNum}!*\n\n👤 ${s.name}\n📚 ${s.course||'—'}\n💵 ${fmt(amount)} (${dotNum===1?'30%':'70%'})\n✅ Đã thu ${dotNum===1?'đợt 1':'cả 2 đợt'}\n🕐 ${ts}\n\n_Trương Dáng Hương Academy_`);
+    gsSend({sheet:'HocVien',rows:D.students,time:ts});
+    renderStudents();
   }catch(e){notify('Lỗi: '+e.message,false);}
 }
 
@@ -1859,10 +2236,11 @@ async function gsSyncAll(){
   if(!url){notify('Chưa nhập Google Sheet URL!',false);return;}
   notify('Đang sync lên Google Sheet...');
   await gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
-  await gsSend({sheet:'HocVien',rows:D.students,time:nowDT()});
-  for(const o of D.orders){
-    await gsSend({sheet:'DonHang',...o,time:o.time||nowDT()});
-  }
+  await gsSend({sheet:'HocVien',rows:D.students.map(s=>{
+    const c=D.courses.find(x=>x.id===s.course_id);
+    return {...s,course:c?c.name:(s.course||'')};
+  }),time:nowDT()});
+  for(const o of D.orders){await gsSend({sheet:'DonHang',...o,time:o.time||nowDT()});}
   notify('✓ Đã sync toàn bộ lên Google Sheet!');
 }
 
