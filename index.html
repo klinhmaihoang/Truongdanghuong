@@ -212,12 +212,21 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="stat" style="--accent:var(--orange)"><div class="stat-num" id="s3">0</div><div class="stat-label">Kho cảnh báo</div></div>
   </div>
   <!-- Badge học viên chưa thu tiền -->
-  <div id="dash-unpaid-bar" style="display:none;background:linear-gradient(135deg,#fff3cd,#ffe8a0);border:1.5px solid #e67e22;border-radius:10px;padding:10px 16px;margin-bottom:14px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+  <div id="dash-unpaid-bar" style="display:none;background:linear-gradient(135deg,#fff3cd,#ffe8a0);border:1.5px solid #e67e22;border-radius:10px;padding:10px 16px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:10px">
     <div style="display:flex;align-items:center;gap:8px">
       <span style="font-size:18px">💳</span>
-      <span style="font-size:13px;font-weight:700;color:#7d4f00">Có <span id="dash-unpaid-count">0</span> học viên chưa thanh toán</span>
+      <span style="font-size:13px;font-weight:700;color:#7d4f00">Có <span id="dash-unpaid-count">0</span> học viên chưa thanh toán đợt 1</span>
     </div>
-    <button class="btn btn-sm" style="background:#e67e22;font-size:12px;padding:5px 12px" onclick="go('students',null);stTab(document.querySelector('.tab'),\'all\')">Xem ngay →</button>
+    <div class="btn-group">
+      <button class="btn btn-sm btn-tg" style="font-size:12px;padding:5px 12px" onclick="remindAllUnpaid()">📣 Nhắc tất cả qua Telegram</button>
+    </div>
+  </div>
+  <!-- Bảng chi tiết chưa thanh toán -->
+  <div id="dash-unpaid-table" style="display:none;margin-bottom:14px" class="card">
+    <div class="card-head"><span class="card-title" style="color:#e67e22">💳 Học viên chưa thanh toán đợt 1</span></div>
+    <table><thead><tr><th>Học viên</th><th>Khóa học</th><th>Học phí</th><th>Trạng thái</th><th></th></tr></thead>
+    <tbody id="dash-unpaid-rows"></tbody></table>
+  </div>
   </div>
   <div class="card">
     <div class="card-head">
@@ -527,8 +536,153 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
   </div>
   <div class="card" style="border-color:rgba(255,140,0,.3)">
-    <div class="card-head"><span class="card-title">📋 Google Apps Script — Cập nhật code đầy đủ</span></div>
-    <div class="guide" style="background:#fff3cd;border-color:#e67e22">⚠️ <strong>Sheet HocVien đang trống?</strong> Bạn cần <strong>thay toàn bộ</strong> nội dung file Apps Script bằng code dưới đây rồi Deploy lại → Manage Deployments → chọn deployment cũ → Edit → New version → Deploy.</div>
+    <div class="card-head"><span class="card-title">📋 Google Apps Script — Code mới nhất (GET + POST)</span></div>
+    <div class="guide" style="background:#fff3cd;border-color:#e67e22">⚠️ <strong>Sheet HocVien đang trống?</strong> Copy toàn bộ code bên dưới → vào Apps Script → xóa code cũ → paste vào → điền TOKEN và CHAT_ID → <strong>Deploy lại (New version)</strong>.</div>
+    <div style="background:#1e1e2e;border-radius:8px;padding:14px;font-size:11px;font-family:monospace;color:#cdd6f4;overflow-x:auto;margin-bottom:10px;line-height:1.7;white-space:pre-wrap">const TG_TOKEN = '<span style="color:#f38ba8">YOUR_BOT_TOKEN</span>';
+const CHAT_ID  = '<span style="color:#f38ba8">YOUR_CHAT_ID</span>';
+
+// Nhận cả GET (từ app) và POST
+function doGet(e)  { return handle(e); }
+function doPost(e) { return handle(e); }
+
+function handle(e) {
+  try {
+    // Lấy payload từ GET params hoặc POST body
+    let raw = '';
+    if (e.parameter && e.parameter.payload) {
+      raw = e.parameter.payload;
+    } else if (e.postData && e.postData.contents) {
+      raw = e.postData.contents;
+    } else {
+      return ok({status:'no payload'});
+    }
+    const data  = JSON.parse(raw);
+    const ss    = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = data.sheet;
+
+    if (sheet === 'HocVien' &amp;&amp; data.rows) {
+      const sh = ss.getSheetByName('HocVien') || ss.insertSheet('HocVien');
+      sh.clearContents();
+      const headers = ['ID','Họ tên','SĐT','Loại','Khóa học','Học phí','Ngày BĐ','Trạng thái','Email','Ngày học','Đợt 1','TG Đợt 1','Đợt 2','TG Đợt 2','Ghi chú','Cập nhật'];
+      sh.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight('bold');
+      if (data.rows.length) {
+        const rows = data.rows.map(s => [
+          s.id||'', s.name||'', s.phone||'', s.type||'',
+          s.course||'', s.fee||0, s.start||'', s.status||'',
+          s.email||'', s.class_date||'',
+          s.paid1||'Chưa thu', s.paid1_at||'',
+          s.paid2||'Chưa thu', s.paid2_at||'',
+          s.note||'', data.time||''
+        ]);
+        sh.getRange(2,1,rows.length,headers.length).setValues(rows);
+        // Tô đỏ hàng chưa thanh toán
+        rows.forEach((r,i) => {
+          if (r[10] === 'Chưa thu') {
+            sh.getRange(i+2,1,1,headers.length).setBackground('#fff0f0');
+          }
+        });
+      }
+    }
+
+    else if (sheet === 'TonKho' &amp;&amp; data.rows) {
+      const sh = ss.getSheetByName('TonKho') || ss.insertSheet('TonKho');
+      sh.clearContents();
+      const headers = ['ID','Tên nguyên liệu','Tồn kho','Đơn vị','Tối thiểu','Giá nhập','Cập nhật'];
+      sh.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight('bold');
+      if (data.rows.length) {
+        const rows = data.rows.map(r => [r.id||'',r.name||'',r.qty||0,r.unit||'',r.min||0,r.cost||0,data.time||'']);
+        sh.getRange(2,1,rows.length,headers.length).setValues(rows);
+        // Tô đỏ hàng sắp hết
+        rows.forEach((r,i) => {
+          if ((r[2]||0) <= (r[4]||0)) sh.getRange(i+2,1,1,headers.length).setBackground('#fff0f0');
+        });
+      }
+    }
+
+    else if (sheet === 'DonHang') {
+      const sh = ss.getSheetByName('DonHang') || ss.insertSheet('DonHang');
+      if (sh.getLastRow() === 0)
+        sh.getRange(1,1,1,7).setValues([['Mã ĐH','Khách','Sản phẩm','Tổng tiền','Trạng thái','Thời gian','Ghi chú']]).setFontWeight('bold');
+      // Kiểm tra trùng mã đơn
+      const existing = sh.getDataRange().getValues().slice(1).map(r=>r[0]);
+      if (!existing.includes(data.id)) {
+        sh.appendRow([data.id||'',data.customer||'',data.items||'',data.total||0,data.status||'',data.time||'',data.note||'']);
+      } else {
+        // Update dòng cũ nếu trùng ID
+        const rows = sh.getDataRange().getValues();
+        rows.forEach((r,i) => {
+          if (i > 0 && r[0] === data.id) {
+            sh.getRange(i+1,5).setValue(data.status||'');
+          }
+        });
+      }
+    }
+
+    else if (sheet === 'LichSuKho') {
+      const sh = ss.getSheetByName('LichSuKho') || ss.insertSheet('LichSuKho');
+      if (sh.getLastRow() === 0)
+        sh.getRange(1,1,1,5).setValues([['Thời gian','Nguyên liệu','Loại','Số lượng','Ghi chú']]).setFontWeight('bold');
+      sh.appendRow([data.time||'',data.name||'',data.type||'',data.qty||'',data.note||'']);
+    }
+
+    return ok({status:'ok',sheet:sheet});
+  } catch(err) {
+    return ok({status:'error',error:err.toString()});
+  }
+}
+
+function ok(obj) {
+  return ContentService.createTextOutput(JSON.stringify(obj))
+    .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Chạy tự động 8h sáng mỗi ngày — set Trigger cho hàm này
+function sendDailyReminders() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName('HocVien');
+  if (!sh || sh.getLastRow() &lt; 2) return;
+  const data  = sh.getDataRange().getValues();
+  const heads = data[0];
+  const idx   = h => heads.indexOf(h);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const msgs  = [];
+
+  data.slice(1).forEach(row => {
+    const name       = row[idx('Họ tên')]      || '';
+    const fee        = +row[idx('Học phí')]    || 0;
+    const status     = row[idx('Trạng thái')] || '';
+    const course     = row[idx('Khóa học')]   || '';
+    const class_date = row[idx('Ngày học')]   || '';
+    const paid1      = row[idx('Đợt 1')]      || '';
+    const paid2      = row[idx('Đợt 2')]      || '';
+    if (status !== 'Đang học') return;
+    const dep  = Math.round(fee * 0.3);
+    const rest = fee - dep;
+
+    if (class_date) {
+      const cd   = new Date(class_date); cd.setHours(0,0,0,0);
+      const diff = Math.round((cd - today) / 86400000);
+      if (diff === 7) msgs.push(`📅 Còn 7 ngày tới ngày học!\n👤 ${name}\n📚 ${course}\n🗓 ${class_date}\n${paid1!=='Đã thu'?'❌ Chưa cọc đợt 1: '+dep.toLocaleString()+'đ':'✅ Đã cọc đợt 1'}`);
+      if (diff === 3) msgs.push(`⏰ Còn 3 ngày tới ngày học!\n👤 ${name}\n🗓 ${class_date}\n${paid1!=='Đã thu'?'❌ Chưa cọc: '+dep.toLocaleString()+'đ':'✅ Đã cọc'}`);
+      if (diff === 1) msgs.push(`🔔 NGÀY MAI LÀ NGÀY HỌC!\n👤 ${name}\n📚 ${course}`);
+      if (diff === 0) msgs.push(`🎉 HÔM NAY LÀ NGÀY HỌC!\n👤 ${name}\n📚 ${course}`);
+    }
+    if (fee &gt; 0 &amp;&amp; paid1 !== 'Đã thu')
+      msgs.push(`💳 Chưa thanh toán đợt 1!\n👤 ${name}\n📚 ${course}\n❌ Đợt 1 (30%): ${dep.toLocaleString()}đ`);
+    if (fee &gt; 0 &amp;&amp; paid1 === 'Đã thu' &amp;&amp; paid2 !== 'Đã thu')
+      msgs.push(`💸 Nhắc thanh toán đợt 2!\n👤 ${name}\n📚 ${course}\n✅ Đã thu đợt 1\n⏳ Đợt 2 (70%): ${rest.toLocaleString()}đ`);
+  });
+
+  if (msgs.length === 0) return;
+  const fullMsg = `🏫 Trương Dáng Hương Academy\n📋 Nhắc nhở hàng ngày:\n━━━━━━━━━\n` + msgs.join('\n━━━━━━━━━\n');
+  UrlFetchApp.fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+    method: 'post',
+    payload: { chat_id: CHAT_ID, text: fullMsg }
+  });
+}</div>
+    <div class="guide"><strong style="color:var(--brand)">B1</strong> — Mở Google Apps Script → xóa code cũ → paste code mới vào → điền <code>YOUR_BOT_TOKEN</code> và <code>YOUR_CHAT_ID</code></div>
+    <div class="guide"><strong style="color:var(--brand)">B2</strong> — Deploy → <strong>Manage deployments</strong> → chọn deployment cũ → ✏️ Edit → New version → Deploy lại</div>
+
     <div style="background:#1e1e2e;border-radius:8px;padding:14px;font-size:11px;font-family:monospace;color:#cdd6f4;overflow-x:auto;margin-bottom:10px;line-height:1.7;white-space:pre-wrap">const TG_TOKEN = '<span style="color:#f38ba8">YOUR_BOT_TOKEN</span>';
 const CHAT_ID  = '<span style="color:#f38ba8">YOUR_CHAT_ID</span>';
 
@@ -1759,10 +1913,28 @@ function renderDash(){
   document.getElementById('s1').textContent=(rev/1000000).toFixed(1)+'M';
   document.getElementById('s2').textContent=D.orders.length;
   document.getElementById('s3').textContent=D.inventory.filter(i=>i.qty<=i.min).length;
-  // Badge học viên chưa thu tiền
+  // Badge + bảng học viên chưa thu tiền
   const unpaid=D.students.filter(s=>s.status==='Đang học'&&(s.fee||0)>0&&!s.paid1);
   const bar=document.getElementById('dash-unpaid-bar');
   if(bar){bar.style.display=unpaid.length?'flex':'none';const el=document.getElementById('dash-unpaid-count');if(el)el.textContent=unpaid.length;}
+  const unpaidTable=document.getElementById('dash-unpaid-table');
+  if(unpaidTable){
+    if(unpaid.length){
+      unpaidTable.style.display='block';
+      document.getElementById('dash-unpaid-rows').innerHTML=unpaid.map(s=>{
+        const fee=s.fee||0;const dep=Math.round(fee*0.3);
+        return`<tr style="cursor:pointer" onclick="openStDetail('${s.id}')">
+          <td><strong>${s.name}</strong><br><span style="font-size:11px;color:var(--muted)">${s.phone||''}</span></td>
+          <td style="font-size:12px">${s.course||''}</td>
+          <td style="color:var(--brand);font-weight:700">${fmt(fee)}</td>
+          <td><span class="tag t-low">❌ Chưa thu đợt 1 — ${fmt(dep)}</span></td>
+          <td><button class="btn btn-sm btn-tg" onclick="event.stopPropagation();remindUnpaid('${s.id}')">Nhắc TG</button></td>
+        </tr>`;
+      }).join('');
+    }else{
+      unpaidTable.style.display='none';
+    }
+  }
   document.getElementById('dash-orders').innerHTML=D.orders.slice(-5).reverse().map(o=>`<tr>
     <td>${o.customer}</td><td style="font-size:12px;color:var(--muted)">${o.items}</td>
     <td style="color:var(--gold2);font-weight:700">${fmt(o.total)}</td>
@@ -1887,7 +2059,9 @@ async function addStudent(){
     renderStudents();renderDash();notify('Đã thêm: '+n);
     if(document.getElementById('at-student').checked)
       tgMsg(`🎓 *Học viên mới!*\n\n👤 ${n}\n📱 ${type}\n📚 ${course?course.name:'—'}\n💰 ${feeVal===0?'Miễn phí':fmt(feeVal)}\n${s.class_date?`🗓 Ngày học: ${s.class_date}\n`:''}\n_Trương Dáng Hương Academy_`);
-    gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
+    // Sync lên GG Sheet — gửi toàn bộ danh sách để đảm bảo đồng bộ
+    await gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
+    notify('✓ Đã thêm & sync Google Sheet: '+n);
   }catch(e){notify('Lưu thất bại: '+e.message,false);}
 }
 
@@ -2586,15 +2760,17 @@ async function deleteRecipeRow(id,pid){
 // ══════════════════════════════════════════════════
 async function gsSend(data){
   const url=cfg.gsUrl;
-  if(!url)return;
+  if(!url)return false;
   try{
-    // Apps Script yêu cầu FormData với no-cors (không được set Content-Type thủ công)
-    const form=new FormData();
-    form.append('payload',JSON.stringify(data));
-    const res=await fetch(url,{method:'POST',mode:'no-cors',body:form});
-    console.log('[GSheet] gsSend OK — sheet:',data.sheet,'rows:',(data.rows?.length||1));
+    // Dùng fetch với mode no-cors (Apps Script yêu cầu)
+    // Encode thành URL params để tránh preflight CORS
+    const params=new URLSearchParams({payload:JSON.stringify(data)});
+    await fetch(url+'?'+params.toString(),{method:'GET',mode:'no-cors'});
+    console.log('[GSheet] OK — sheet:',data.sheet);
+    return true;
   }catch(e){
-    console.error('[GSheet] gsSend lỗi:',e.message,'data:',data);
+    console.error('[GSheet] Lỗi:',e.message);
+    return false;
   }
 }
 
@@ -2602,10 +2778,17 @@ async function gsSyncAll(){
   const url=cfg.gsUrl;
   if(!url){notify('Chưa nhập Google Sheet URL!',false);return;}
   notify('Đang sync lên Google Sheet...');
-  await gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
-  await gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
-  for(const o of D.orders){await gsSend({sheet:'DonHang',...o,time:o.time||nowDT()});}
-  notify('✓ Đã sync toàn bộ lên Google Sheet!');
+  try{
+    await gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
+    await gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
+    for(const o of D.orders){
+      await gsSend({sheet:'DonHang',...o,time:o.time||nowDT()});
+    }
+    for(const l of D.stockLog){
+      await gsSend({sheet:'LichSuKho',...l});
+    }
+    notify('✓ Đã sync toàn bộ lên Google Sheet!');
+  }catch(e){notify('Lỗi sync: '+e.message,false);}
 }
 
 function gsStudents(){
@@ -2623,8 +2806,26 @@ function gsStudents(){
   });
 }
 
-// ══════════════════════════════════════════════════
-// TELEGRAM
+// ── NHẮC THANH TOÁN ──
+function remindUnpaid(id){
+  const s=D.students.find(x=>x.id===id);if(!s)return;
+  const fee=s.fee||0;const dep=Math.round(fee*0.3);
+  tgMsg(`💳 *Nhắc thanh toán học phí!*\n\n👤 Học viên: ${s.name}\n📱 SĐT: ${s.phone||'—'}\n📚 Khóa: ${s.course||''}\n\n❌ Đợt 1 (30%): ${fmt(dep)}\n💰 Tổng học phí: ${fmt(fee)}\n\n➡️ Vui lòng liên hệ thanh toán sớm!\n_Trương Dáng Hương Academy_`);
+  notify('Đã gửi nhắc nhở qua Telegram cho: '+s.name);
+}
+
+function remindAllUnpaid(){
+  const unpaid=D.students.filter(s=>s.status==='Đang học'&&(s.fee||0)>0&&!s.paid1);
+  if(!unpaid.length){notify('Không có học viên nào chưa thanh toán!');return;}
+  const lines=unpaid.map(s=>{
+    const dep=Math.round((s.fee||0)*0.3);
+    return`• ${s.name} (${s.course||''}) — Đợt 1: ${fmt(dep)}`;
+  }).join('\n');
+  tgMsg(`💳 *DANH SÁCH CHƯA THANH TOÁN ĐỢT 1*\n\n${lines}\n\n📊 Tổng: ${unpaid.length} học viên\n🕐 ${nowDT()}\n\n➡️ Cần liên hệ thu tiền!\n_Trương Dáng Hương Academy_`);
+  notify(`Đã gửi nhắc ${unpaid.length} học viên qua Telegram`);
+}
+
+
 // ══════════════════════════════════════════════════
 async function saveTg(){
   const t=document.getElementById('tg-token').value.trim();
@@ -2636,9 +2837,10 @@ async function saveTg(){
     accName:document.getElementById('tg-acc-name').value.trim()||'TRUONG DANG HUONG',
     gsUrl:document.getElementById('gs-url').value.trim()||cfg.gsUrl};
   saveCfgLocal();
-  // Lưu lên Supabase để sync cho cả team
+  // Lưu lên Supabase — bao gồm cả gs_url để sync cho cả team
   await sbUpsert('settings',{id:'main',tg_token:t,tg_chat_id:c,
-    bank_acc:cfg.bankAcc,bank_id:cfg.bankId,acc_name:cfg.accName});
+    bank_acc:cfg.bankAcc,bank_id:cfg.bankId,acc_name:cfg.accName,
+    gs_url:cfg.gsUrl});
   try{
     const r=await fetch(`https://api.telegram.org/bot${t}/getMe`);
     const d=await r.json();
