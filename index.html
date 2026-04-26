@@ -1950,11 +1950,21 @@ function openStDetail(id){
 
 async function toggleSt(){
   const s=D.students.find(x=>x.id===selectedStudentId);if(!s)return;
-  s.status=s.status==='Đang học'?'Hoàn thành':'Đang học';
-  await sbPatch('students',{status:s.status},`?id=eq.${s.id}`);
-  closeM('modal-student-detail');renderStudents();renderDash();notify('Đã cập nhật: '+s.name);
-  if(document.getElementById('at-student').checked)
-    tgMsg(`🔄 *Cập nhật học viên!*\n\n👤 ${s.name}\n📊 Trạng thái: ${s.status}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+  if(s.status==='Đã xóa') return;
+  // Cycle theo logic ngày học
+  const cycle={
+    'Chưa học':'Đang học',
+    'Đang học':'Học xong',
+    'Học xong':'Đang học',
+    'Hoàn thành':'Đang học',
+  };
+  const newStatus=cycle[s.status]||'Đang học';
+  s.status=newStatus;
+  await sbPatch('students',{status:newStatus},`?id=eq.${s.id}`);
+  closeM('modal-student-detail');
+  renderStudents();renderDash();
+  notify('Đã cập nhật: '+s.name+' → '+newStatus);
+  tgMsg('🔄 Trạng thái học viên: '+s.name+' → '+newStatus+' ('+nowDT()+')');
   gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
 }
 
