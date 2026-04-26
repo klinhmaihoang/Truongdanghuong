@@ -238,7 +238,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
   </div>
   <div class="card">
     <div class="card-head"><span class="card-title">Lịch sử nhập/xuất</span><button class="btn btn-excel btn-sm" onclick="xlExport('stocklog')">📊 Excel</button></div>
-    <table><thead><tr><th>Thời gian</th><th>Nguyên liệu</th><th>Loại</th><th>Số lượng</th><th>Ghi chú</th></tr></thead>
+    <table><thead><tr><th>Thời gian</th><th>Nguyên liệu</th><th>Loại</th><th>Số lượng</th><th>Ghi chú</th><th></th></tr></thead>
     <tbody id="stock-log"></tbody></table>
   </div>
 </div>
@@ -472,6 +472,53 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--teal);f
   </div>
 </div>
 
+<!-- Sửa lịch sử kho -->
+<div class="overlay" id="modal-edit-log">
+  <div class="modal">
+    <div class="modal-title">✏️ Sửa lịch sử nhập/xuất</div>
+    <input type="hidden" id="el-id"/>
+    <input type="hidden" id="el-type"/>
+    <input type="hidden" id="el-mat-name"/>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:12px">
+      ⚠️ Sửa lịch sử <strong>không tự động điều chỉnh tồn kho</strong>. Nếu nhập sai số lượng, hãy xóa dòng này và nhập lại đúng.
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Nguyên liệu</label><input id="el-name" readonly style="opacity:.6"/></div>
+      <div class="fg"><label>Loại</label><input id="el-type-show" readonly style="opacity:.6"/></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Số lượng (hiển thị)</label><input id="el-qty" placeholder="VD: +5 kg"/></div>
+      <div class="fg"><label>Ghi chú</label><input id="el-note" placeholder="Nhà cung cấp, lý do..."/></div>
+    </div>
+    <div class="btn-group" style="margin-top:4px">
+      <button class="btn btn-green btn-sm" onclick="saveEditLog()">Lưu thay đổi</button>
+      <button class="btn btn-red btn-sm" onclick="deleteLog()">🗑 Xóa dòng này</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-edit-log')">Hủy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Công thức sản phẩm -->
+<div class="overlay" id="modal-recipe">
+  <div class="modal wide">
+    <div class="modal-title">🧪 Công thức pha chế</div>
+    <div class="modal-sub" id="recipe-prod-name"></div>
+    <input type="hidden" id="recipe-prod-id"/>
+    <div id="recipe-rows" style="margin-bottom:12px"></div>
+    <div style="background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:8px">Thêm nguyên liệu</div>
+      <div class="form-row" style="margin-bottom:0">
+        <div class="fg"><label>Nguyên liệu</label><select id="recipe-mat"></select></div>
+        <div class="fg"><label>Lượng dùng/lần</label><input id="recipe-use" type="number" step="0.001" placeholder="0.1"/></div>
+      </div>
+      <button class="btn btn-green btn-sm" style="margin-top:8px" onclick="addRecipeRow()">+ Thêm</button>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-recipe')">Đóng</button>
+    </div>
+  </div>
+</div>
+
 <!-- Confirm -->
 <div class="overlay" id="modal-confirm">
   <div class="modal" style="max-width:360px;text-align:center">
@@ -535,7 +582,7 @@ const sbUpsert = async (t,d)=> {
 // ══════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════
-let D = {students:[],inventory:[],products:[],orders:[],stockLog:[]};
+let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[]};
 let cfg = {tgToken:'',tgChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG'};
 let cart=[], invoice=null, selectedStudentId=null, stFilter='all', tgLog=[];
 
@@ -587,13 +634,14 @@ async function boot(){
 
   setSyncStatus(false,'Đang kết nối...');
   try{
-    const [students,inventory,products,orders,stockLog,settings] = await Promise.all([
+    const [students,inventory,products,orders,stockLog,settings,recipes] = await Promise.all([
       sbGet('students','?order=created_at.asc'),
       sbGet('inventory','?order=created_at.asc'),
       sbGet('products','?order=created_at.asc'),
       sbGet('orders','?order=created_at.asc'),
       sbGet('stock_log','?order=created_at.desc&limit=200'),
       sbGet('settings','?id=eq.main'),
+      sbGet('recipes','?order=created_at.asc'),
     ]);
 
     D.students = students||[];
@@ -601,6 +649,7 @@ async function boot(){
     D.products  = products&&products.length  ? products  : DEFAULTS.products;
     D.orders    = orders||[];
     D.stockLog  = stockLog||[];
+    D.recipes   = recipes||[];
 
     // Seed defaults nếu inventory/products trống
     if(!inventory||!inventory.length){
@@ -818,7 +867,10 @@ function renderProductList(){
       <td style="font-weight:700;color:${profitColor}">${profit===null?'—':fmt(profit)}</td>
       <td style="font-size:12px;color:var(--muted)">${mat?mat.name:'—'}</td>
       <td style="font-size:12px;color:var(--muted)">${mat&&p.mat_use?p.mat_use+' '+mat.unit+'/lần':'—'}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="openEditProd('${p.id}')">✏️ Sửa</button></td>
+      <td class="btn-group" style="gap:5px">
+        <button class="btn btn-ghost btn-sm" onclick="openEditProd('${p.id}')">✏️ Sửa</button>
+        <button class="btn btn-ghost btn-sm" onclick="openRecipe('${p.id}')">🧪 Công thức</button>
+      </td>
     </tr>`;
   }).join('');
 }
@@ -928,8 +980,19 @@ async function markPaid(){
   if(!invoice)return;
   const ts=nowDT();
   for(const c of cart){
-    const p=D.products.find(x=>x.id===c.pid);
-    if(p&&p.mat_id&&p.mat_use>0){
+    const p=D.products.find(x=>x.id===c.pid);if(!p)continue;
+    // Ưu tiên dùng công thức recipes nếu có
+    const recipeRows=D.recipes.filter(r=>r.product_id===p.id);
+    if(recipeRows.length>0){
+      for(const r of recipeRows){
+        const mat=D.inventory.find(i=>i.id===r.mat_id);
+        if(mat){
+          mat.qty=Math.max(0,Math.round((mat.qty-r.mat_use*c.qty)*100)/100);
+          await sbPatch('inventory',{qty:mat.qty},`?id=eq.${mat.id}`);
+        }
+      }
+    } else if(p.mat_id&&p.mat_use>0){
+      // Fallback: dùng mat_id/mat_use cũ nếu chưa có recipe
       const mat=D.inventory.find(i=>i.id===p.mat_id);
       if(mat){
         mat.qty=Math.max(0,Math.round((mat.qty-p.mat_use*c.qty)*100)/100);
@@ -1108,7 +1171,97 @@ function renderStockLog(){
     <td><span class="tag ${l.type==='Nhập'?'t-paid':'t-pending'}">${l.type}</span></td>
     <td style="font-weight:700;color:${l.type==='Nhập'?'var(--teal)':'var(--orange)'}">${l.qty}</td>
     <td style="font-size:12px;color:var(--muted)">${l.note}</td>
-  </tr>`).join(''):'<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:16px;font-size:12px">Chưa có lịch sử</td></tr>';
+    <td><button class="btn btn-ghost btn-sm" onclick="openEditLog('${l.id}')">✏️</button></td>
+  </tr>`).join(''):'<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:16px;font-size:12px">Chưa có lịch sử</td></tr>';
+}
+
+// ── STOCK LOG EDIT ──
+function openEditLog(id){
+  const l=D.stockLog.find(x=>x.id===id);if(!l)return;
+  document.getElementById('el-id').value=id;
+  document.getElementById('el-name').value=l.name;
+  document.getElementById('el-type-show').value=l.type;
+  document.getElementById('el-qty').value=l.qty;
+  document.getElementById('el-note').value=l.note||'';
+  showM('modal-edit-log');
+}
+
+async function saveEditLog(){
+  const id=document.getElementById('el-id').value;
+  const qty=document.getElementById('el-qty').value.trim();
+  const note=document.getElementById('el-note').value.trim();
+  if(!qty){notify('Nhập số lượng!',false);return;}
+  try{
+    await sbPatch('stock_log',{qty,note},`?id=eq.${id}`);
+    const l=D.stockLog.find(x=>x.id===id);
+    if(l){l.qty=qty;l.note=note;}
+    closeM('modal-edit-log');renderStockLog();notify('Đã cập nhật lịch sử kho');
+  }catch(e){notify('Lỗi: '+e.message,false);}
+}
+
+function deleteLog(){
+  const id=document.getElementById('el-id').value;
+  const l=D.stockLog.find(x=>x.id===id);if(!l)return;
+  confirmAct(`Xóa dòng "${l.name} ${l.qty}"?`,
+    'Tồn kho sẽ KHÔNG tự động thay đổi. Nếu cần điều chỉnh kho, hãy nhập/xuất lại sau.',
+    async()=>{
+      try{
+        await sbDel('stock_log',`?id=eq.${id}`);
+        D.stockLog=D.stockLog.filter(x=>x.id!==id);
+        closeM('modal-edit-log');renderStockLog();notify('Đã xóa dòng lịch sử');
+      }catch(e){notify('Lỗi: '+e.message,false);}
+    });
+}
+
+// ── RECIPE (CÔNG THỨC NHIỀU NGUYÊN LIỆU) ──
+function openRecipe(pid){
+  const p=D.products.find(x=>x.id===pid);if(!p)return;
+  document.getElementById('recipe-prod-id').value=pid;
+  document.getElementById('recipe-prod-name').textContent='Sản phẩm: '+p.name;
+  const matOpts=D.inventory.map(i=>`<option value="${i.id}">${i.name} (${i.unit})</option>`).join('');
+  document.getElementById('recipe-mat').innerHTML=matOpts;
+  renderRecipeRows(pid);
+  showM('modal-recipe');
+}
+
+function renderRecipeRows(pid){
+  const rows=D.recipes.filter(r=>r.product_id===pid);
+  const el=document.getElementById('recipe-rows');
+  if(!rows.length){
+    el.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:10px">Chưa có công thức — thêm nguyên liệu bên dưới</div>';
+    return;
+  }
+  el.innerHTML=rows.map(r=>{
+    const mat=D.inventory.find(i=>i.id===r.mat_id);
+    return`<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border-radius:8px;margin-bottom:6px">
+      <span style="flex:1;font-size:13px;font-weight:600">${mat?mat.name:'?'}</span>
+      <span style="color:var(--gold2);font-weight:700">${r.mat_use} ${mat?mat.unit:''}</span>
+      <button class="btn btn-red btn-sm" onclick="deleteRecipeRow('${r.id}','${pid}')">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+async function addRecipeRow(){
+  const pid=document.getElementById('recipe-prod-id').value;
+  const matId=document.getElementById('recipe-mat').value;
+  const use=+document.getElementById('recipe-use').value;
+  if(!matId||!use||use<=0){notify('Chọn nguyên liệu và nhập lượng dùng!',false);return;}
+  if(D.recipes.find(r=>r.product_id===pid&&r.mat_id===matId)){notify('Nguyên liệu này đã có trong công thức!',false);return;}
+  const row={id:uid(),product_id:pid,mat_id:matId,mat_use:use,created_at:Date.now()};
+  try{
+    await sbUpsert('recipes',row);
+    D.recipes.push(row);
+    document.getElementById('recipe-use').value='';
+    renderRecipeRows(pid);notify('Đã thêm nguyên liệu vào công thức');
+  }catch(e){notify('Lỗi: '+e.message,false);}
+}
+
+async function deleteRecipeRow(id,pid){
+  try{
+    await sbDel('recipes',`?id=eq.${id}`);
+    D.recipes=D.recipes.filter(x=>x.id!==id);
+    renderRecipeRows(pid);notify('Đã xóa khỏi công thức');
+  }catch(e){notify('Lỗi: '+e.message,false);}
 }
 
 // ══════════════════════════════════════════════════
