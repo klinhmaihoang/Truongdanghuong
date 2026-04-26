@@ -2150,7 +2150,7 @@ function collectFee(id){
   const course=D.courses.find(c=>c.id===s.course_id);
   document.getElementById('cf-student-info').textContent=(course?course.name:(s.course||''))+(s.class_date?` · Ngày học: ${s.class_date}`:'')+' · '+s.type;
 
-  // Đặt label đợt 1 an toàn bằng id riêng
+  // Set label đợt 1 an toàn
   const lbl1=document.getElementById('cf-box1-label');
   if(lbl1) lbl1.textContent=isOnline?'💻 Thanh toán toàn bộ (Online)':'Đợt 1 — 30% học phí';
 
@@ -2582,24 +2582,39 @@ async function gsSend(data){
   const url=cfg.gsUrl;
   if(!url)return;
   try{
-    // Apps Script yêu cầu FormData với no-cors (không được set Content-Type thủ công)
-    const form=new FormData();
-    form.append('payload',JSON.stringify(data));
-    const res=await fetch(url,{method:'POST',mode:'no-cors',body:form});
-    console.log('[GSheet] gsSend OK — sheet:',data.sheet,'rows:',(data.rows?.length||1));
+    // URLSearchParams + POST: Apps Script đọc được qua e.parameter.payload
+    const body=new URLSearchParams({payload:JSON.stringify(data)});
+    await fetch(url,{
+      method:'POST',
+      mode:'no-cors',
+      body:body.toString(),
+      headers:{'Content-Type':'application/x-www-form-urlencoded'}
+    });
+    console.log('[GSheet] sent — sheet:',data.sheet);
   }catch(e){
-    console.error('[GSheet] gsSend lỗi:',e.message,'data:',data);
+    console.error('[GSheet] lỗi:',e.message);
   }
 }
 
 async function gsSyncAll(){
   const url=cfg.gsUrl;
   if(!url){notify('Chưa nhập Google Sheet URL!',false);return;}
-  notify('Đang sync lên Google Sheet...');
-  await gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
-  await gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
-  for(const o of D.orders){await gsSend({sheet:'DonHang',...o,time:o.time||nowDT()});}
-  notify('✓ Đã sync toàn bộ lên Google Sheet!');
+  notify('⏳ Đang sync lên Google Sheet...');
+  try{
+    await gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
+    await new Promise(r=>setTimeout(r,800));
+    await gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
+    await new Promise(r=>setTimeout(r,800));
+    for(const o of D.orders){
+      await gsSend({sheet:'DonHang',...o,time:o.time||nowDT()});
+      await new Promise(r=>setTimeout(r,300));
+    }
+    for(const l of D.stockLog.slice(0,50)){
+      await gsSend({sheet:'LichSuKho',...l});
+      await new Promise(r=>setTimeout(r,200));
+    }
+    notify('✅ Đã sync toàn bộ lên Google Sheet!');
+  }catch(e){notify('Lỗi sync: '+e.message,false);}
 }
 
 function gsStudents(){
