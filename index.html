@@ -446,6 +446,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
           <option value="BIDV">BIDV</option><option value="ACB">ACB</option>
           <option value="VPB">VPBank</option><option value="TPB">TPBank</option>
           <option value="STB">Sacombank</option><option value="MSB">MSB</option>
+          <option value="TIMO">Timo (by Ban Viet Bank)</option>
         </select>
       </div>
     </div>
@@ -488,40 +489,117 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
   </div>
   <div class="card" style="border-color:rgba(255,140,0,.3)">
-    <div class="card-head"><span class="card-title">⏰ Nhắc nhở tự động hàng ngày (Google Apps Script)</span></div>
-    <div class="guide">Để Telegram nhận nhắc nhở tự động mỗi ngày <strong>dù app không mở</strong>, thêm đoạn code này vào Google Apps Script (cùng file Sheet):</div>
-    <div style="background:var(--bg);border-radius:8px;padding:12px;font-size:11px;font-family:monospace;color:var(--brown);overflow-x:auto;margin-bottom:8px;border:1px solid var(--border)">
-function sendDailyReminders() {<br>
-&nbsp;&nbsp;const TG_TOKEN = 'YOUR_BOT_TOKEN';<br>
-&nbsp;&nbsp;const CHAT_ID = 'YOUR_CHAT_ID';<br>
-&nbsp;&nbsp;const ss = SpreadsheetApp.getActiveSpreadsheet();<br>
-&nbsp;&nbsp;const sh = ss.getSheetByName('HocVien');<br>
-&nbsp;&nbsp;if(!sh) return;<br>
-&nbsp;&nbsp;const data = sh.getDataRange().getValues();<br>
-&nbsp;&nbsp;const today = new Date(); today.setHours(0,0,0,0);<br>
-&nbsp;&nbsp;const msgs = [];<br>
-&nbsp;&nbsp;data.slice(1).forEach(row => {<br>
-&nbsp;&nbsp;&nbsp;&nbsp;const [name,,type,,fee,start,status,,phone,,,class_date,paid1,,paid2] = row;<br>
-&nbsp;&nbsp;&nbsp;&nbsp;if(status !== 'Đang học' || !fee) return;<br>
-&nbsp;&nbsp;&nbsp;&nbsp;const dep = Math.round(fee * 0.3);<br>
-&nbsp;&nbsp;&nbsp;&nbsp;const rest = fee - dep;<br>
-&nbsp;&nbsp;&nbsp;&nbsp;if(class_date) {<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;const cd = new Date(class_date); cd.setHours(0,0,0,0);<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;const diff = Math.round((cd-today)/(86400000));<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(diff===7) msgs.push(`📅 Còn 7 ngày tới ngày học!\n👤 ${name}\n🗓 ${class_date}\n💰 Cần cọc: ${dep.toLocaleString()}đ`);<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(diff===3) msgs.push(`⏰ Còn 3 ngày tới ngày học!\n👤 ${name}\n🗓 ${class_date}`);<br>
-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(diff===1) msgs.push(`🔔 NGÀY MAI LÀ NGÀY HỌC!\n👤 ${name}`);<br>
-&nbsp;&nbsp;&nbsp;&nbsp;}<br>
-&nbsp;&nbsp;&nbsp;&nbsp;if(paid1 && !paid2) msgs.push(`💸 Nhắc đợt 2!\n👤 ${name}\n💵 Còn lại: ${rest.toLocaleString()}đ`);<br>
-&nbsp;&nbsp;});<br>
-&nbsp;&nbsp;msgs.forEach(m => UrlFetchApp.fetch(<br>
-&nbsp;&nbsp;&nbsp;&nbsp;`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`,<br>
-&nbsp;&nbsp;&nbsp;&nbsp;{method:'post',payload:{chat_id:CHAT_ID,text:m}}<br>
-&nbsp;&nbsp;));<br>
+    <div class="card-head"><span class="card-title">📋 Google Apps Script — Cập nhật code đầy đủ</span></div>
+    <div class="guide" style="background:#fff3cd;border-color:#e67e22">⚠️ <strong>Sheet HocVien đang trống?</strong> Bạn cần <strong>thay toàn bộ</strong> nội dung file Apps Script bằng code dưới đây rồi Deploy lại → Manage Deployments → chọn deployment cũ → Edit → New version → Deploy.</div>
+    <div style="background:#1e1e2e;border-radius:8px;padding:14px;font-size:11px;font-family:monospace;color:#cdd6f4;overflow-x:auto;margin-bottom:10px;line-height:1.7;white-space:pre-wrap">const TG_TOKEN = '<span style="color:#f38ba8">YOUR_BOT_TOKEN</span>';
+const CHAT_ID  = '<span style="color:#f38ba8">YOUR_CHAT_ID</span>';
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const ss   = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = data.sheet;
+
+    if (sheet === 'HocVien' &amp;&amp; data.rows) {
+      const sh = ss.getSheetByName('HocVien') || ss.insertSheet('HocVien');
+      sh.clearContents();
+      const headers = ['ID','Họ tên','SĐT','Loại','Khóa học','Học phí','Ngày BĐ','Trạng thái','Email','Ngày học','Đợt 1','Thời gian Đ1','Đợt 2','Thời gian Đ2','Ghi chú','Cập nhật'];
+      sh.getRange(1, 1, 1, headers.length).setValues([headers]).setFontWeight('bold');
+      if (data.rows.length) {
+        const rows = data.rows.map(s => [
+          s.id||'', s.name||'', s.phone||'', s.type||'',
+          s.course||'', s.fee||0, s.start||'', s.status||'',
+          s.email||'', s.class_date||'',
+          s.paid1||'Chưa thu', s.paid1_at||'',
+          s.paid2||'Chưa thu', s.paid2_at||'',
+          s.note||'', data.time||''
+        ]);
+        sh.getRange(2, 1, rows.length, headers.length).setValues(rows);
+      }
+    }
+
+    else if (sheet === 'TonKho' &amp;&amp; data.rows) {
+      const sh = ss.getSheetByName('TonKho') || ss.insertSheet('TonKho');
+      sh.clearContents();
+      const headers = ['ID','Tên nguyên liệu','Tồn kho','Đơn vị','Tối thiểu','Giá nhập','Cập nhật'];
+      sh.getRange(1,1,1,headers.length).setValues([headers]).setFontWeight('bold');
+      if (data.rows.length) {
+        const rows = data.rows.map(r => [r.id||'',r.name||'',r.qty||0,r.unit||'',r.min||0,r.cost||0,data.time||'']);
+        sh.getRange(2,1,rows.length,headers.length).setValues(rows);
+      }
+    }
+
+    else if (sheet === 'DonHang') {
+      const sh = ss.getSheetByName('DonHang') || ss.insertSheet('DonHang');
+      if (sh.getLastRow() === 0)
+        sh.getRange(1,1,1,7).setValues([['Mã ĐH','Khách','Sản phẩm','Tổng tiền','Trạng thái','Thời gian','Ghi chú']]).setFontWeight('bold');
+      sh.appendRow([data.id||'',data.customer||'',data.items||'',data.total||0,data.status||'',data.time||'',data.note||'']);
+    }
+
+    else if (sheet === 'LichSuKho') {
+      const sh = ss.getSheetByName('LichSuKho') || ss.insertSheet('LichSuKho');
+      if (sh.getLastRow() === 0)
+        sh.getRange(1,1,1,5).setValues([['Thời gian','Nguyên liệu','Loại','Số lượng','Ghi chú']]).setFontWeight('bold');
+      sh.appendRow([data.time||'',data.name||'',data.type||'',data.qty||'',data.note||'']);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ok:true})).setMimeType(ContentService.MimeType.JSON);
+  } catch(err) {
+    return ContentService.createTextOutput(JSON.stringify({ok:false,error:err.toString()})).setMimeType(ContentService.MimeType.JSON);
+  }
 }
-    </div>
-    <div class="guide"><strong style="color:var(--brand)">B1</strong> — Thay YOUR_BOT_TOKEN và YOUR_CHAT_ID</div>
-    <div class="guide"><strong style="color:var(--brand)">B2</strong> — Apps Script → <strong>Triggers</strong> → Add trigger → chọn <code>sendDailyReminders</code> → Time-driven → Day timer → 8:00-9:00 AM</div>
+
+// Chạy tự động 8h sáng mỗi ngày — set Trigger cho hàm này
+function sendDailyReminders() {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sh = ss.getSheetByName('HocVien');
+  if (!sh || sh.getLastRow() &lt; 2) return;
+  const data  = sh.getDataRange().getValues();
+  const heads = data[0]; // headers row
+  const idx   = h => heads.indexOf(h);
+  const today = new Date(); today.setHours(0,0,0,0);
+  const msgs  = [];
+
+  data.slice(1).forEach(row => {
+    const name       = row[idx('Họ tên')]      || '';
+    const fee        = +row[idx('Học phí')]    || 0;
+    const status     = row[idx('Trạng thái')] || '';
+    const course     = row[idx('Khóa học')]   || '';
+    const class_date = row[idx('Ngày học')]   || '';
+    const paid1      = row[idx('Đợt 1')]      || '';
+    const paid2      = row[idx('Đợt 2')]      || '';
+    if (status !== 'Đang học') return;
+    const dep  = Math.round(fee * 0.3);
+    const rest = fee - dep;
+
+    // Nhắc ngày học sắp tới
+    if (class_date) {
+      const cd   = new Date(class_date); cd.setHours(0,0,0,0);
+      const diff = Math.round((cd - today) / 86400000);
+      if (diff === 7) msgs.push(`📅 Còn 7 ngày tới ngày học!\n👤 ${name}\n📚 ${course}\n🗓 ${class_date}\n${paid1!=='Đã thu'?'❌ Chưa cọc đợt 1: '+dep.toLocaleString()+'đ':'✅ Đã cọc đợt 1'}`);
+      if (diff === 3) msgs.push(`⏰ Còn 3 ngày tới ngày học!\n👤 ${name}\n🗓 ${class_date}\n${paid1!=='Đã thu'?'❌ Chưa cọc: '+dep.toLocaleString()+'đ':'✅ Đã cọc'}`);
+      if (diff === 1) msgs.push(`🔔 NGÀY MAI LÀ NGÀY HỌC!\n👤 ${name}\n📚 ${course}`);
+      if (diff === 0) msgs.push(`🎉 HÔM NAY LÀ NGÀY HỌC!\n👤 ${name}\n📚 ${course}`);
+    }
+    // Nhắc chưa thanh toán đợt 1
+    if (fee &gt; 0 &amp;&amp; paid1 !== 'Đã thu')
+      msgs.push(`💳 Chưa thanh toán đợt 1!\n👤 ${name}\n📚 ${course}\n❌ Đợt 1 (30%): ${dep.toLocaleString()}đ`);
+    // Nhắc đợt 2
+    if (fee &gt; 0 &amp;&amp; paid1 === 'Đã thu' &amp;&amp; paid2 !== 'Đã thu')
+      msgs.push(`💸 Nhắc thanh toán đợt 2!\n👤 ${name}\n📚 ${course}\n✅ Đã thu đợt 1\n⏳ Đợt 2 (70%): ${rest.toLocaleString()}đ`);
+  });
+
+  msgs.forEach(m => {
+    UrlFetchApp.fetch(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+      method: 'post',
+      payload: { chat_id: CHAT_ID, text: m }
+    });
+  });
+}</div>
+    <div class="guide"><strong style="color:var(--brand)">B1</strong> — Mở Google Apps Script → thay TOÀN BỘ code bằng đoạn trên → điền <code>YOUR_BOT_TOKEN</code> và <code>YOUR_CHAT_ID</code></div>
+    <div class="guide"><strong style="color:var(--brand)">B2</strong> — Deploy → <strong>Manage deployments</strong> → chọn deployment cũ → ✏️ Edit → New version → Deploy lại</div>
+    <div class="guide"><strong style="color:var(--brand)">B3</strong> — Triggers → Add trigger → hàm <code>sendDailyReminders</code> → Time-driven → Day timer → <strong>8:00–9:00 AM</strong></div>
+    <div class="guide"><strong style="color:var(--brand)">B4</strong> — Quay lại app → Cài đặt → bấm <strong>"Sync toàn bộ → Google Sheet"</strong> để đẩy data lên ngay</div>
   </div>
   <div class="card">
     <div class="card-head"><span class="card-title">Nhật ký gửi</span><button class="btn btn-ghost btn-sm" onclick="clearLog()">Xóa log</button></div>
@@ -1187,19 +1265,26 @@ async function checkReminders(){
     const fee=s.fee||0;
     const dep=Math.round(fee*0.3);
     const rest=fee-dep;
+    const course=D.courses.find(c=>c.id===s.course_id);
+    const courseName=course?course.name:(s.course||'—');
 
     // Nhắc ngày học sắp tới (offline)
     if(s.class_date){
       const classDay=new Date(s.class_date);classDay.setHours(0,0,0,0);
       const diff=Math.round((classDay-today)/(1000*60*60*24));
-      if(diff===7)msgs.push(`📅 *Nhắc lịch học!*\n\n👤 ${s.name}\n📚 ${s.course||'—'}\n🗓 Còn *7 ngày* tới ngày học: ${s.class_date}\n💰 Cần cọc đợt 1: ${fmt(dep)}\n\n_Trương Dáng Hương Academy_`);
-      else if(diff===3)msgs.push(`⏰ *Sắp tới ngày học!*\n\n👤 ${s.name}\n🗓 Còn *3 ngày*: ${s.class_date}\n${!s.paid1?`❌ Chưa cọc đợt 1: ${fmt(dep)}`:'✅ Đã cọc đợt 1'}\n\n_Trương Dáng Hương Academy_`);
-      else if(diff===1)msgs.push(`🔔 *NGÀY MAI LÀ NGÀY HỌC!*\n\n👤 ${s.name}\n🗓 ${s.class_date}\n${!s.paid1?`❌ Chưa cọc đợt 1: ${fmt(dep)}`:'✅ Đã cọc đợt 1'}\n\n_Trương Dáng Hương Academy_`);
+      if(diff===7)msgs.push(`📅 *Nhắc lịch học — 7 ngày nữa!*\n\n👤 ${s.name}\n📚 ${courseName}\n🗓 Ngày học: ${s.class_date}\n${!s.paid1?`❌ Chưa cọc đợt 1: ${fmt(dep)}`:'✅ Đã cọc đợt 1'}\n\n_Trương Dáng Hương Academy_`);
+      else if(diff===3)msgs.push(`⏰ *Sắp tới ngày học — còn 3 ngày!*\n\n👤 ${s.name}\n📚 ${courseName}\n🗓 ${s.class_date}\n${!s.paid1?`❌ Chưa cọc đợt 1: ${fmt(dep)}`:'✅ Đã cọc đợt 1'}\n\n_Trương Dáng Hương Academy_`);
+      else if(diff===1)msgs.push(`🔔 *NGÀY MAI LÀ NGÀY HỌC!*\n\n👤 ${s.name}\n📚 ${courseName}\n🗓 ${s.class_date}\n${!s.paid1?`❌ Chưa cọc đợt 1: ${fmt(dep)}`:'✅ Đã cọc'}\n\n_Trương Dáng Hương Academy_`);
+      else if(diff===0)msgs.push(`🎉 *HÔM NAY LÀ NGÀY HỌC!*\n\n👤 ${s.name}\n📚 ${courseName}\n\n_Trương Dáng Hương Academy_`);
     }
 
-    // Nhắc thanh toán
+    // Nhắc chưa thanh toán đợt 1
+    if(fee>0&&!s.paid1)
+      msgs.push(`💳 *Chưa thanh toán đợt 1!*\n\n👤 ${s.name}\n📚 ${courseName}\n${s.type==='Offline'?`🗓 Ngày học: ${s.class_date||'—'}\n`:''}\n❌ Đợt 1 (30%): ${fmt(dep)}\n\n_Trương Dáng Hương Academy_`);
+
+    // Nhắc chưa thanh toán đợt 2
     if(fee>0&&s.paid1&&!s.paid2)
-      msgs.push(`💸 *Nhắc thanh toán đợt 2!*\n\n👤 ${s.name}\n📚 ${s.course||'—'}\n✅ Đã thu đợt 1: ${fmt(dep)}\n⏳ Còn lại đợt 2: ${fmt(rest)}\n\n_Trương Dáng Hương Academy_`);
+      msgs.push(`💸 *Nhắc thanh toán đợt 2!*\n\n👤 ${s.name}\n📚 ${courseName}\n✅ Đã thu đợt 1: ${fmt(dep)}\n⏳ Còn lại đợt 2 (70%): ${fmt(rest)}\n\n_Trương Dáng Hương Academy_`);
   });
 
   if(msgs.length===0){notify('✓ Không có nhắc nhở nào hôm nay');return;}
@@ -1524,7 +1609,7 @@ async function toggleSt(){
   closeM('modal-student-detail');renderStudents();renderDash();notify('Đã cập nhật: '+s.name);
   if(document.getElementById('at-student').checked)
     tgMsg(`🔄 *Cập nhật học viên!*\n\n👤 ${s.name}\n📊 Trạng thái: ${s.status}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
-  gsSend({sheet:'HocVien',rows:D.students,time:nowDT()});
+  gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
 }
 
 function deleteSt(){
@@ -1560,7 +1645,7 @@ async function addStudent(){
     renderStudents();renderDash();notify('Đã thêm: '+n);
     if(document.getElementById('at-student').checked)
       tgMsg(`🎓 *Học viên mới!*\n\n👤 ${n}\n📱 ${type}\n📚 ${course?course.name:'—'}\n💰 ${feeVal===0?'Miễn phí':fmt(feeVal)}\n${s.class_date?`🗓 Ngày học: ${s.class_date}\n`:''}\n_Trương Dáng Hương Academy_`);
-    gsSend({sheet:'HocVien',rows:D.students,time:nowDT()});
+    gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
   }catch(e){notify('Lưu thất bại: '+e.message,false);}
 }
 
@@ -1862,7 +1947,7 @@ async function markFeePaid(dotNum){
       time:ts,note:`Đợt ${dotNum}/${2}`,status:'Đã thanh toán',created_at:Date.now()};
     await sbUpsert('orders',order);D.orders.push(order);renderOrders();renderDash();
     tgMsg(`💰 *Thu học phí đợt ${dotNum}!*\n\n👤 ${s.name}\n📚 ${s.course||'—'}\n💵 ${fmt(amount)} (${dotNum===1?'30%':'70%'})\n✅ Đã thu ${dotNum===1?'đợt 1':'cả 2 đợt'}\n🕐 ${ts}\n\n_Trương Dáng Hương Academy_`);
-    gsSend({sheet:'HocVien',rows:D.students,time:ts});
+    gsSend({sheet:'HocVien',rows:gsStudents(),time:ts});
     renderStudents();
   }catch(e){notify('Lỗi: '+e.message,false);}
 }
@@ -2236,12 +2321,24 @@ async function gsSyncAll(){
   if(!url){notify('Chưa nhập Google Sheet URL!',false);return;}
   notify('Đang sync lên Google Sheet...');
   await gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
-  await gsSend({sheet:'HocVien',rows:D.students.map(s=>{
-    const c=D.courses.find(x=>x.id===s.course_id);
-    return {...s,course:c?c.name:(s.course||'')};
-  }),time:nowDT()});
+  await gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
   for(const o of D.orders){await gsSend({sheet:'DonHang',...o,time:o.time||nowDT()});}
   notify('✓ Đã sync toàn bộ lên Google Sheet!');
+}
+
+function gsStudents(){
+  return D.students.map(s=>{
+    const c=D.courses.find(x=>x.id===s.course_id);
+    return {
+      id:s.id,name:s.name,phone:s.phone||'',type:s.type,
+      course:c?c.name:(s.course||''),
+      fee:s.fee||0,start:s.start||'',status:s.status,
+      class_date:s.class_date||'',
+      paid1:s.paid1?'Đã thu':'Chưa thu',paid1_at:s.paid1_at||'',
+      paid2:s.paid2?'Đã thu':'Chưa thu',paid2_at:s.paid2_at||'',
+      note:s.note||''
+    };
+  });
 }
 
 // ══════════════════════════════════════════════════
