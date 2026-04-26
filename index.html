@@ -3925,8 +3925,8 @@ function renderFinance(){
   }
 
   // Gộp và lọc theo tab
-  let allTxs=[...autoTxs,...manualTxs].sort((a,b)=>(b.time||'').localeCompare(a.time||''));
-  let txs=allTxs;
+  let allTxs=([...autoTxs,...manualTxs]||[]).sort((a,b)=>(b.time||'').localeCompare(a.time||''));
+  let txs=[...allTxs];
   if(finFilter==='thu') txs=allTxs.filter(t=>t.type==='thu');
   if(finFilter==='chi') txs=allTxs.filter(t=>t.type==='chi');
 
@@ -3963,6 +3963,33 @@ function renderFinance(){
       :`<button class="btn btn-ghost btn-sm" style="color:var(--red);font-size:11px" onclick="deleteTransaction('${t.id}')">✕</button>`
     }</td>
   </tr>`).join(''):'<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--muted)">Chưa có giao dịch nào</td></tr>';
+}
+
+
+async function addTransaction(type){
+  const amount=parseFloat(document.getElementById(type+'-amount').value)||0;
+  if(!amount||amount<=0){notify('Nhập số tiền hợp lệ!',false);return;}
+  const cat=document.getElementById(type+'-cat').value;
+  const note=document.getElementById(type+'-note').value.trim();
+  const tx={
+    id:'TX'+Date.now(),
+    type,
+    category:cat,
+    amount,
+    note,
+    time:nowDT(),
+    created_at:Date.now()
+  };
+  try{
+    await sbUpsert('transactions',tx);
+    D.transactions.unshift(tx);
+    closeM('modal-add-'+type);
+    document.getElementById(type+'-amount').value='';
+    document.getElementById(type+'-note').value='';
+    renderFinance();
+    notify('✓ Đã lưu phiếu '+(type==='thu'?'thu':'chi')+': '+fmt(amount));
+    tgMsg((type==='thu'?'💚 *Phiếu thu*':'🔴 *Phiếu chi*')+'\n\n💰 '+fmt(amount)+'\n📂 '+cat+(note?'\n📝 '+note:'')+'\n🕐 '+nowDT()+'\n\n_Trương Dáng Hương Academy_');
+  }catch(e){notify('Lỗi lưu: '+e.message,false);}
 }
 
 
