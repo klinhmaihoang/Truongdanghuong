@@ -1572,7 +1572,7 @@ async function boot(){
     render();
 
     // Polling realtime mỗi 15s
-    setInterval(pollUpdates, 15000);
+    startPolling();
   }catch(e){
     setSyncStatus(false,'Lỗi kết nối');
     notify('Không kết nối được Supabase: '+e.message,false);
@@ -1580,7 +1580,13 @@ async function boot(){
   }
 }
 
+let _pollFailCount=0;
+let _pollInterval=null;
+let _isPolling=false;
+
 async function pollUpdates(){
+  if(_isPolling) return; // Tránh chạy đè nhau
+  _isPolling=true;
   try{
     const [students,inventory,products,orders,courses,customers,transactions] = await Promise.all([
       sbGet('students','?order=created_at.asc'),
@@ -1598,9 +1604,36 @@ async function pollUpdates(){
     D.courses=courses||D.courses;
     D.customers=customers||D.customers;
     D.transactions=transactions||D.transactions;
+    // Reset lỗi khi kết nối lại
+    if(_pollFailCount>0){
+      _pollFailCount=0;
+      notify('✅ Đã kết nối lại Supabase!');
+    }
     setSyncStatus(true,'Đồng bộ lúc '+nowTime());
     render();
-  }catch(e){setSyncStatus(false,'Mất kết nối');}
+  }catch(e){
+    _pollFailCount++;
+    if(_pollFailCount===1){
+      // Lần đầu mất kết nối
+      setSyncStatus(false,'Mất kết nối');
+      notify('⚠️ Mất kết nối Supabase — đang thử lại...',false);
+    } else if(_pollFailCount===3){
+      // Mất kết nối 3 lần liên tiếp (~45s)
+      setSyncStatus(false,'Offline — dữ liệu có thể chưa cập nhật');
+      notify('❌ Không kết nối được Supabase sau 3 lần thử. Kiểm tra mạng!',false);
+    }
+    // Exponential backoff: lần 1=15s, lần 2=30s, lần 3+=60s
+    const delay=_pollFailCount===1?15000:_pollFailCount===2?30000:60000;
+    if(_pollInterval) clearInterval(_pollInterval);
+    _pollInterval=setInterval(pollUpdates, delay);
+  }finally{
+    _isPolling=false;
+  }
+}
+
+function startPolling(){
+  if(_pollInterval) clearInterval(_pollInterval);
+  _pollInterval=setInterval(pollUpdates,15000);
 }
 
 // ══════════════════════════════════════════════════
@@ -4007,6 +4040,19 @@ function checkDailyRemind(){
   tgMsg(msg);
 }
 
+
+// Lắng nghe trạng thái mạng
+window.addEventListener('online', ()=>{
+  notify('✅ Đã có mạng — đang đồng bộ lại...');
+  _pollFailCount=0;
+  pollUpdates();
+  startPolling();
+});
+window.addEventListener('offline', ()=>{
+  setSyncStatus(false,'Không có mạng');
+  notify('⚠️ Mất kết nối Internet!',false);
+  if(_pollInterval) clearInterval(_pollInterval);
+});
 
 boot();
 </script>
