@@ -4114,6 +4114,9 @@ function renderOrders(){
   // Update badge
   const badge=document.getElementById('pending-badge');
   if(badge) badge.textContent=pending||'';
+  // Sync badge vào tab pos-orders luôn
+  const badgePos=document.getElementById('pending-badge-pos');
+  if(badgePos) badgePos.textContent=pending||'';
 
   // Stats
   const retailRev=retailOrders.filter(o=>o.status==='Đã thanh toán').reduce((a,o)=>a+(o.total||0),0);
@@ -7259,18 +7262,12 @@ function posTab(tab, el) {
       ordersPanel.appendChild(comp);
     }
     renderOrders();
-  }
-}
-
-// Sync pending badge từ orders sang pos tab
-const _origRenderOrders = renderOrders;
-function renderOrders() {
-  _origRenderOrders();
-  // Sync badge vào tab pos-orders
-  const srcBadge  = document.getElementById('pending-badge');
-  const destBadge = document.getElementById('pending-badge-pos');
-  if (srcBadge && destBadge) destBadge.textContent = srcBadge.textContent;
-}
+    // Sync pending badge vào tab pos-orders
+    setTimeout(()=>{
+      const src = document.getElementById('pending-badge');
+      const dst = document.getElementById('pending-badge-pos');
+      if(src && dst) dst.textContent = src.textContent;
+    }, 50);
 
 // Nếu URL hash có #orders, tự mở tab đơn hàng
 window.addEventListener('load', () => {
