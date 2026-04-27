@@ -3426,14 +3426,14 @@ async function importStock(){
   mat.qty=Math.round((mat.qty+qty)*100)/100;
   try{
     await sbPatch('inventory',{qty:mat.qty},`?id=eq.${id}`);
-    const log={id:uid(),time:nowDT(),name:mat.name,type:'Nhập',qty:'+'+qty+' '+mat.unit,
+    const log={id:uid(),time:nowDT(),name:mat.name,type:'Nhập',qty:qty,unit:mat.unit,
       note:sup+(price?' ('+fmt(price)+'/đv)':''),created_at:Date.now()};
     await sbUpsert('stock_log',log);D.stockLog.unshift(log);
     closeM('modal-import');['im-qty','im-sup','im-price'].forEach(id=>document.getElementById(id).value='');
     render();notify(`Đã nhập: +${qty} ${mat.unit} ${mat.name}`);
     if(document.getElementById('at-import').checked)
       tgMsg(`📦 *Nhập kho!*\n\n${mat.name}: +${qty} ${mat.unit}\nNCC: ${sup}\nTồn: ${mat.qty} ${mat.unit}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
-    gsSend({sheet:'LichSuKho',time:nowDT(),name:mat.name,type:'Nhập',qty:'+'+qty+' '+mat.unit,note:sup});
+    gsSend({sheet:'LichSuKho',id:D.stockLog[0]?.id||uid(),time:nowDT(),name:mat.name,type:'Nhập',qty:qty,unit:mat.unit,note:sup,mat_id:id,mat_qty:qty});
     gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
   }catch(e){mat.qty=oldQty;notify('Lưu thất bại: '+e.message,false);}
 }
@@ -3450,14 +3450,15 @@ async function exportStock(){
   await sbPatch('inventory',{qty:newQty},`?id=eq.${id}`);
   // Lưu matId vào log để có thể hoàn tác
   const log={id:uid(),time:nowDT(),name:mat.name,type:'Xuất',
-    qty:'-'+qty+' '+mat.unit,note:reason,mat_id:id,mat_qty:qty,created_at:Date.now()};
+    qty:qty,unit:mat.unit,note:reason,mat_id:id,mat_qty:qty,created_at:Date.now()};
   await sbUpsert('stock_log',log);D.stockLog.unshift(log);
   closeM('modal-export-stock');['ex-qty','ex-reason'].forEach(id=>document.getElementById(id).value='');
   render();notify(`✓ Đã xuất: ${qty} ${mat.unit} ${mat.name} (còn ${newQty})`);
   if(document.getElementById('at-import').checked)
     tgMsg(`📤 *Xuất kho thủ công!*\n\n📦 ${mat.name}: -${qty} ${mat.unit}\n📝 Lý do: ${reason}\n🔢 Còn lại: ${newQty} ${mat.unit}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
-  gsSend({sheet:'LichSuKho',time:nowDT(),name:mat.name,type:'Xuất',qty:'-'+qty+' '+mat.unit,note:reason});
+  gsSend({sheet:'LichSuKho',id:D.stockLog[0]?.id||uid(),time:nowDT(),name:mat.name,type:'Xuất',qty:qty,unit:mat.unit,note:reason,mat_id:id,mat_qty:qty});
   gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
+  gsSend({sheet:'TomTatKho',rows:gsTomTatKho(),time:nowDT()});
 }
 
 function renderStockLog(){
@@ -3637,10 +3638,33 @@ async function gsSyncAll(){
     // Sync Thu Chi
     await gsSend({sheet:'ThuChi',rows:gsThuChi(),time:nowDT()});
     await new Promise(r=>setTimeout(r,500));
-    // Sync tổng nhập xuất
+    // Sync tổng nhập/xuất kho
     await gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
+    await new Promise(r=>setTimeout(r,500));
+    await gsSend({sheet:'TomTatKho',rows:gsTomTatKho(),time:nowDT()});
     notify('✅ Đã sync toàn bộ lên Google Sheet!');
   }catch(e){notify('Lỗi sync: '+e.message,false);}
+}
+
+function gsTomTatKho(){
+  // Tính tổng nhập/xuất theo từng nguyên liệu từ stockLog
+  return D.inventory.map(item=>{
+    const logs=D.stockLog.filter(l=>l.name===item.name||l.mat_id===item.id);
+    const totalIn=logs.filter(l=>l.type==='Nhập')
+      .reduce((a,l)=>a+(parseFloat((l.qty||'0').toString().replace(/[^0-9.]/g,''))||0),0);
+    const totalOut=logs.filter(l=>l.type!=='Nhập')
+      .reduce((a,l)=>a+(parseFloat((l.qty||'0').toString().replace(/[^0-9.]/g,''))||0),0);
+    return{
+      name:item.name,
+      unit:item.unit,
+      sku:item.sku||'',
+      totalIn:Math.round(totalIn*1000)/1000,
+      totalOut:Math.round(totalOut*1000)/1000,
+      qty:item.qty||0,
+      min:item.min||0,
+      cost:item.cost||0
+    };
+  });
 }
 
 function gsThuChi(){
