@@ -574,74 +574,153 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 </div>
 
 
-<!-- TÍNH COST MÓN NƯỚC -->
+<!-- TÍNH COST MÓN NƯỚC — BOM MODEL -->
 <div class="page" id="page-costcalc">
-  <div class="btn-group" style="margin-bottom:14px">
-    <button class="btn btn-sm" onclick="showM('modal-add-drink')">+ Thêm món mới</button>
-    <button class="btn btn-ghost btn-sm" onclick="printCostTable()">🖨️ In bảng cost</button>
-    <button class="btn btn-excel btn-sm" onclick="xlExportDrinkCost()">📊 Xuất Excel</button>
-  </div>
-  <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
-    <div class="stat" style="--accent:var(--teal)"><div class="stat-num" id="cost-total-drinks">0</div><div class="stat-label">Số món nước</div></div>
-    <div class="stat" style="--accent:var(--orange)"><div class="stat-num" id="cost-avg-pct">0%</div><div class="stat-label">% Cost trung bình</div></div>
-    <div class="stat" style="--accent:var(--green)"><div class="stat-num" id="cost-avg-profit">0</div><div class="stat-label">Lợi nhuận TB/ly (₫)</div></div>
-  </div>
-  <div class="card">
-    <div class="card-head">
-      <span class="card-title">📋 Danh sách món nước &amp; cost</span>
-      <input id="cost-search" placeholder="🔍 Tìm tên món..." oninput="renderCostCalc()"
-        style="padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit;min-width:200px"/>
+
+  <!-- Toolbar -->
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center">
+    <!-- Filter nhóm -->
+    <div id="cc-group-tabs" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+    <div style="margin-left:auto;display:flex;gap:7px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="ccToggleView()"><span id="cc-view-icon">🔲</span> <span id="cc-view-label">Lưới</span></button>
+      <button class="btn btn-ghost btn-sm" onclick="printCostTable()">🖨️ In bảng cost</button>
+      <button class="btn btn-excel btn-sm" onclick="xlExportDrinkCost()">📊 Excel</button>
+      <button class="btn btn-sm" onclick="showM('modal-add-drink')">+ Thêm món mới</button>
     </div>
-    <table>
-      <thead><tr>
-        <th>Tên món</th><th>Giá bán</th><th>Cost nguyên liệu</th><th>% Cost</th><th>Lợi nhuận/ly</th><th>Đánh giá</th><th></th>
-      </tr></thead>
-      <tbody id="cost-list"></tbody>
-    </table>
   </div>
+
+  <!-- Stats -->
+  <div class="stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px">
+    <div class="stat"><div class="stat-num" id="cc-stat-total">0</div><div class="stat-label">Số món</div></div>
+    <div class="stat" style="--accent:var(--orange)"><div class="stat-num" id="cc-stat-avgcost">0%</div><div class="stat-label">% Cost trung bình</div></div>
+    <div class="stat" style="--accent:var(--green)"><div class="stat-num" id="cc-stat-profit">0</div><div class="stat-label">Lợi nhuận TB (₫)</div></div>
+    <div class="stat" style="--accent:var(--red)"><div class="stat-num" id="cc-stat-warn">0</div><div class="stat-label">Cost cao (>35%)</div></div>
+  </div>
+
+  <!-- Search -->
+  <div style="margin-bottom:14px">
+    <input id="cc-search" placeholder="🔍 Tìm tên món..." oninput="renderCostCalc()"
+      style="width:100%;padding:9px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit"/>
+  </div>
+
+  <!-- View: TABLE (default) -->
+  <div id="cc-table-view">
+    <div class="card" style="padding:0;overflow:hidden">
+      <table id="cc-main-table">
+        <thead><tr>
+          <th style="width:28%">Tên món</th>
+          <th style="width:8%;text-align:center">Size</th>
+          <th style="width:12%;text-align:right">Giá bán</th>
+          <th style="width:12%;text-align:right">Cost NL</th>
+          <th style="width:10%;text-align:center">% Cost</th>
+          <th style="width:12%;text-align:right">LN/ly</th>
+          <th style="width:10%;text-align:center">Đánh giá</th>
+          <th style="width:8%"></th>
+        </tr></thead>
+        <tbody id="cc-list"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- View: GRID (cards) -->
+  <div id="cc-grid-view" style="display:none">
+    <div id="cc-grid" style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px"></div>
+  </div>
+
+  <!-- Legend -->
   <div class="guide" style="margin-top:12px">
-    💡 <strong>Mục tiêu cost lý tưởng cho đồ uống:</strong>
-    &nbsp;🟢 Tốt: &lt; 25% &nbsp;|&nbsp; 🟡 Chấp nhận: 25–35% &nbsp;|&nbsp; 🔴 Cao: &gt; 35%
+    💡 <strong>Chuẩn cost F&B đồ uống:</strong>&nbsp;
+    🟢 Tốt &lt;25% &nbsp;|&nbsp; 🟡 Chấp nhận 25–35% &nbsp;|&nbsp; 🔴 Cần xem lại &gt;35%
   </div>
 </div>
 
-<!-- Modal thêm/sửa món nước -->
+<!-- Modal chi tiết BOM -->
+<div class="overlay" id="modal-bom-detail">
+  <div class="modal wide" style="max-width:560px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+      <div>
+        <div class="modal-title" id="bom-detail-title" style="margin-bottom:2px"></div>
+        <div style="font-size:12px;color:var(--muted)" id="bom-detail-sub"></div>
+      </div>
+      <span id="bom-detail-badge" style="font-size:13px;font-weight:700;padding:4px 12px;border-radius:20px"></span>
+    </div>
+
+    <!-- Cost summary bar -->
+    <div id="bom-detail-summary" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0;background:var(--brand-light);border-radius:10px;padding:12px;text-align:center">
+      <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Giá bán</div><div style="font-size:22px;font-weight:800;color:var(--brown)" id="bom-gb"></div></div>
+      <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost NL</div><div style="font-size:22px;font-weight:800;color:var(--brand)" id="bom-cost"></div><div style="font-size:13px;font-weight:700" id="bom-pct"></div></div>
+      <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Lợi nhuận</div><div style="font-size:22px;font-weight:800;color:var(--green)" id="bom-ln"></div></div>
+    </div>
+
+    <!-- BOM table -->
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Công thức nguyên liệu</div>
+    <table style="margin-bottom:10px">
+      <thead><tr>
+        <th style="width:45%">Nguyên liệu</th>
+        <th style="text-align:right;width:18%">Định lượng</th>
+        <th style="text-align:right;width:18%">Đơn giá</th>
+        <th style="text-align:right;width:19%">Thành tiền</th>
+      </tr></thead>
+      <tbody id="bom-ing-rows"></tbody>
+      <tfoot><tr>
+        <td colspan="3" style="font-weight:700;text-align:right;padding:8px 10px;border-top:2px solid var(--border)">Tổng cost</td>
+        <td style="font-weight:800;color:var(--brand);text-align:right;padding:8px 10px;border-top:2px solid var(--border)" id="bom-total-cost"></td>
+      </tr></tfoot>
+    </table>
+
+    <!-- Giá bán chỉnh sửa -->
+    <div style="background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:14px">
+      <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:6px">Thử nghiệm giá bán</div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <input id="bom-trial-price" type="number" placeholder="Nhập giá bán thử..." oninput="updateTrialCalc()"
+          style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none"/>
+        <div style="font-size:13px;font-weight:700;min-width:80px;text-align:right" id="bom-trial-result"></div>
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-ghost btn-sm" onclick="printSingleDrink()">🖨️ In phiếu</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-bom-detail')">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal thêm món mới (tự nhập tay) -->
 <div class="overlay" id="modal-add-drink">
   <div class="modal wide">
     <div class="modal-title" id="drink-modal-title">+ Thêm món nước mới</div>
     <input type="hidden" id="drink-edit-id"/>
     <div class="form-row">
-      <div class="fg"><label>Tên món *</label><input id="drink-name" placeholder="VD: Trà sữa Oolong, Bạc xỉu..."/></div>
-      <div class="fg"><label>Giá bán (₫)</label><input id="drink-price" type="number" placeholder="45000" oninput="recalcDrinkLive()"/></div>
+      <div class="fg"><label>Tên món *</label><input id="drink-name" placeholder="VD: Trà sữa Oolong 240ml"/></div>
+      <div class="fg"><label>Nhóm</label>
+        <select id="drink-nhom" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;outline:none">
+          <option>Cà phê</option><option>Trà trái cây</option><option>Kombucha</option>
+          <option>Soda</option><option>Matcha</option><option>Khác</option>
+        </select>
+      </div>
     </div>
-    <div class="fg" style="margin-bottom:14px"><label>Ghi chú (size, cách pha...)</label><input id="drink-note" placeholder="VD: Size M 350ml, dùng 70% sữa đặc..."/></div>
-    <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:8px">🧂 Nguyên liệu (giá lấy tự động từ kho)</div>
+    <div class="form-row">
+      <div class="fg"><label>Giá bán (₫)</label><input id="drink-price" type="number" placeholder="35000" oninput="recalcDrinkLive()"/></div>
+      <div class="fg"><label>Size</label>
+        <select id="drink-size" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;outline:none">
+          <option>240ml</option><option>650ml</option><option>Khác</option>
+        </select>
+      </div>
+    </div>
+    <div style="font-size:13px;font-weight:700;color:var(--brown);margin:12px 0 8px">🧂 Nguyên liệu (tự động lấy giá từ DMHH)</div>
     <div id="drink-ingredient-rows" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
     <button class="btn btn-ghost btn-sm" onclick="addDrinkIngredient()" style="width:100%;margin-bottom:14px">+ Thêm nguyên liệu</button>
+    <!-- Live result -->
     <div id="drink-cost-summary" style="background:var(--brand-light);border-radius:10px;padding:14px;margin-bottom:14px;display:none">
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">
-        <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost NL</div><div style="font-size:20px;font-weight:800;color:var(--brand)" id="summary-cost">0₫</div></div>
-        <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">% Cost</div><div style="font-size:20px;font-weight:800" id="summary-pct">—</div></div>
-        <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Lợi nhuận/ly</div><div style="font-size:20px;font-weight:800;color:var(--green)" id="summary-profit">0₫</div></div>
+        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost NL</div><div style="font-size:20px;font-weight:800;color:var(--brand)" id="summary-cost">0₫</div></div>
+        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">% Cost</div><div style="font-size:20px;font-weight:800" id="summary-pct">—</div></div>
+        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">LN/ly</div><div style="font-size:20px;font-weight:800;color:var(--green)" id="summary-profit">0₫</div></div>
       </div>
     </div>
     <div class="btn-group">
       <button class="btn btn-green btn-sm" onclick="saveDrinkRecipe()">💾 Lưu công thức</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-drink')">Hủy</button>
-    </div>
-  </div>
-</div>
-
-<!-- Modal chi tiết công thức -->
-<div class="overlay" id="modal-drink-detail">
-  <div class="modal wide">
-    <div class="modal-title" id="dd-title">Chi tiết công thức</div>
-    <div id="dd-content"></div>
-    <div class="btn-group" style="margin-top:16px">
-      <button class="btn btn-sm" onclick="editDrinkFromDetail()">✏️ Sửa</button>
-      <button class="btn btn-red btn-sm" onclick="deleteDrinkFromDetail()">🗑 Xóa</button>
-      <button class="btn btn-ghost btn-sm" onclick="printSingleDrink()">🖨️ In phiếu</button>
-      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-drink-detail')">Đóng</button>
     </div>
   </div>
 </div>
@@ -2056,7 +2135,8 @@ async function autoUpdateStudentStatus(){
 }
 
 function render(){
-  setTimeout(()=>{if(document.getElementById('cost-list'))renderCostCalc();},0);autoUpdateStudentStatus();renderDash();renderStudents();renderDeletedStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();renderCourses();renderCustomers();fillMatSelects();}
+  if(typeof renderCostCalc==="function"&&document.getElementById("cc-list"))setTimeout(renderCostCalc,50);
+autoUpdateStudentStatus();renderDash();renderStudents();renderDeletedStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();renderCourses();renderCustomers();fillMatSelects();}
 
 // ══════════════════════════════════════════════════
 // CUSTOMERS
@@ -4620,249 +4700,493 @@ window.addEventListener('offline', ()=>{
 });
 
 
-// ════════════════════════════════════════════════════
-// MODULE: TÍNH COST MÓN NƯỚC — Trương Dáng Hương Academy
-// ════════════════════════════════════════════════════
-let D_drinks = [];
 
-async function loadDrinkRecipes() {
-  try { D_drinks = (await sbGet('drink_recipes','?order=created_at.asc')) || []; }
-  catch(e) { D_drinks = []; }
+
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE: TÍNH COST MÓN NƯỚC — BOM MODEL
+// Trương Dáng Hương Academy
+// ═══════════════════════════════════════════════════════════════
+
+// ── DATA BOM (từ file Excel DMHH + Bom mẫu) ──────────────────
+const BOM_DATA = {"products":[{"id":"p_Cà_phê_đen_đá_240ml","ten":"Cà phê đen đá 240ml","nhom":"Cà phê","size":"240ml","cost":6588.82,"gia_ban":21000.0,"ingredients":[{"ma_nl":"A1","ten_nl":"Bột cà phê TAS","don_vi":"gram","so_luong":20.0,"don_gia":240.0,"thanh_tien":4800.0},{"ma_nl":"A11","ten_nl":"Nước bình tinh khiết Viz-Sky","don_vi":"ml","so_luong":200.0,"don_gia":0.631578947368421,"thanh_tien":126.32},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A15","ten_nl":"Ống hút giấy phi 6","don_vi":"cái","so_luong":1.0,"don_gia":280.0,"thanh_tien":280.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Bạc_xỉu_240ml","ten":"Bạc xỉu 240ml","nhom":"Cà phê","size":"240ml","cost":8084.72,"gia_ban":25000.0,"ingredients":[{"ma_nl":"A1","ten_nl":"Bột cà phê TAS","don_vi":"gram","so_luong":20.0,"don_gia":240.0,"thanh_tien":4800.0},{"ma_nl":"A25","ten_nl":"Sữa tươi Barista","don_vi":"ml","so_luong":40.0,"don_gia":40.55555555555556,"thanh_tien":1622.22},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A15","ten_nl":"Ống hút giấy phi 6","don_vi":"cái","so_luong":1.0,"don_gia":280.0,"thanh_tien":280.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Cà_phê_sữa_tươi_240ml","ten":"Cà phê sữa tươi 240ml","nhom":"Cà phê","size":"240ml","cost":12545.83,"gia_ban":39000.0,"ingredients":[{"ma_nl":"A1","ten_nl":"Bột cà phê TAS","don_vi":"gram","so_luong":20.0,"don_gia":240.0,"thanh_tien":4800.0},{"ma_nl":"A25","ten_nl":"Sữa tươi Barista","don_vi":"ml","so_luong":150.0,"don_gia":40.55555555555556,"thanh_tien":6083.33},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A15","ten_nl":"Ống hút giấy phi 6","don_vi":"cái","so_luong":1.0,"don_gia":280.0,"thanh_tien":280.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Cacao_sữa_240ml","ten":"Cacao sữa 240ml","nhom":"Matcha","size":"240ml","cost":12777.29,"gia_ban":40000.0,"ingredients":[{"ma_nl":"A2","ten_nl":"Bột cacao Luave","don_vi":"gram","so_luong":20.0,"don_gia":128.0,"thanh_tien":2560.0},{"ma_nl":"A25","ten_nl":"Sữa tươi Barista","don_vi":"ml","so_luong":150.0,"don_gia":40.55555555555556,"thanh_tien":6083.33},{"ma_nl":"A29","ten_nl":"Thành phẩm nước đường","don_vi":"ml","so_luong":20.0,"don_gia":27.0,"thanh_tien":540.0},{"ma_nl":"A23","ten_nl":"Sữa đặc Phương Nam","don_vi":"gram","so_luong":40.0,"don_gia":48.28660436137071,"thanh_tien":1931.46},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A15","ten_nl":"Ống hút giấy phi 6","don_vi":"cái","so_luong":1.0,"don_gia":280.0,"thanh_tien":280.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Cà_phê_kem_muối_240ml","ten":"Cà phê kem muối 240ml","nhom":"Cà phê","size":"240ml","cost":9289.47,"gia_ban":29000.0,"ingredients":[{"ma_nl":"A1","ten_nl":"Bột cà phê TAS","don_vi":"gram","so_luong":20.0,"don_gia":240.0,"thanh_tien":4800.0},{"ma_nl":"A23","ten_nl":"Sữa đặc Phương Nam","don_vi":"gram","so_luong":20.0,"don_gia":48.28660436137071,"thanh_tien":965.73},{"ma_nl":"A32","ten_nl":"Thành phẩm kem muối","don_vi":"gram","so_luong":30.0,"don_gia":62.04146417445483,"thanh_tien":1861.24},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A15","ten_nl":"Ống hút giấy phi 6","don_vi":"cái","so_luong":1.0,"don_gia":280.0,"thanh_tien":280.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Matcha_latte_240ml","ten":"Matcha latte 240ml","nhom":"Matcha","size":"240ml","cost":11932.04,"gia_ban":38000.0,"ingredients":[{"ma_nl":"A4","ten_nl":"Bột matcha Fuji","don_vi":"gram","so_luong":3.0,"don_gia":1640.0,"thanh_tien":4920.0},{"ma_nl":"A25","ten_nl":"Sữa tươi Barista","don_vi":"ml","so_luong":120.0,"don_gia":40.55555555555556,"thanh_tien":4866.67},{"ma_nl":"A23","ten_nl":"Sữa đặc Phương Nam","don_vi":"gram","so_luong":10.0,"don_gia":48.28660436137071,"thanh_tien":482.87},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A15","ten_nl":"Ống hút giấy phi 6","don_vi":"cái","so_luong":1.0,"don_gia":280.0,"thanh_tien":280.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Trà_chanh_muối_240ml","ten":"Trà chanh muối 240ml","nhom":"Trà trái cây","size":"240ml","cost":2942.74,"gia_ban":9000.0,"ingredients":[{"ma_nl":"A31","ten_nl":"Thành phẩm trà lài","don_vi":"ml","so_luong":150.0,"don_gia":4.0015789473684205,"thanh_tien":600.24},{"ma_nl":"A46","ten_nl":"Chanh muối ngâm","don_vi":"gram","so_luong":20.0,"don_gia":0,"thanh_tien":0.0},{"ma_nl":"A29","ten_nl":"Thành phẩm nước đường","don_vi":"ml","so_luong":30.0,"don_gia":27.0,"thanh_tien":810.0},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Soda_chanh_muối_240ml","ten":"Soda chanh muối 240ml","nhom":"Soda","size":"240ml","cost":5812.19,"gia_ban":18000.0,"ingredients":[{"ma_nl":"A22","ten_nl":"Soda Schweppes","don_vi":"ml","so_luong":150.0,"don_gia":19.53125,"thanh_tien":2929.69},{"ma_nl":"A46","ten_nl":"Chanh muối ngâm","don_vi":"gram","so_luong":20.0,"don_gia":0,"thanh_tien":0.0},{"ma_nl":"A29","ten_nl":"Thành phẩm nước đường","don_vi":"ml","so_luong":50.0,"don_gia":27.0,"thanh_tien":1350.0},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Trà_đào_cam_sả_240ml","ten":"Trà đào cam sả 240ml","nhom":"Trà trái cây","size":"240ml","cost":11072.69,"gia_ban":35000.0,"ingredients":[{"ma_nl":"A31","ten_nl":"Thành phẩm trà lài","don_vi":"ml","so_luong":120.0,"don_gia":4.0015789473684205,"thanh_tien":480.19},{"ma_nl":"A19","ten_nl":"Sinh tố đào GTP","don_vi":"ml","so_luong":50.0,"don_gia":81.0,"thanh_tien":4050.0},{"ma_nl":"A12","ten_nl":"Nước chanh","don_vi":"ml","so_luong":10.0,"don_gia":50.0,"thanh_tien":500.0},{"ma_nl":"A26","ten_nl":"Syrup sả Davinci","don_vi":"ml","so_luong":15.0,"don_gia":246.66666666666666,"thanh_tien":3700.0},{"ma_nl":"A29","ten_nl":"Thành phẩm nước đường","don_vi":"ml","so_luong":30.0,"don_gia":27.0,"thanh_tien":810.0},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Trà_đào_cam_sả_650ml","ten":"Trà đào cam sả 650ml","nhom":"Trà trái cây","size":"650ml","cost":11367.41,"gia_ban":36000.0,"ingredients":[{"ma_nl":"A31","ten_nl":"Thành phẩm trà lài","don_vi":"ml","so_luong":150.0,"don_gia":4.0015789473684205,"thanh_tien":600.24},{"ma_nl":"A19","ten_nl":"Sinh tố đào GTP","don_vi":"ml","so_luong":60.0,"don_gia":81.0,"thanh_tien":4860.0},{"ma_nl":"A12","ten_nl":"Nước chanh","don_vi":"ml","so_luong":10.0,"don_gia":50.0,"thanh_tien":500.0},{"ma_nl":"A26","ten_nl":"Syrup sả Davinci","don_vi":"ml","so_luong":10.0,"don_gia":246.66666666666666,"thanh_tien":2466.67},{"ma_nl":"A29","ten_nl":"Thành phẩm nước đường","don_vi":"ml","so_luong":40.0,"don_gia":27.0,"thanh_tien":1080.0},{"ma_nl":"A7","ten_nl":"Ly giấy 650ml","don_vi":"cái","so_luong":1.0,"don_gia":1258.0,"thanh_tien":1258.0},{"ma_nl":"A10","ten_nl":"Nắp ly 650ml","don_vi":"cái","so_luong":1.0,"don_gia":340.0,"thanh_tien":340.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Trà_vải_240ml","ten":"Trà vải 240ml","nhom":"Trà trái cây","size":"240ml","cost":6506.45,"gia_ban":20000.0,"ingredients":[{"ma_nl":"A31","ten_nl":"Thành phẩm trà lài","don_vi":"ml","so_luong":120.0,"don_gia":4.0015789473684205,"thanh_tien":480.19},{"ma_nl":"A27","ten_nl":"Syrup vải GTP","don_vi":"ml","so_luong":40.0,"don_gia":76.34408602150538,"thanh_tien":3053.76},{"ma_nl":"A12","ten_nl":"Nước chanh","don_vi":"ml","so_luong":10.0,"don_gia":50.0,"thanh_tien":500.0},{"ma_nl":"A29","ten_nl":"Thành phẩm nước đường","don_vi":"ml","so_luong":30.0,"don_gia":27.0,"thanh_tien":810.0},{"ma_nl":"A42","ten_nl":"Vải ngâm Boddob","don_vi":"gram","so_luong":1.0,"don_gia":0,"thanh_tien":0.0},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A15","ten_nl":"Ống hút giấy phi 6","don_vi":"cái","so_luong":1.0,"don_gia":280.0,"thanh_tien":280.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Trà_vải_650ml","ten":"Trà vải 650ml","nhom":"Trà trái cây","size":"650ml","cost":7857.94,"gia_ban":25000.0,"ingredients":[{"ma_nl":"A31","ten_nl":"Thành phẩm trà lài","don_vi":"ml","so_luong":150.0,"don_gia":4.0015789473684205,"thanh_tien":600.24},{"ma_nl":"A27","ten_nl":"Syrup vải GTP","don_vi":"ml","so_luong":50.0,"don_gia":76.34408602150538,"thanh_tien":3817.2},{"ma_nl":"A12","ten_nl":"Nước chanh","don_vi":"ml","so_luong":10.0,"don_gia":50.0,"thanh_tien":500.0},{"ma_nl":"A29","ten_nl":"Thành phẩm nước đường","don_vi":"ml","so_luong":40.0,"don_gia":27.0,"thanh_tien":1080.0},{"ma_nl":"A42","ten_nl":"Vải ngâm Boddob","don_vi":"gram","so_luong":0,"don_gia":0,"thanh_tien":0},{"ma_nl":"A7","ten_nl":"Ly giấy 650ml","don_vi":"cái","so_luong":1.0,"don_gia":1258.0,"thanh_tien":1258.0},{"ma_nl":"A10","ten_nl":"Nắp ly 650ml","don_vi":"cái","so_luong":1.0,"don_gia":340.0,"thanh_tien":340.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Trà_xoài_240ml","ten":"Trà xoài 240ml","nhom":"Trà trái cây","size":"240ml","cost":7372.69,"gia_ban":23000.0,"ingredients":[{"ma_nl":"A31","ten_nl":"Thành phẩm trà lài","don_vi":"ml","so_luong":120.0,"don_gia":4.0015789473684205,"thanh_tien":480.19},{"ma_nl":"A21","ten_nl":"Sinh tố xoài GTP","don_vi":"ml","so_luong":50.0,"don_gia":81.0,"thanh_tien":4050.0},{"ma_nl":"A12","ten_nl":"Nước chanh","don_vi":"ml","so_luong":10.0,"don_gia":50.0,"thanh_tien":500.0},{"ma_nl":"A29","ten_nl":"Thành phẩm nước đường","don_vi":"ml","so_luong":30.0,"don_gia":27.0,"thanh_tien":810.0},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Trà_xoài_650ml","ten":"Trà xoài 650ml","nhom":"Trà trái cây","size":"650ml","cost":8900.74,"gia_ban":28000.0,"ingredients":[{"ma_nl":"A31","ten_nl":"Thành phẩm trà lài","don_vi":"ml","so_luong":150.0,"don_gia":4.0015789473684205,"thanh_tien":600.24},{"ma_nl":"A21","ten_nl":"Sinh tố xoài GTP","don_vi":"ml","so_luong":60.0,"don_gia":81.0,"thanh_tien":4860.0},{"ma_nl":"A12","ten_nl":"Nước chanh","don_vi":"ml","so_luong":10.0,"don_gia":50.0,"thanh_tien":500.0},{"ma_nl":"A29","ten_nl":"Thành phẩm nước đường","don_vi":"ml","so_luong":40.0,"don_gia":27.0,"thanh_tien":1080.0},{"ma_nl":"A7","ten_nl":"Ly giấy 650ml","don_vi":"cái","so_luong":1.0,"don_gia":1258.0,"thanh_tien":1258.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A10","ten_nl":"Nắp ly 650ml","don_vi":"cái","so_luong":1.0,"don_gia":340.0,"thanh_tien":340.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Trà_việt_quất_240ml","ten":"Trà việt quất 240ml","nhom":"Trà trái cây","size":"240ml","cost":8722.69,"gia_ban":27000.0,"ingredients":[{"ma_nl":"A31","ten_nl":"Thành phẩm trà lài","don_vi":"ml","so_luong":120.0,"don_gia":4.0015789473684205,"thanh_tien":480.19},{"ma_nl":"A20","ten_nl":"Sinh tố việt quất GTP","don_vi":"ml","so_luong":50.0,"don_gia":108.0,"thanh_tien":5400.0},{"ma_nl":"A12","ten_nl":"Nước chanh","don_vi":"ml","so_luong":10.0,"don_gia":50.0,"thanh_tien":500.0},{"ma_nl":"A29","ten_nl":"Thành phẩm nước đường","don_vi":"ml","so_luong":30.0,"don_gia":27.0,"thanh_tien":810.0},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Trà_việt_quất_650ml","ten":"Trà việt quất 650ml","nhom":"Trà trái cây","size":"650ml","cost":10520.74,"gia_ban":33000.0,"ingredients":[{"ma_nl":"A31","ten_nl":"Thành phẩm trà lài","don_vi":"ml","so_luong":150.0,"don_gia":4.0015789473684205,"thanh_tien":600.24},{"ma_nl":"A20","ten_nl":"Sinh tố việt quất GTP","don_vi":"ml","so_luong":60.0,"don_gia":108.0,"thanh_tien":6480.0},{"ma_nl":"A12","ten_nl":"Nước chanh","don_vi":"ml","so_luong":10.0,"don_gia":50.0,"thanh_tien":500.0},{"ma_nl":"A29","ten_nl":"Thành phẩm nước đường","don_vi":"ml","so_luong":40.0,"don_gia":27.0,"thanh_tien":1080.0},{"ma_nl":"A7","ten_nl":"Ly giấy 650ml","don_vi":"cái","so_luong":1.0,"don_gia":1258.0,"thanh_tien":1258.0},{"ma_nl":"A10","ten_nl":"Nắp ly 650ml","don_vi":"cái","so_luong":1.0,"don_gia":340.0,"thanh_tien":340.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Trà_chanh_dây_240ml","ten":"Trà chanh dây 240ml","nhom":"Trà trái cây","size":"240ml","cost":7922.69,"gia_ban":25000.0,"ingredients":[{"ma_nl":"A31","ten_nl":"Thành phẩm trà lài","don_vi":"ml","so_luong":120.0,"don_gia":4.0015789473684205,"thanh_tien":480.19},{"ma_nl":"A18","ten_nl":"Sinh tố chanh dây GTP","don_vi":"ml","so_luong":50.0,"don_gia":92.0,"thanh_tien":4600.0},{"ma_nl":"A12","ten_nl":"Nước chanh","don_vi":"ml","so_luong":10.0,"don_gia":50.0,"thanh_tien":500.0},{"ma_nl":"A29","ten_nl":"Thành phẩm nước đường","don_vi":"ml","so_luong":30.0,"don_gia":27.0,"thanh_tien":810.0},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Trà_chanh_dây_650ml","ten":"Trà chanh dây 650ml","nhom":"Trà trái cây","size":"650ml","cost":9560.74,"gia_ban":30000.0,"ingredients":[{"ma_nl":"A31","ten_nl":"Thành phẩm trà lài","don_vi":"ml","so_luong":150.0,"don_gia":4.0015789473684205,"thanh_tien":600.24},{"ma_nl":"A18","ten_nl":"Sinh tố chanh dây GTP","don_vi":"ml","so_luong":60.0,"don_gia":92.0,"thanh_tien":5520.0},{"ma_nl":"A12","ten_nl":"Nước chanh","don_vi":"ml","so_luong":10.0,"don_gia":50.0,"thanh_tien":500.0},{"ma_nl":"A29","ten_nl":"Thành phẩm nước đường","don_vi":"ml","so_luong":40.0,"don_gia":27.0,"thanh_tien":1080.0},{"ma_nl":"A7","ten_nl":"Ly giấy 650ml","don_vi":"cái","so_luong":1.0,"don_gia":1258.0,"thanh_tien":1258.0},{"ma_nl":"A10","ten_nl":"Nắp ly 650ml","don_vi":"cái","so_luong":1.0,"don_gia":340.0,"thanh_tien":340.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Trà_mận_Bắc_240ml","ten":"Trà mận Bắc 240ml","nhom":"Trà trái cây","size":"240ml","cost":10727.91,"gia_ban":34000.0,"ingredients":[{"ma_nl":"A30","ten_nl":"Thành phẩm trà bá tước","don_vi":"ml","so_luong":120.0,"don_gia":4.357578947368421,"thanh_tien":522.91},{"ma_nl":"A8","ten_nl":"Mứt mận Good Heart","don_vi":"ml","so_luong":50.0,"don_gia":145.0,"thanh_tien":7250.0},{"ma_nl":"A12","ten_nl":"Nước chanh","don_vi":"ml","so_luong":10.0,"don_gia":50.0,"thanh_tien":500.0},{"ma_nl":"A29","ten_nl":"Thành phẩm nước đường","don_vi":"ml","so_luong":30.0,"don_gia":27.0,"thanh_tien":810.0},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Trà_mận_Bắc_650ml","ten":"Trà mận Bắc 650ml","nhom":"Trà trái cây","size":"650ml","cost":12681.64,"gia_ban":40000.0,"ingredients":[{"ma_nl":"A30","ten_nl":"Thành phẩm trà bá tước","don_vi":"ml","so_luong":150.0,"don_gia":4.357578947368421,"thanh_tien":653.64},{"ma_nl":"A8","ten_nl":"Mứt mận Good Heart","don_vi":"ml","so_luong":60.0,"don_gia":145.0,"thanh_tien":8700.0},{"ma_nl":"A12","ten_nl":"Nước chanh","don_vi":"ml","so_luong":10.0,"don_gia":50.0,"thanh_tien":500.0},{"ma_nl":"A29","ten_nl":"Thành phẩm nước đường","don_vi":"ml","so_luong":40.0,"don_gia":27.0,"thanh_tien":1080.0},{"ma_nl":"A7","ten_nl":"Ly giấy 650ml","don_vi":"cái","so_luong":1.0,"don_gia":1258.0,"thanh_tien":1258.0},{"ma_nl":"A10","ten_nl":"Nắp ly 650ml","don_vi":"cái","so_luong":1.0,"don_gia":340.0,"thanh_tien":340.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0}]},{"id":"p_Kombucha_xoài_240ml","ten":"Kombucha xoài 240ml","nhom":"Kombucha","size":"240ml","cost":5582.5,"gia_ban":18000.0,"ingredients":[{"ma_nl":"A28","ten_nl":"Thành phẩm kombucha","don_vi":"ml","so_luong":120.0,"don_gia":0,"thanh_tien":0.0},{"ma_nl":"A21","ten_nl":"Sinh tố xoài GTP","don_vi":"ml","so_luong":50.0,"don_gia":81.0,"thanh_tien":4050.0},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Kombucha_xoài_650ml","ten":"Kombucha xoài 650ml","nhom":"Kombucha","size":"650ml","cost":6720.5,"gia_ban":21000.0,"ingredients":[{"ma_nl":"A28","ten_nl":"Thành phẩm kombucha","don_vi":"ml","so_luong":150.0,"don_gia":0,"thanh_tien":0.0},{"ma_nl":"A21","ten_nl":"Sinh tố xoài GTP","don_vi":"ml","so_luong":60.0,"don_gia":81.0,"thanh_tien":4860.0},{"ma_nl":"A7","ten_nl":"Ly giấy 650ml","don_vi":"cái","so_luong":1.0,"don_gia":1258.0,"thanh_tien":1258.0},{"ma_nl":"A10","ten_nl":"Nắp ly 650ml","don_vi":"cái","so_luong":1.0,"don_gia":340.0,"thanh_tien":340.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Kombucha_dâu_240ml","ten":"Kombucha dâu 240ml","nhom":"Kombucha","size":"240ml","cost":5582.5,"gia_ban":18000.0,"ingredients":[{"ma_nl":"A28","ten_nl":"Thành phẩm kombucha","don_vi":"ml","so_luong":150.0,"don_gia":0,"thanh_tien":0.0},{"ma_nl":"A48","ten_nl":"Sinh tố dâu GTP","don_vi":"ml","so_luong":50.0,"don_gia":81.0,"thanh_tien":4050.0},{"ma_nl":"A6","ten_nl":"Ly giấy 240ml","don_vi":"cái","so_luong":1.0,"don_gia":1240.0,"thanh_tien":1240.0},{"ma_nl":"A9","ten_nl":"Nắp ly 240ml","don_vi":"cái","so_luong":1.0,"don_gia":30.0,"thanh_tien":30.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Kombucha_dâu_650ml","ten":"Kombucha dâu 650ml","nhom":"Kombucha","size":"650ml","cost":6720.5,"gia_ban":21000.0,"ingredients":[{"ma_nl":"A28","ten_nl":"Thành phẩm kombucha","don_vi":"ml","so_luong":150.0,"don_gia":0,"thanh_tien":0.0},{"ma_nl":"A48","ten_nl":"Sinh tố dâu GTP","don_vi":"ml","so_luong":60.0,"don_gia":81.0,"thanh_tien":4860.0},{"ma_nl":"A7","ten_nl":"Ly giấy 650ml","don_vi":"cái","so_luong":1.0,"don_gia":1258.0,"thanh_tien":1258.0},{"ma_nl":"A10","ten_nl":"Nắp ly 650ml","don_vi":"cái","so_luong":1.0,"don_gia":340.0,"thanh_tien":340.0},{"ma_nl":"A17","ten_nl":"Ống hút giấy phi 8","don_vi":"cái","so_luong":1.0,"don_gia":150.0,"thanh_tien":150.0},{"ma_nl":"A36","ten_nl":"Túi đựng 1 ly","don_vi":"cái","so_luong":1.0,"don_gia":112.5,"thanh_tien":112.5}]},{"id":"p_Hạt_3Q_240ml","ten":"Hạt 3Q 240ml","nhom":"Khác","size":"240ml","cost":535.0,"gia_ban":10000.0,"ingredients":[{"ma_nl":"A43","ten_nl":"Hạt 3Q Zion","don_vi":"gram","so_luong":20.0,"don_gia":26.75,"thanh_tien":535.0}]},{"id":"p_Hạt_3Q_650ml","ten":"Hạt 3Q 650ml","nhom":"Khác","size":"650ml","cost":802.5,"gia_ban":2000.0,"ingredients":[{"ma_nl":"A43","ten_nl":"Hạt 3Q Zion","don_vi":"gram","so_luong":30.0,"don_gia":26.75,"thanh_tien":802.5}]}],"materials":[{"ma":"A1","ten":"Bột cà phê TAS","don_vi":"gram","gia":240.0,"ncc":"TAS"},{"ma":"A2","ten":"Bột cacao Luave","don_vi":"gram","gia":128.0,"ncc":"Tân Đại Hải"},{"ma":"A3","ten":"Bột sữa V83","don_vi":"gram","gia":95.0,"ncc":"Tân Đại Hải"},{"ma":"A4","ten":"Bột matcha Fuji","don_vi":"gram","gia":1640.0,"ncc":""},{"ma":"A5","ten":"Chanh muối","don_vi":"gram","gia":0,"ncc":""},{"ma":"A6","ten":"Ly giấy 240ml","don_vi":"cái","gia":1240.0,"ncc":"Tân Đại Hải"},{"ma":"A7","ten":"Ly giấy 650ml","don_vi":"cái","gia":1258.0,"ncc":"Tân Đại Hải"},{"ma":"A8","ten":"Mứt mận Good Heart","don_vi":"ml","gia":145.0,"ncc":"Tân Đại Hải"},{"ma":"A9","ten":"Nắp ly 240ml","don_vi":"cái","gia":30.0,"ncc":"Tân Đại Hải"},{"ma":"A10","ten":"Nắp ly 650ml","don_vi":"cái","gia":340.0,"ncc":"Tân Đại Hải"},{"ma":"A11","ten":"Nước bình tinh khiết Viz-Sky","don_vi":"ml","gia":0.631578947368421,"ncc":"Viz-Sky"},{"ma":"A12","ten":"Nước chanh","don_vi":"ml","gia":50.0,"ncc":""},{"ma":"A14","ten":"Ống hút giấy phi 12","don_vi":"cái","gia":400.0,"ncc":"Tân Đại Hải"},{"ma":"A15","ten":"Ống hút giấy phi 6","don_vi":"cái","gia":280.0,"ncc":"Tân Đại Hải"},{"ma":"A17","ten":"Ống hút giấy phi 8","don_vi":"cái","gia":150.0,"ncc":"Tân Đại Hải"},{"ma":"A18","ten":"Sinh tố chanh dây GTP","don_vi":"ml","gia":92.0,"ncc":"GTP"},{"ma":"A19","ten":"Sinh tố đào GTP","don_vi":"ml","gia":81.0,"ncc":"GTP"},{"ma":"A20","ten":"Sinh tố việt quất GTP","don_vi":"ml","gia":108.0,"ncc":"GTP"},{"ma":"A21","ten":"Sinh tố xoài GTP","don_vi":"ml","gia":81.0,"ncc":"GTP"},{"ma":"A22","ten":"Soda Schweppes","don_vi":"ml","gia":19.53125,"ncc":"Coop Mart"},{"ma":"A23","ten":"Sữa đặc Phương Nam","don_vi":"gram","gia":48.28660436137071,"ncc":"Tân Đại Hải"},{"ma":"A24","ten":"Sữa Rich's","don_vi":"gram","gia":66.07929515418502,"ncc":"Tân Đại Hải"},{"ma":"A25","ten":"Sữa tươi Barista","don_vi":"ml","gia":40.55555555555556,"ncc":"Tân Đại Hải"},{"ma":"A26","ten":"Syrup sả Davinci","don_vi":"ml","gia":246.66666666666666,"ncc":"Tân Đại Hải"},{"ma":"A27","ten":"Syrup vải GTP","don_vi":"ml","gia":76.34408602150538,"ncc":"GTP"},{"ma":"A28","ten":"Thành phẩm kombucha","don_vi":"ml","gia":0,"ncc":""},{"ma":"A29","ten":"Thành phẩm nước đường","don_vi":"ml","gia":27.0,"ncc":""},{"ma":"A30","ten":"Thành phẩm trà bá tước","don_vi":"ml","gia":4.357578947368421,"ncc":""},{"ma":"A31","ten":"Thành phẩm trà lài","don_vi":"ml","gia":4.0015789473684205,"ncc":""},{"ma":"A32","ten":"Thành phẩm kem muối","don_vi":"gram","gia":62.04146417445483,"ncc":""},{"ma":"A33","ten":"Trà bá tước Casa","don_vi":"gram","gia":123.0,"ncc":"Casa"},{"ma":"A34","ten":"Trà lài Tân Nam Bắc","don_vi":"gram","gia":93.33333333333333,"ncc":"Tân Đại Hải"},{"ma":"A35","ten":"Trà olong GTP","don_vi":"gram","gia":264.0,"ncc":"GTP"},{"ma":"A36","ten":"Túi đựng 1 ly","don_vi":"cái","gia":112.5,"ncc":"Tân Đại Hải"},{"ma":"A37","ten":"Túi đựng 2 ly","don_vi":"cái","gia":112.5,"ncc":"Tân Đại Hải"},{"ma":"A38","ten":"Xí muội","don_vi":"gram","gia":0,"ncc":""},{"ma":"A39","ten":"Đường cát trắng","don_vi":"gram","gia":27.0,"ncc":"Tân Đại Hải"},{"ma":"A40","ten":"Muối me xí muội","don_vi":"gram","gia":140.0,"ncc":"Tân Đại Hải"},{"ma":"A41","ten":"Đào ngâm Boddob","don_vi":"gram","gia":0,"ncc":"Boddob"},{"ma":"A42","ten":"Vải ngâm Boddob","don_vi":"gram","gia":0,"ncc":"Boddob"},{"ma":"A43","ten":"Hạt 3Q Zion","don_vi":"gram","gia":26.75,"ncc":"Tân Đại Hải"},{"ma":"A44","ten":"Đường vàng An Khuê","don_vi":"gram","gia":31.0,"ncc":"An Khuê"},{"ma":"A45","ten":"Đá bi","don_vi":"gram","gia":4.5,"ncc":""},{"ma":"A46","ten":"Chanh muối ngâm","don_vi":"gram","gia":0,"ncc":""},{"ma":"A47","ten":"Muối trắng","don_vi":"gram","gia":11.0,"ncc":""},{"ma":"A48","ten":"Sinh tố dâu GTP","don_vi":"ml","gia":81.0,"ncc":"GTP"},{"ma":"A49","ten":"Thành phẩm trà sữa truyền thống","don_vi":"ml","gia":68.8578947368421,"ncc":""}]};
+
+// Runtime: kết hợp BOM gốc + món tự thêm từ Supabase
+let CC_products = []; // merge của BOM_DATA.products + D_drinks
+let CC_matMap   = {}; // map mã NL → {ten, don_vi, gia}
+let CC_viewMode = 'table'; // 'table' | 'grid'
+let CC_filter   = 'Tất cả';
+let CC_currentId = null;
+
+// ── KHỞI TẠO ─────────────────────────────────────────────────
+async function initCostCalc() {
+  // Build material map từ DMHH
+  BOM_DATA.materials.forEach(m => { CC_matMap[m.ma] = m; });
+  // Merge BOM gốc + món custom từ Supabase (D_drinks)
+  CC_products = [...BOM_DATA.products];
+  // Load custom drinks từ Supabase
+  try {
+    const rows = await sbGet('drink_recipes','?order=created_at.asc');
+    if (rows && rows.length) {
+      rows.forEach(r => {
+        // Check trùng tên
+        if (!CC_products.find(p => p.ten === r.name)) {
+          CC_products.push({
+            id: r.id, ten: r.name,
+            nhom: r.nhom||'Khác', size: r.size||'—',
+            cost: calcCustomCost(r.ingredients||[]),
+            gia_ban: r.sale_price||0,
+            ingredients: (r.ingredients||[]).map(i=>({
+              ma_nl:'', ten_nl:i.mat_name||'', don_vi:i.mat_unit||'',
+              so_luong:i.qty||0, don_gia:i.cost_snapshot||0,
+              thanh_tien:(i.qty||0)*(i.cost_snapshot||0)
+            })),
+            _custom: true
+          });
+        }
+      });
+    }
+  } catch(e) { /* offline, dùng BOM gốc */ }
+  renderCostCalcGroups();
+  renderCostCalc();
+}
+function calcCustomCost(ings) {
+  return ings.reduce((s,i)=>{
+    const mat = D.inventory.find(m=>m.id===i.mat_id||m.name===i.mat_name);
+    const p = mat?(mat.cost||0):(i.cost_snapshot||0);
+    return s + p*(i.qty||0);
+  }, 0);
 }
 
-function renderCostCalc() {
-  const q = (document.getElementById('cost-search')?.value||'').toLowerCase();
-  const filtered = D_drinks.filter(d=>!q||(d.name||'').toLowerCase().includes(q));
-  let sumPct=0, sumProfit=0, pctCount=0;
-  filtered.forEach(d=>{
-    const {costPerServing,profitPerServing}=calcDrinkCost(d);
-    if(d.sale_price>0){sumPct+=costPerServing/d.sale_price*100;sumProfit+=profitPerServing;pctCount++;}
+// ── TABS NHÓM ────────────────────────────────────────────────
+function renderCostCalcGroups() {
+  const groups = ['Tất cả', ...new Set(CC_products.map(p=>p.nhom).filter(Boolean))];
+  const el = document.getElementById('cc-group-tabs');
+  if (!el) return;
+  el.innerHTML = groups.map(g => `
+    <button onclick="ccSetGroup('${g}',this)"
+      style="padding:5px 14px;border-radius:20px;border:1.5px solid var(--border);background:${g===CC_filter?'var(--brand)':'transparent'};
+             color:${g===CC_filter?'#fff':'var(--muted)'};font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:.15s">
+      ${g}
+    </button>`).join('');
+}
+function ccSetGroup(g, btn) {
+  CC_filter = g;
+  document.querySelectorAll('#cc-group-tabs button').forEach(b=>{
+    b.style.background='transparent'; b.style.color='var(--muted)';
   });
-  const el=id=>document.getElementById(id);
-  if(el('cost-total-drinks')) el('cost-total-drinks').textContent=filtered.length;
-  if(el('cost-avg-pct')) el('cost-avg-pct').textContent=pctCount>0?Math.round(sumPct/pctCount)+'%':'—';
-  if(el('cost-avg-profit')) el('cost-avg-profit').textContent=pctCount>0?Math.round(sumProfit/pctCount).toLocaleString('vi-VN'):'—';
-  const tbody=el('cost-list');
-  if(!tbody) return;
-  if(!filtered.length){
-    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">Chưa có món nào — Nhấn "+ Thêm món mới" để bắt đầu!</td></tr>';
+  btn.style.background='var(--brand)'; btn.style.color='#fff';
+  renderCostCalc();
+}
+
+// ── RENDER CHÍNH ─────────────────────────────────────────────
+function renderCostCalc() {
+  const q = (document.getElementById('cc-search')?.value||'').toLowerCase();
+  let filtered = CC_products.filter(p => {
+    if (CC_filter !== 'Tất cả' && p.nhom !== CC_filter) return false;
+    if (q && !p.ten.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  // Stats
+  let sumPct=0, sumLN=0, cntPct=0, cntWarn=0;
+  filtered.forEach(p => {
+    const cost = getCost(p);
+    const gb = p.gia_ban||0;
+    if (gb>0) { const pct=cost/gb*100; sumPct+=pct; sumLN+=(gb-cost); cntPct++; if(pct>35)cntWarn++; }
+  });
+  setEl('cc-stat-total', filtered.length);
+  setEl('cc-stat-avgcost', cntPct>0 ? Math.round(sumPct/cntPct)+'%' : '—');
+  setEl('cc-stat-profit', cntPct>0 ? Math.round(sumLN/cntPct).toLocaleString('vi-VN')+'₫' : '—');
+  setEl('cc-stat-warn', cntWarn);
+
+  if (CC_viewMode === 'table') renderTable(filtered);
+  else renderGrid(filtered);
+}
+
+function getCost(p) {
+  // Dùng cost có sẵn (từ BOM), hoặc tính lại nếu là custom
+  if (p._custom) {
+    return (p.ingredients||[]).reduce((s,i)=>{
+      const mat = D.inventory.find(m=>m.id===i.ma_nl||m.name===i.ten_nl);
+      return s + (mat?(mat.cost||0):(i.don_gia||0)) * (i.so_luong||0);
+    },0);
+  }
+  return p.cost || 0;
+}
+
+function setEl(id, val) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = val;
+}
+function fmtVND(n) { return Math.round(n).toLocaleString('vi-VN')+'₫'; }
+function costBadge(pct) {
+  if (pct===null) return {icon:'—',color:'#888',bg:'transparent'};
+  if (pct<25) return {icon:'🟢 Tốt',color:'#27ae60',bg:'rgba(39,174,96,.1)'};
+  if (pct<=35) return {icon:'🟡 Ổn',color:'#e67e22',bg:'rgba(230,126,34,.1)'};
+  return {icon:'🔴 Cao',color:'#c0392b',bg:'rgba(192,57,43,.1)'};
+}
+
+// ── TABLE VIEW ───────────────────────────────────────────────
+function renderTable(filtered) {
+  const tbody = document.getElementById('cc-list');
+  if (!tbody) return;
+  if (!filtered.length) {
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">Không có món nào</td></tr>';
     return;
   }
-  tbody.innerHTML=filtered.map(d=>{
-    const {costPerServing,profitPerServing}=calcDrinkCost(d);
-    const pct=d.sale_price>0?Math.round(costPerServing/d.sale_price*100):null;
-    let badge='',pctColor='#888';
-    if(pct!==null){if(pct<25){badge='🟢 Tốt';pctColor='var(--green)';}else if(pct<=35){badge='🟡 Chấp nhận';pctColor='#e67e22';}else{badge='🔴 Cao';pctColor='var(--red)';}}
-    return `<tr style="cursor:pointer" onclick="showDrinkDetail('${d.id}')">
-      <td><strong>${d.name}</strong>${d.note?`<div style="font-size:11px;color:var(--muted)">${d.note}</div>`:''}
+  tbody.innerHTML = filtered.map(p => {
+    const cost = getCost(p);
+    const gb = p.gia_ban||0;
+    const pct = gb>0 ? Math.round(cost/gb*100) : null;
+    const ln = gb>0 ? gb-cost : null;
+    const b = costBadge(pct);
+    return `<tr style="cursor:pointer" onclick="showBomDetail('${p.id}')">
+      <td>
+        <div style="font-weight:700;font-size:13px">${p.ten}</div>
+        <div style="font-size:10px;color:var(--muted)">${p.nhom}${p._custom?' · Tự thêm':''}</div>
       </td>
-      <td>${d.sale_price>0?d.sale_price.toLocaleString('vi-VN')+'₫':'—'}</td>
-      <td><strong>${Math.round(costPerServing).toLocaleString('vi-VN')}₫</strong></td>
-      <td style="color:${pctColor};font-weight:700">${pct!==null?pct+'%':'—'}</td>
-      <td style="color:var(--green);font-weight:700">${d.sale_price>0?Math.round(profitPerServing).toLocaleString('vi-VN')+'₫':'—'}</td>
-      <td>${badge}</td>
-      <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openEditDrink('${d.id}')">✏️</button></td>
+      <td style="text-align:center"><span class="tag" style="background:var(--dim);color:var(--brown);font-size:10px">${p.size||'—'}</span></td>
+      <td style="text-align:right;font-weight:600">${gb>0?fmtVND(gb):'—'}</td>
+      <td style="text-align:right;font-weight:700;color:var(--brand)">${fmtVND(cost)}</td>
+      <td style="text-align:center">
+        ${pct!==null?`<span style="font-weight:800;color:${b.color}">${pct}%</span>`:'—'}
+      </td>
+      <td style="text-align:right;color:var(--green);font-weight:700">${ln!==null?fmtVND(ln):'—'}</td>
+      <td style="text-align:center"><span style="font-size:12px;font-weight:600;color:${b.color}">${b.icon}</span></td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" style="padding:3px 8px" onclick="event.stopPropagation();showBomDetail('${p.id}')">👁</button>
+          ${p._custom?`<button class="btn btn-ghost btn-sm" style="padding:3px 8px;color:var(--red)" onclick="event.stopPropagation();deleteCustomDrink('${p.id}')">🗑</button>`:''}
+        </div>
+      </td>
     </tr>`;
   }).join('');
 }
 
-function calcDrinkCost(drink){
-  let cost=0;
-  (drink.ingredients||[]).forEach(ing=>{
-    const mat=D.inventory.find(m=>m.id===ing.mat_id||m.name===ing.mat_name);
-    const unitCost=mat?(mat.cost||0):(ing.cost_snapshot||0);
-    cost+=unitCost*(ing.qty||0);
-  });
-  return{costPerServing:cost,profitPerServing:(drink.sale_price||0)-cost};
+// ── GRID VIEW ────────────────────────────────────────────────
+function renderGrid(filtered) {
+  const el = document.getElementById('cc-grid');
+  if (!el) return;
+  el.innerHTML = filtered.map(p => {
+    const cost = getCost(p);
+    const gb = p.gia_ban||0;
+    const pct = gb>0 ? Math.round(cost/gb*100) : null;
+    const b = costBadge(pct);
+    return `<div onclick="showBomDetail('${p.id}')" style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:.18s;box-shadow:0 2px 8px rgba(255,140,0,.06)"
+        onmouseover="this.style.borderColor='var(--brand)';this.style.transform='translateY(-2px)'" 
+        onmouseout="this.style.borderColor='var(--border)';this.style.transform='none'">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div style="font-weight:700;font-size:13px;line-height:1.3;flex:1">${p.ten}</div>
+        <span style="font-size:10px;background:var(--dim);color:var(--brown);padding:2px 7px;border-radius:10px;margin-left:6px;white-space:nowrap">${p.size||''}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+        <div style="background:var(--bg);border-radius:6px;padding:6px;text-align:center">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost</div>
+          <div style="font-size:15px;font-weight:800;color:var(--brand)">${fmtVND(cost)}</div>
+        </div>
+        <div style="background:var(--bg);border-radius:6px;padding:6px;text-align:center">
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:600">Giá bán</div>
+          <div style="font-size:15px;font-weight:800;color:var(--brown)">${gb>0?fmtVND(gb):'—'}</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:12px;font-weight:700;color:${b.color};background:${b.bg};padding:3px 10px;border-radius:20px">
+          ${pct!==null?pct+'% — ':''} ${b.icon}
+        </span>
+        <span style="font-size:11px;color:var(--muted)">${p.nhom}</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
-function addDrinkIngredient(matId='',qty=''){
+// ── TOGGLE VIEW ──────────────────────────────────────────────
+function ccToggleView() {
+  CC_viewMode = CC_viewMode === 'table' ? 'grid' : 'table';
+  document.getElementById('cc-table-view').style.display = CC_viewMode==='table'?'block':'none';
+  document.getElementById('cc-grid-view').style.display = CC_viewMode==='grid'?'block':'none';
+  document.getElementById('cc-view-icon').textContent = CC_viewMode==='table'?'🔲':'📋';
+  document.getElementById('cc-view-label').textContent = CC_viewMode==='table'?'Lưới':'Bảng';
+  renderCostCalc();
+}
+
+// ── CHI TIẾT BOM ─────────────────────────────────────────────
+function showBomDetail(id) {
+  const p = CC_products.find(x => x.id===id);
+  if (!p) return;
+  CC_currentId = id;
+  const cost = getCost(p);
+  const gb = p.gia_ban||0;
+  const pct = gb>0 ? Math.round(cost/gb*100) : null;
+  const ln = gb>0 ? gb-cost : null;
+  const b = costBadge(pct);
+
+  document.getElementById('bom-detail-title').textContent = p.ten;
+  document.getElementById('bom-detail-sub').textContent = p.nhom + (p.size?' · '+p.size:'');
+
+  const badge = document.getElementById('bom-detail-badge');
+  badge.textContent = pct!==null ? pct+'% '+b.icon : '—';
+  badge.style.color = b.color;
+  badge.style.background = b.bg;
+  badge.style.border = '1.5px solid '+b.color;
+
+  document.getElementById('bom-gb').textContent = gb>0?fmtVND(gb):'—';
+  document.getElementById('bom-cost').textContent = fmtVND(cost);
+  document.getElementById('bom-pct').textContent = pct!==null?pct+'%':'—';
+  document.getElementById('bom-pct').style.color = b.color;
+  document.getElementById('bom-ln').textContent = ln!==null?fmtVND(ln):'—';
+  document.getElementById('bom-total-cost').textContent = fmtVND(cost);
+
+  // BOM rows
+  const ings = p.ingredients||[];
+  document.getElementById('bom-ing-rows').innerHTML = ings.map(i => {
+    const mat = CC_matMap[i.ma_nl];
+    // Tính lại với giá kho hiện tại nếu có
+    const invMat = D.inventory.find(m=>m.id===i.ma_nl||m.name===i.ten_nl);
+    const unitPrice = invMat?(invMat.cost||0):(i.don_gia||0);
+    const total = unitPrice*(i.so_luong||0);
+    const isTop = total > cost*0.3; // highlight NL tốn nhất
+    return `<tr style="${isTop?'background:rgba(255,140,0,.05)':''}">
+      <td style="font-weight:${isTop?700:400}">${i.ten_nl} ${isTop?'<span style="font-size:10px;color:var(--brand);background:var(--dim);padding:1px 5px;border-radius:4px">NL chính</span>':''}</td>
+      <td style="text-align:right;color:var(--muted)">${i.so_luong} <small>${i.don_vi}</small></td>
+      <td style="text-align:right;color:var(--muted)">${Math.round(unitPrice*10)/10}₫/${i.don_vi}</td>
+      <td style="text-align:right;font-weight:600;color:${isTop?'var(--brand)':'inherit'}">${fmtVND(total)}</td>
+    </tr>`;
+  }).join('');
+
+  // Reset trial price
+  document.getElementById('bom-trial-price').value = gb||'';
+  document.getElementById('bom-trial-result').textContent = '';
+  updateTrialCalc();
+
+  showM('modal-bom-detail');
+}
+
+// ── THỬ NGHIỆM GIÁ BÁN ──────────────────────────────────────
+function updateTrialCalc() {
+  const p = CC_products.find(x=>x.id===CC_currentId);
+  if (!p) return;
+  const cost = getCost(p);
+  const trial = parseFloat(document.getElementById('bom-trial-price')?.value)||0;
+  const el = document.getElementById('bom-trial-result');
+  if (!el||trial<=0) return;
+  const pct = Math.round(cost/trial*100);
+  const b = costBadge(pct);
+  el.innerHTML = `<span style="font-weight:800;color:${b.color}">${pct}%</span> <span style="font-size:11px">${b.icon}</span><div style="font-size:11px;color:var(--green)">LN: ${fmtVND(trial-cost)}</div>`;
+}
+
+// ── IN BÁO CÁO ──────────────────────────────────────────────
+function printCostTable() {
+  const rows = CC_products.map((p,i) => {
+    const cost = getCost(p);
+    const gb = p.gia_ban||0;
+    const pct = gb>0?Math.round(cost/gb*100):null;
+    const pc = pct===null?'#888':pct<25?'#27ae60':pct<=35?'#e67e22':'#c0392b';
+    const ingList = (p.ingredients||[]).map(i=>i.ten_nl+': '+i.so_luong+i.don_vi).join(' | ');
+    return `<tr>
+      <td style="font-weight:600;white-space:nowrap">${i+1}. ${p.ten}</td>
+      <td style="text-align:center;font-size:11px">${p.size||'—'}</td>
+      <td style="text-align:right">${gb>0?fmtVND(gb):'—'}</td>
+      <td style="text-align:right;font-weight:700;color:#FF8C00">${fmtVND(cost)}</td>
+      <td style="text-align:center;font-weight:800;color:${pc}">${pct!==null?pct+'%':'—'}</td>
+      <td style="text-align:right;color:#27ae60;font-weight:700">${gb>0?fmtVND(gb-cost):'—'}</td>
+      <td style="font-size:10px;color:#666;max-width:200px">${ingList}</td>
+    </tr>`;
+  }).join('');
+  const d = new Date();
+  const ds = d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear();
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bảng Cost</title>
+  <style>body{font-family:Arial,sans-serif;font-size:11px;color:#222;margin:0;padding:10mm}
+  h1{text-align:center;font-size:17px;color:#FF8C00;margin-bottom:2px}.sub{text-align:center;font-size:11px;color:#888;margin-bottom:14px}
+  table{width:100%;border-collapse:collapse}th{background:#FF8C00;color:#fff;padding:7px 8px;text-align:left;font-size:10px}
+  td{padding:6px 8px;border-bottom:1px solid #eee;vertical-align:top}tr:nth-child(even){background:#fafafa}
+  .legend{display:flex;gap:16px;justify-content:center;font-size:10px;margin-bottom:10px}
+  .footer{text-align:center;font-size:9px;color:#aaa;margin-top:12px;border-top:1px solid #eee;padding-top:6px}
+  @media print{body{padding:6mm}}</style></head><body>
+  <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
+  <div class="sub">BẢNG COST NGUYÊN LIỆU ĐỒ UỐNG — Ngày ${ds}</div>
+  <div class="legend"><span>🟢 Cost tốt &lt;25%</span><span>🟡 Chấp nhận 25–35%</span><span>🔴 Cần xem lại &gt;35%</span></div>
+  <table><thead><tr><th>Tên món</th><th>Size</th><th>Giá bán</th><th>Cost NL</th><th>% Cost</th><th>LN/ly</th><th>Nguyên liệu</th></tr></thead>
+  <tbody>${rows}</tbody></table>
+  <div class="footer">Trương Dáng Hương Academy — BOM Menu Cost Report</div>
+  </body></html>`;
+  const w = window.open('','_blank','width=1000,height=700');
+  w.document.write(html); w.document.close(); w.onload=()=>setTimeout(()=>w.print(),400);
+}
+
+function printSingleDrink() {
+  const p = CC_products.find(x=>x.id===CC_currentId);
+  if (!p) return;
+  const cost = getCost(p);
+  const gb = p.gia_ban||0;
+  const pct = gb>0?Math.round(cost/gb*100):null;
+  const pc = pct===null?'#888':pct<25?'#27ae60':pct<=35?'#e67e22':'#c0392b';
+  const ingRows = (p.ingredients||[]).map(i=>{
+    const invMat = D.inventory.find(m=>m.id===i.ma_nl||m.name===i.ten_nl);
+    const up = invMat?(invMat.cost||0):(i.don_gia||0);
+    return `<tr><td>${i.ten_nl}</td><td style="text-align:right">${i.so_luong} ${i.don_vi}</td>
+    <td style="text-align:right">${Math.round(up*10)/10}₫</td><td style="text-align:right;font-weight:600">${fmtVND(up*i.so_luong)}</td></tr>`;
+  }).join('');
+  const d=new Date(), ds=d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear();
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${p.ten}</title>
+  <style>body{font-family:Arial,sans-serif;font-size:13px;color:#222;width:148mm;margin:0 auto;padding:10mm}
+  .header{background:#FF8C00;color:#fff;text-align:center;padding:10px;border-radius:8px;margin-bottom:14px}
+  .header h1{font-size:15px;margin:0 0 2px;font-weight:700}.header p{font-size:10px;opacity:.85;margin:0}
+  .name{font-size:20px;font-weight:800;color:#FF8C00;text-align:center;margin:10px 0 2px}
+  .sub{text-align:center;font-size:11px;color:#888;margin-bottom:14px}
+  table{width:100%;border-collapse:collapse;margin-bottom:14px}
+  th{background:#fff3e0;color:#cc5500;padding:7px 10px;text-align:left;font-size:11px;border-bottom:2px solid #FF8C00}
+  td{padding:6px 10px;border-bottom:1px solid #eee;font-size:12px}
+  .box{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;background:#fff3e0;border-radius:8px;padding:12px;text-align:center;margin-bottom:14px}
+  .box .lbl{font-size:10px;color:#888;text-transform:uppercase;font-weight:600}
+  .box .val{font-size:18px;font-weight:800}
+  .footer{text-align:center;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:8px}
+  @media print{body{width:100%}}</style></head><body>
+  <div class="header"><h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1><p>Chuyên Gia F&B — BOM Cost Sheet — ${ds}</p></div>
+  <div class="name">${p.ten}</div>
+  <div class="sub">${p.nhom} · ${p.size||''}</div>
+  <table><thead><tr><th>Nguyên liệu</th><th style="text-align:right">Định lượng</th><th style="text-align:right">Đơn giá</th><th style="text-align:right">Thành tiền</th></tr></thead>
+  <tbody>${ingRows}</tbody></table>
+  <div class="box">
+    <div><div class="lbl">Giá bán</div><div class="val" style="color:#5c3a1e">${gb>0?fmtVND(gb):'—'}</div></div>
+    <div><div class="lbl">Cost NL</div><div class="val" style="color:#FF8C00">${fmtVND(cost)}</div>
+         ${pct!==null?`<div style="font-size:12px;font-weight:700;color:${pc}">${pct}%</div>`:''}</div>
+    <div><div class="lbl">Lợi nhuận</div><div class="val" style="color:#27ae60">${gb>0?fmtVND(gb-cost):'—'}</div></div>
+  </div>
+  <div class="footer">Trương Dáng Hương Academy — BOM Cost Report</div>
+  </body></html>`;
+  const w=window.open('','_blank','width=600,height=750');
+  w.document.write(html);w.document.close();w.onload=()=>setTimeout(()=>w.print(),400);
+}
+
+// ── XUẤT EXCEL ───────────────────────────────────────────────
+function xlExportDrinkCost() {
+  if (!CC_products.length) { notify('Chưa có dữ liệu!',false); return; }
+  const wb2 = XLSX.utils.book_new();
+  // Sheet 1: Tóm tắt cost
+  const sumData = [['STT','Tên món','Nhóm','Size','Giá bán (₫)','Cost NL (₫)','% Cost','LN/ly (₫)','Đánh giá']];
+  CC_products.forEach((p,i)=>{
+    const cost=getCost(p),gb=p.gia_ban||0;
+    const pct=gb>0?Math.round(cost/gb*100):null;
+    const eval_=pct===null?'—':pct<25?'🟢 Tốt':pct<=35?'🟡 Chấp nhận':'🔴 Cao';
+    sumData.push([i+1,p.ten,p.nhom,p.size,gb||'—',Math.round(cost),pct!==null?pct+'%':'—',gb>0?Math.round(gb-cost):'—',eval_]);
+  });
+  const ws1=XLSX.utils.aoa_to_sheet(sumData);
+  ws1['!cols']=[{wch:4},{wch:25},{wch:14},{wch:8},{wch:12},{wch:12},{wch:8},{wch:12},{wch:14}];
+  XLSX.utils.book_append_sheet(wb2,ws1,'Tóm tắt cost');
+  // Sheet 2: BOM chi tiết
+  const bomData=[['Tên món','Nhóm','Nguyên liệu','Đơn vị','Số lượng','Đơn giá (₫)','Thành tiền (₫)']];
+  CC_products.forEach(p=>{
+    (p.ingredients||[]).forEach(i=>{
+      bomData.push([p.ten,p.nhom,i.ten_nl,i.don_vi,i.so_luong,Math.round(i.don_gia*10)/10,Math.round(i.thanh_tien)]);
+    });
+  });
+  const ws2=XLSX.utils.aoa_to_sheet(bomData);
+  ws2['!cols']=[{wch:25},{wch:14},{wch:25},{wch:8},{wch:10},{wch:12},{wch:14}];
+  XLSX.utils.book_append_sheet(wb2,ws2,'BOM chi tiết');
+  const dt=new Date();
+  XLSX.writeFile(wb2,'Cost_BOM_'+dt.getDate()+'_'+(dt.getMonth()+1)+'_'+dt.getFullYear()+'.xlsx');
+  notify('✅ Đã xuất Excel BOM cost!');
+}
+
+// ── THÊM MÓN TỰ NHẬP ────────────────────────────────────────
+function addDrinkIngredient(matId='',qty='') {
   const container=document.getElementById('drink-ingredient-rows');
-  const matOpts=D.inventory.map(m=>`<option value="${m.id}" data-cost="${m.cost||0}" data-unit="${m.unit||''}" ${m.id===matId?'selected':''}>${m.name} (${(m.cost||0).toLocaleString('vi-VN')}₫/${m.unit||'đv'})</option>`).join('');
+  // Dùng DMHH từ BOM làm option chính, bổ sung từ D.inventory
+  const allMats = {};
+  BOM_DATA.materials.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
+  D.inventory.forEach(m=>{ if(!allMats[m.id]) allMats[m.id]={id:m.id,name:m.name,unit:m.unit,cost:m.cost||0}; });
+  const matOpts = Object.values(allMats).map(m=>
+    `<option value="${m.id}" data-cost="${m.cost}" data-unit="${m.unit}" ${m.id===matId?'selected':''}>${m.name} (${Math.round(m.cost)}₫/${m.unit})</option>`
+  ).join('');
   const row=document.createElement('div');
   row.className='drink-ing-row';
-  row.style.cssText='display:grid;grid-template-columns:1fr 120px 80px auto;gap:8px;align-items:center;background:var(--bg);border-radius:8px;padding:8px 10px;border:1px solid var(--border)';
+  row.style.cssText='display:grid;grid-template-columns:1fr 110px 70px auto;gap:8px;align-items:center;background:var(--bg);border-radius:8px;padding:8px 10px;border:1px solid var(--border)';
   row.innerHTML=`
     <select class="ing-mat" onchange="updateIngUnit(this);recalcDrinkLive()" style="border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-size:13px;font-family:inherit;background:#fff;outline:none">
-      <option value="">-- Chọn nguyên liệu --</option>${matOpts}
+      <option value="">-- Chọn NL --</option>${matOpts}
     </select>
-    <input class="ing-qty" type="number" step="0.001" min="0" placeholder="0.05" value="${qty}" oninput="recalcDrinkLive()"
+    <input class="ing-qty" type="number" step="0.001" min="0" placeholder="0" value="${qty}" oninput="recalcDrinkLive()"
       style="border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-size:13px;font-family:inherit;width:100%;outline:none"/>
     <div class="ing-unit" style="font-size:12px;color:var(--muted);font-weight:600"></div>
     <button onclick="this.closest('.drink-ing-row').remove();recalcDrinkLive()"
       style="background:var(--red);color:#fff;border:none;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;flex-shrink:0">✕</button>`;
   container.appendChild(row);
-  if(matId){const sel=row.querySelector('.ing-mat');sel.value=matId;updateIngUnit(sel);}
+  if (matId) { row.querySelector('.ing-mat').value=matId; }
+  const sel=row.querySelector('.ing-mat');
+  const upd=()=>{const o=sel.options[sel.selectedIndex];row.querySelector('.ing-unit').textContent=o?o.dataset.unit:''};
+  sel.addEventListener('change',upd); upd();
   recalcDrinkLive();
 }
-function updateIngUnit(sel){
-  const row=sel.closest('.drink-ing-row');
-  if(!row) return;
-  const opt=sel.options[sel.selectedIndex];
-  row.querySelector('.ing-unit').textContent=opt?(opt.dataset.unit||''):'';
-}
+function updateIngUnit(sel){const row=sel.closest('.drink-ing-row');if(!row)return;const o=sel.options[sel.selectedIndex];row.querySelector('.ing-unit').textContent=o?(o.dataset.unit||''):''}
 function recalcDrinkLive(){
   let total=0;
   document.querySelectorAll('.drink-ing-row').forEach(row=>{
-    const sel=row.querySelector('.ing-mat');
-    const qty=parseFloat(row.querySelector('.ing-qty').value)||0;
-    if(sel&&sel.value){const opt=sel.options[sel.selectedIndex];total+=(parseFloat(opt.dataset.cost)||0)*qty;}
+    const sel=row.querySelector('.ing-mat');const qty=parseFloat(row.querySelector('.ing-qty').value)||0;
+    if(sel&&sel.value){const o=sel.options[sel.selectedIndex];total+=(parseFloat(o.dataset.cost)||0)*qty;}
   });
   const price=parseFloat(document.getElementById('drink-price')?.value)||0;
-  const summary=document.getElementById('drink-cost-summary');
-  if(!summary) return;
-  summary.style.display=total>0?'block':'none';
-  document.getElementById('summary-cost').textContent=Math.round(total).toLocaleString('vi-VN')+'₫';
+  const sum=document.getElementById('drink-cost-summary');if(!sum)return;
+  sum.style.display=total>0?'block':'none';
+  document.getElementById('summary-cost').textContent=fmtVND(total);
   if(price>0){
     const pct=Math.round(total/price*100);
     const pctEl=document.getElementById('summary-pct');
     pctEl.textContent=pct+'%';
     pctEl.style.color=pct<25?'var(--green)':pct<=35?'#e67e22':'var(--red)';
-    document.getElementById('summary-profit').textContent=Math.round(price-total).toLocaleString('vi-VN')+'₫';
-  }else{
-    document.getElementById('summary-pct').textContent='—';
-    document.getElementById('summary-profit').textContent='—';
-  }
+    document.getElementById('summary-profit').textContent=fmtVND(price-total);
+  }else{document.getElementById('summary-pct').textContent='—';document.getElementById('summary-profit').textContent='—';}
 }
-function openEditDrink(id){
-  const d=D_drinks.find(x=>x.id===id);
-  if(!d) return;
-  document.getElementById('drink-modal-title').textContent='✏️ Sửa công thức';
-  document.getElementById('drink-edit-id').value=d.id;
-  document.getElementById('drink-name').value=d.name||'';
-  document.getElementById('drink-price').value=d.sale_price||'';
-  document.getElementById('drink-note').value=d.note||'';
-  document.getElementById('drink-ingredient-rows').innerHTML='';
-  (d.ingredients||[]).forEach(ing=>addDrinkIngredient(ing.mat_id,ing.qty));
-  recalcDrinkLive();
-  showM('modal-add-drink');
-}
+
 async function saveDrinkRecipe(){
   const name=(document.getElementById('drink-name').value||'').trim();
-  if(!name){notify('Vui lòng nhập tên món!',false);return;}
+  if(!name){notify('Nhập tên món!',false);return;}
   const ingredients=[];
   document.querySelectorAll('.drink-ing-row').forEach(row=>{
-    const sel=row.querySelector('.ing-mat');
-    const qty=parseFloat(row.querySelector('.ing-qty').value)||0;
+    const sel=row.querySelector('.ing-mat');const qty=parseFloat(row.querySelector('.ing-qty').value)||0;
     if(sel&&sel.value&&qty>0){
-      const mat=D.inventory.find(m=>m.id===sel.value);
-      ingredients.push({mat_id:sel.value,mat_name:mat?mat.name:'',mat_unit:mat?mat.unit:'',qty,cost_snapshot:mat?(mat.cost||0):0});
+      const o=sel.options[sel.selectedIndex];
+      const matName=o?o.text.split(' (')[0]:'';
+      const matUnit=o?o.dataset.unit:'';
+      const cost=parseFloat(o?o.dataset.cost:0)||0;
+      ingredients.push({mat_id:sel.value,mat_name:matName,mat_unit:matUnit,qty,cost_snapshot:cost});
     }
   });
-  const editId=document.getElementById('drink-edit-id').value;
-  const row={id:editId||('dr'+Date.now()),name,sale_price:parseFloat(document.getElementById('drink-price').value)||0,note:(document.getElementById('drink-note').value||'').trim(),ingredients};
+  const row={
+    id:'dr'+Date.now(),name,
+    nhom:document.getElementById('drink-nhom')?.value||'Khác',
+    size:document.getElementById('drink-size')?.value||'—',
+    sale_price:parseFloat(document.getElementById('drink-price').value)||0,
+    ingredients
+  };
   try{
     await sbUpsert('drink_recipes',row);
-    const idx=D_drinks.findIndex(x=>x.id===row.id);
-    if(idx>=0)D_drinks[idx]=row;else D_drinks.push(row);
+    // Add to local
+    CC_products.push({
+      id:row.id,ten:row.name,nhom:row.nhom,size:row.size,
+      cost:ingredients.reduce((s,i)=>s+(i.cost_snapshot||0)*(i.qty||0),0),
+      gia_ban:row.sale_price,
+      ingredients:ingredients.map(i=>({ma_nl:i.mat_id,ten_nl:i.mat_name,don_vi:i.mat_unit,so_luong:i.qty,don_gia:i.cost_snapshot,thanh_tien:i.cost_snapshot*i.qty})),
+      _custom:true
+    });
     closeM('modal-add-drink');
+    renderCostCalcGroups();
     renderCostCalc();
-    notify('✅ Đã lưu công thức: '+name);
-  }catch(e){notify('Lỗi lưu: '+e.message,false);}
+    notify('✅ Đã lưu: '+name);
+  }catch(e){notify('Lỗi: '+e.message,false);}
 }
-let _currentDrinkId=null;
-function showDrinkDetail(id){
-  const d=D_drinks.find(x=>x.id===id);
-  if(!d) return;
-  _currentDrinkId=id;
-  document.getElementById('dd-title').textContent='🧪 '+d.name;
-  const{costPerServing,profitPerServing}=calcDrinkCost(d);
-  const pct=d.sale_price>0?Math.round(costPerServing/d.sale_price*100):null;
-  const pctColor=pct===null?'#888':pct<25?'var(--green)':pct<=35?'#e67e22':'var(--red)';
-  const badge=pct===null?'':pct<25?'🟢 Tốt (<25%)':pct<=35?'🟡 Chấp nhận (25–35%)':'🔴 Cost cao (>35%)';
-  const ingRows=(d.ingredients||[]).map(ing=>{
-    const mat=D.inventory.find(m=>m.id===ing.mat_id);
-    const c=mat?(mat.cost||0):(ing.cost_snapshot||0);
-    return`<tr><td>${ing.mat_name||'—'}</td><td style="text-align:right">${ing.qty} ${ing.mat_unit||''}</td><td style="text-align:right">${c.toLocaleString('vi-VN')}₫/${ing.mat_unit||'đv'}</td><td style="text-align:right;font-weight:600">${Math.round(c*ing.qty).toLocaleString('vi-VN')}₫</td></tr>`;
-  }).join('');
-  document.getElementById('dd-content').innerHTML=`
-    ${d.note?`<div style="font-size:12px;color:var(--muted);margin-bottom:12px;background:var(--bg);padding:8px 12px;border-radius:8px">📝 ${d.note}</div>`:''}
-    <table style="margin-bottom:14px">
-      <thead><tr><th>Nguyên liệu</th><th style="text-align:right">Định lượng</th><th style="text-align:right">Đơn giá</th><th style="text-align:right">Thành tiền</th></tr></thead>
-      <tbody>${ingRows||'<tr><td colspan="4" style="text-align:center;color:var(--muted)">Chưa có nguyên liệu</td></tr>'}</tbody>
-    </table>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:var(--brand-light);border-radius:10px;padding:14px;text-align:center">
-      <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Giá bán</div><div style="font-size:22px;font-weight:800;color:var(--brown)">${d.sale_price>0?d.sale_price.toLocaleString('vi-VN')+'₫':'—'}</div></div>
-      <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost NL</div><div style="font-size:22px;font-weight:800;color:var(--brand)">${Math.round(costPerServing).toLocaleString('vi-VN')}₫</div><div style="font-size:13px;font-weight:700;color:${pctColor}">${pct!==null?pct+'% — '+badge:'—'}</div></div>
-      <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Lợi nhuận</div><div style="font-size:22px;font-weight:800;color:var(--green)">${d.sale_price>0?Math.round(profitPerServing).toLocaleString('vi-VN')+'₫':'—'}</div></div>
-    </div>`;
-  showM('modal-drink-detail');
-}
-function editDrinkFromDetail(){closeM('modal-drink-detail');openEditDrink(_currentDrinkId);}
-async function deleteDrinkFromDetail(){
-  if(!confirm('Xóa công thức này?')) return;
+
+async function deleteCustomDrink(id){
+  if(!confirm('Xóa món này?')) return;
   try{
-    await sbDel('drink_recipes','?id=eq.'+_currentDrinkId);
-    D_drinks=D_drinks.filter(x=>x.id!==_currentDrinkId);
-    closeM('modal-drink-detail');renderCostCalc();notify('Đã xóa công thức');
-  }catch(e){notify('Lỗi xóa: '+e.message,false);}
+    await sbDel('drink_recipes','?id=eq.'+id);
+    CC_products=CC_products.filter(x=>x.id!==id);
+    renderCostCalcGroups();renderCostCalc();notify('Đã xóa');
+  }catch(e){notify('Lỗi: '+e.message,false);}
 }
-function printCostTable(){
-  const rows=D_drinks.map(d=>{
-    const{costPerServing,profitPerServing}=calcDrinkCost(d);
-    const pct=d.sale_price>0?Math.round(costPerServing/d.sale_price*100):null;
-    const pc=pct===null?'#888':pct<25?'#27ae60':pct<=35?'#e67e22':'#c0392b';
-    const ingList=(d.ingredients||[]).map(i=>`${i.mat_name}: ${i.qty}${i.mat_unit||''}`).join(', ');
-    return`<tr><td style="font-weight:600">${d.name}${d.note?`<div style="font-size:10px;color:#666">${d.note}</div>`:''}</td><td style="text-align:right">${d.sale_price>0?d.sale_price.toLocaleString('vi-VN')+'₫':'—'}</td><td style="font-size:11px;color:#555">${ingList}</td><td style="text-align:right;font-weight:700">${Math.round(costPerServing).toLocaleString('vi-VN')}₫</td><td style="text-align:right;font-weight:700;color:${pc}">${pct!==null?pct+'%':'—'}</td><td style="text-align:right;color:#27ae60;font-weight:700">${d.sale_price>0?Math.round(profitPerServing).toLocaleString('vi-VN')+'₫':'—'}</td></tr>`;
-  }).join('');
-  const d=new Date(),ds=`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bảng Cost Món Nước</title>
-  <style>body{font-family:Arial,sans-serif;font-size:12px;color:#222;margin:0;padding:14mm}h1{text-align:center;font-size:18px;color:#FF8C00;margin-bottom:4px}.sub{text-align:center;font-size:11px;color:#888;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#FF8C00;color:#fff;padding:8px 10px;text-align:left;font-size:11px}td{padding:7px 10px;border-bottom:1px solid #eee;vertical-align:top}tr:nth-child(even){background:#fafafa}.legend{display:flex;gap:20px;justify-content:center;font-size:11px;margin-bottom:12px}.footer{text-align:center;font-size:10px;color:#aaa;margin-top:16px;border-top:1px solid #eee;padding-top:8px}@media print{body{padding:8mm}}</style>
-  </head><body>
-  <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
-  <div class="sub">BẢNG GIÁ COST NGUYÊN LIỆU ĐỒ UỐNG — Ngày ${ds}</div>
-  <div class="legend"><span>🟢 Cost tốt (&lt;25%)</span><span>🟡 Chấp nhận (25–35%)</span><span>🔴 Cost cao (&gt;35%)</span></div>
-  <table><thead><tr><th>Tên món</th><th>Giá bán</th><th>Công thức nguyên liệu</th><th>Cost NL</th><th>% Cost</th><th>Lợi nhuận/ly</th></tr></thead><tbody>${rows}</tbody></table>
-  <div class="footer">Trương Dáng Hương Academy — Bảng cost xuất tự động</div>
-  </body></html>`;
-  const w=window.open('','_blank','width=900,height=700');
-  w.document.write(html);w.document.close();w.onload=()=>setTimeout(()=>w.print(),400);
-}
-function printSingleDrink(){
-  const d=D_drinks.find(x=>x.id===_currentDrinkId);
-  if(!d) return;
-  const{costPerServing,profitPerServing}=calcDrinkCost(d);
-  const pct=d.sale_price>0?Math.round(costPerServing/d.sale_price*100):null;
-  const pc=pct===null?'#888':pct<25?'#27ae60':pct<=35?'#e67e22':'#c0392b';
-  const ingRows=(d.ingredients||[]).map(i=>{
-    const mat=D.inventory.find(m=>m.id===i.mat_id);
-    const c=mat?(mat.cost||0):(i.cost_snapshot||0);
-    return`<tr><td>${i.mat_name}</td><td style="text-align:right">${i.qty} ${i.mat_unit||''}</td><td style="text-align:right">${c.toLocaleString('vi-VN')}₫</td><td style="text-align:right;font-weight:600">${Math.round(c*i.qty).toLocaleString('vi-VN')}₫</td></tr>`;
-  }).join('');
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Công thức ${d.name}</title>
-  <style>body{font-family:Arial,sans-serif;font-size:13px;color:#222;width:148mm;margin:0 auto;padding:10mm}.header{background:#FF8C00;color:#fff;text-align:center;padding:10px;border-radius:8px;margin-bottom:14px}.header h1{font-size:15px;font-weight:700;margin:0 0 2px}.header p{font-size:10px;opacity:.85;margin:0}.drink-name{font-size:20px;font-weight:800;color:#FF8C00;text-align:center;margin:10px 0 4px}.drink-note{text-align:center;font-size:11px;color:#888;margin-bottom:14px}table{width:100%;border-collapse:collapse;margin-bottom:14px}th{background:#fff3e0;color:#cc5500;padding:7px 10px;text-align:left;font-size:11px;border-bottom:2px solid #FF8C00}td{padding:6px 10px;border-bottom:1px solid #eee;font-size:12px}.summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;background:#fff3e0;border-radius:8px;padding:12px;text-align:center}.summary .label{font-size:10px;color:#888;text-transform:uppercase;font-weight:600}.summary .val{font-size:18px;font-weight:800}.footer{text-align:center;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:14px}@media print{body{width:100%}}</style>
-  </head><body>
-  <div class="header"><h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1><p>Chuyên Gia F&B</p></div>
-  <div class="drink-name">${d.name}</div>
-  ${d.note?`<div class="drink-note">📝 ${d.note}</div>`:''}
-  <table><thead><tr><th>Nguyên liệu</th><th style="text-align:right">Định lượng</th><th style="text-align:right">Đơn giá</th><th style="text-align:right">Thành tiền</th></tr></thead><tbody>${ingRows}</tbody></table>
-  <div class="summary">
-    <div><div class="label">Giá bán</div><div class="val" style="color:#5c3a1e">${d.sale_price>0?d.sale_price.toLocaleString('vi-VN')+'₫':'—'}</div></div>
-    <div><div class="label">Cost NL</div><div class="val" style="color:#FF8C00">${Math.round(costPerServing).toLocaleString('vi-VN')}₫</div>${pct!==null?`<div style="font-size:12px;font-weight:700;color:${pc}">${pct}%</div>`:''}</div>
-    <div><div class="label">Lợi nhuận</div><div class="val" style="color:#27ae60">${d.sale_price>0?Math.round(profitPerServing).toLocaleString('vi-VN')+'₫':'—'}</div></div>
-  </div>
-  <div class="footer">Trương Dáng Hương Academy — Phiếu công thức xuất tự động</div>
-  </body></html>`;
-  const w=window.open('','_blank','width=600,height=750');
-  w.document.write(html);w.document.close();w.onload=()=>setTimeout(()=>w.print(),400);
-}
-function xlExportDrinkCost(){
-  if(!D_drinks.length){notify('Chưa có công thức nào!',false);return;}
-  const wb=XLSX.utils.book_new();
-  const data=[['Tên món','Ghi chú','Giá bán (₫)','Nguyên liệu','Cost NL (₫)','% Cost','Lợi nhuận/ly (₫)']];
-  D_drinks.forEach(d=>{
-    const{costPerServing,profitPerServing}=calcDrinkCost(d);
-    const pct=d.sale_price>0?Math.round(costPerServing/d.sale_price*100)+'%':'';
-    data.push([d.name,d.note||'',d.sale_price||0,(d.ingredients||[]).map(i=>`${i.mat_name}: ${i.qty}${i.mat_unit||''}`).join('; '),Math.round(costPerServing),pct,d.sale_price>0?Math.round(profitPerServing):'']);
-  });
-  const ws=XLSX.utils.aoa_to_sheet(data);
-  ws['!cols']=[{wch:22},{wch:25},{wch:12},{wch:45},{wch:14},{wch:10},{wch:16}];
-  XLSX.utils.book_append_sheet(wb,ws,'Cost Món Nước');
-  XLSX.writeFile(wb,'BangCost_'+new Date().toLocaleDateString('vi-VN').replace(/\//g,'-')+'.xlsx');
-  notify('✅ Đã xuất Excel bảng cost!');
-}
-// Load công thức sau 2s (không cần sửa hàm boot)
-setTimeout(()=>loadDrinkRecipes().then(()=>renderCostCalc()),2000);
+
+// Gọi initCostCalc sau khi boot xong (2.5s)
+setTimeout(()=>initCostCalc(), 2500);
 
 boot();
 </script>
