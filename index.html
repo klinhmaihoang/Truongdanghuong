@@ -6209,6 +6209,7 @@ async function bomSaveEdit() {
   _bomRenderView(p);
   renderCostCalcGroups();
   renderCostCalc();
+  try{ await loadSemiRecipes(); }catch(e){}
 }
 
 // ── XÓA MÓN ─────────────────────────────────────────────────
@@ -7208,13 +7209,6 @@ async function deleteSemi(id) {
   CC_semis = CC_semis.filter(x=>x.id!==id);
   renderSemiList();
   notify('Đã xóa: '+s.ten);
-}
-
-// Patch initCostCalc để load semi recipes
-const _origInit2 = initCostCalc;
-async function initCostCalc() {
-  await _origInit2();
-  await loadSemiRecipes();
 }
 
 boot();
