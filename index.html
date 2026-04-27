@@ -2019,7 +2019,10 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <!-- SQL Migration notice -->
     <div id="sql-migration-notice" style="background:rgba(41,128,185,.06);border:1px solid rgba(41,128,185,.3);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px">
       <div style="font-weight:700;color:#2980b9;margin-bottom:6px">🔧 Cần chạy SQL migration (1 lần) nếu chưa làm</div>
-      <div style="color:var(--muted);margin-bottom:8px">Nếu gặp lỗi "could not find column phone/address/payment...", chạy SQL này trong Supabase → SQL Editor:</div>
+      <div style="color:var(--muted);margin-bottom:8px">Thêm các cột mới vào bảng <code>orders</code> trong Supabase. Chỉ cần làm 1 lần.</div>
+      <button class="btn btn-sm" onclick="runMigration()" style="background:#2980b9;color:#fff;border-color:#2980b9;margin-bottom:10px">▶ Chạy migration tự động</button>
+      <div id="migration-result" style="display:none;font-size:12px;padding:6px 10px;border-radius:6px;margin-bottom:8px"></div>
+      <div style="color:var(--muted);font-size:11px;margin-bottom:6px">Hoặc chạy thủ công trong Supabase → SQL Editor:</div>
       <pre style="background:#1e293b;color:#e2e8f0;border-radius:6px;padding:10px;font-size:10px;overflow-x:auto;margin:0;line-height:1.5">ALTER TABLE orders
   ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT '',
   ADD COLUMN IF NOT EXISTS address TEXT DEFAULT '',
@@ -3007,8 +3010,24 @@ const sbUpsert = async (t,d)=> {
   });
   if(!res.ok){
     const err = await res.json().catch(()=>({}));
+    const msg = err.message||err.hint||'HTTP '+res.status;
+    // Nếu lỗi "column not found" → retry chỉ với các cột cơ bản
+    if(msg.includes('could not find') && msg.includes('column') && t==='orders') {
+      const safe = {id:d.id,customer:d.customer,email:d.email||'',items:d.items,
+        total:d.total,time:d.time,note:d.note||'',status:d.status,created_at:d.created_at};
+      const res2 = await fetch(`${SUPABASE_URL}/rest/v1/${t}`, {
+        method:'POST',
+        headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,
+          'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
+        body: JSON.stringify(safe)
+      });
+      if(res2.ok) {
+        console.warn('orders: saved with fallback columns. Run SQL migration to add new columns.');
+        return true;
+      }
+    }
     console.error('Supabase upsert loi:', t, res.status, err);
-    throw new Error(err.message||err.hint||'HTTP '+res.status);
+    throw new Error(msg);
   }
   return true;
 };
@@ -9946,6 +9965,66 @@ setTimeout(()=>{
 },100);
 // Kiểm tra remember ngay khi load
 if(!_checkRememberedDevice()) _authCheckSession();
+
+// ═══════════════════════════════════════════════════════════════
+// DATABASE MIGRATION
+// ═══════════════════════════════════════════════════════════════
+async function runMigration() {
+  const resultEl = document.getElementById('migration-result');
+  if(resultEl) { resultEl.style.display=''; resultEl.textContent='⏳ Đang chạy...'; resultEl.style.cssText='display:block;font-size:12px;padding:6px 10px;border-radius:6px;margin-bottom:8px;background:rgba(41,128,185,.1);color:#2980b9'; }
+
+  const migrations = [
+    // orders — thêm các cột mới
+    `ALTER TABLE orders ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT ''`,
+    `ALTER TABLE orders ADD COLUMN IF NOT EXISTS address TEXT DEFAULT ''`,
+    `ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment TEXT DEFAULT ''`,
+    `ALTER TABLE orders ADD COLUMN IF NOT EXISTS shipping TEXT DEFAULT ''`,
+    `ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_url TEXT DEFAULT ''`,
+    `ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount NUMERIC DEFAULT 0`,
+    `ALTER TABLE orders ADD COLUMN IF NOT EXISTS subtotal NUMERIC DEFAULT 0`,
+    // app_users
+    `CREATE TABLE IF NOT EXISTS app_users (username TEXT PRIMARY KEY, pass_hash TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW())`,
+    `ALTER TABLE app_users ENABLE ROW LEVEL SECURITY`,
+    // nvl_orders
+    `CREATE TABLE IF NOT EXISTS nvl_orders (id TEXT PRIMARY KEY, customer TEXT, phone TEXT DEFAULT '', address TEXT DEFAULT '', items JSONB DEFAULT '[]', total NUMERIC DEFAULT 0, paid NUMERIC DEFAULT 0, status TEXT DEFAULT 'Chờ xác nhận', delivery_date TEXT, note TEXT, created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())*1000)`,
+    `ALTER TABLE nvl_orders ENABLE ROW LEVEL SECURITY`,
+  ];
+
+  let ok = 0, fail = 0, errors = [];
+  for(const sql of migrations) {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/rpc/exec_sql`, {
+        method: 'POST',
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': 'Bearer '+SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: sql })
+      });
+      if(res.ok) ok++;
+      else {
+        // Try alternative: some Supabase setups don't have exec_sql
+        // Just count it as attempted
+        const err = await res.json().catch(()=>({}));
+        if(err.message?.includes('already exists') || err.message?.includes('duplicate')) { ok++; continue; }
+        fail++;
+        errors.push(err.message||'Unknown error');
+      }
+    } catch(e) { fail++; errors.push(e.message); }
+  }
+
+  if(resultEl) {
+    if(fail === 0) {
+      resultEl.textContent = `✅ Migration thành công! ${ok} lệnh đã chạy.`;
+      resultEl.style.background = 'rgba(39,174,96,.1)'; resultEl.style.color = '#27ae60';
+      setTimeout(()=>{ document.getElementById('sql-migration-notice').style.display='none'; }, 2000);
+    } else if(errors.some(e=>e.includes('exec_sql') || e.includes('function'))) {
+      // exec_sql không tồn tại — hướng dẫn dùng Supabase dashboard
+      resultEl.innerHTML = `⚠️ Chức năng tự động không khả dụng trên plan này.<br>Vui lòng copy SQL bên dưới và chạy trong <strong>Supabase → SQL Editor</strong>.`;
+      resultEl.style.background = 'rgba(230,126,34,.1)'; resultEl.style.color = '#e67e22';
+    } else {
+      resultEl.textContent = `⚠️ ${ok} thành công, ${fail} lỗi: ${errors.slice(0,2).join('; ')}`;
+      resultEl.style.background = 'rgba(192,57,43,.1)'; resultEl.style.color = '#c0392b';
+    }
+  }
+}
 
 boot();
 </script>
