@@ -615,7 +615,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
         <span class="card-title" style="color:var(--orange)">⏳ Đơn hàng chờ thu tiền</span>
         <button class="btn btn-tg btn-sm" onclick="remindAllPending()">📣 Nhắc tất cả qua Telegram</button>
       </div>
-      <table><thead><tr><th>Mã đơn</th><th>Khách</th><th>Sản phẩm</th><th>Tổng tiền</th><th>Thời gian</th><th>Ghi chú</th><th></th></tr></thead>
+      <table><thead><tr><th>Mã đơn</th><th>Khách</th><th>Sản phẩm</th><th>Tổng tiền</th><th>Thời gian</th><th>Trạng thái</th><th>Ghi chú</th><th></th></tr></thead>
       <tbody id="pending-orders"></tbody></table>
     </div>
   </div>
@@ -1459,6 +1459,9 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       </div>
     </div>
 
+    <!-- Status progress bar -->
+    <div id="od-status-progress" style="margin-bottom:14px;overflow-x:auto;padding-bottom:4px"></div>
+
     <!-- VIEW mode -->
     <div id="od-view">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
@@ -1478,6 +1481,17 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <div id="od-items-view" style="background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.8"></div>
       <!-- Ghi chú -->
       <div id="od-note-view" style="display:none;background:rgba(255,140,0,.06);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--muted)"></div>
+      <!-- Tracking link (view mode) -->
+      <div id="od-tracking-view" style="display:none;margin-top:10px;background:rgba(26,188,156,.06);border:1.5px solid rgba(26,188,156,.3);border-radius:10px;padding:12px">
+        <div style="font-size:11px;color:var(--teal);font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">🚚 Theo dõi đơn giao</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div id="od-tracking-provider-view" style="font-size:12px;font-weight:700;color:var(--teal)"></div>
+          <button id="od-tracking-link-btn" onclick="odOpenTrackingView()" class="btn btn-sm"
+            style="background:var(--teal);color:#fff;border-color:var(--teal);font-size:12px;padding:5px 14px">🔗 Mở link tracking</button>
+          <button onclick="odCopyTracking()" class="btn btn-ghost btn-sm" style="font-size:11px;color:var(--teal);border-color:var(--teal)">📋 Copy link</button>
+        </div>
+        <div id="od-tracking-url-display" style="font-size:10px;color:var(--muted);margin-top:6px;word-break:break-all"></div>
+      </div>
       <!-- Discount / Subtotal nếu có -->
       <div id="od-discount-view" style="display:none;margin-top:10px;font-size:13px;color:var(--muted);text-align:right"></div>
     </div>
@@ -1509,7 +1523,13 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
         </div>
         <div class="fg">
           <label>Trạng thái</label>
-          <select id="od-edit-status" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;outline:none">
+          <select id="od-edit-status" onchange="odStatusChange()" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;outline:none">
+            <option>Đã lên đơn</option>
+            <option>Đã xác nhận</option>
+            <option>Đang chuẩn bị</option>
+            <option>Chờ lấy hàng</option>
+            <option>Đang giao</option>
+            <option>Đã giao</option>
             <option>Chờ thanh toán</option>
             <option>Đã thanh toán</option>
             <option>Đã hủy</option>
@@ -1519,6 +1539,16 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <div class="fg" style="margin-bottom:12px">
         <label>Ghi chú</label>
         <input id="od-edit-note" placeholder="Ghi chú đơn hàng..."/>
+      </div>
+      <!-- Tracking link -->
+      <div id="od-tracking-section" style="display:none;margin-bottom:14px">
+        <label style="font-size:12px;font-weight:700;color:var(--teal);display:block;margin-bottom:6px">🚚 Link theo dõi đơn giao (Grab / GHN / GHTK / J&T...)</label>
+        <div style="display:flex;gap:7px;align-items:center">
+          <input id="od-edit-tracking" placeholder="Dán link tracking vào đây..." oninput="odTrackingPreview()"
+            style="flex:1;border:1.5px solid var(--teal);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none"/>
+          <button class="btn btn-ghost btn-sm" onclick="odOpenTracking()" id="od-tracking-open-btn" style="display:none;color:var(--teal);border-color:var(--teal)">🔗 Mở</button>
+        </div>
+        <div id="od-tracking-provider" style="font-size:11px;color:var(--teal);margin-top:4px;font-weight:600"></div>
       </div>
       <!-- Live calc -->
       <div id="od-edit-summary" style="background:var(--brand-light);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px">
@@ -4627,7 +4657,8 @@ function renderOrders(){
 
 function renderPendingOrders(){
   const el=document.getElementById('pending-orders');if(!el)return;
-  const pending=D.orders.filter(o=>o.status==='Chờ thanh toán'&&!o.id.startsWith('HP')).slice().reverse();
+  const pending=D.orders.filter(o=>!o.id.startsWith('HP')&&
+    !['Đã thanh toán','Đã hủy'].includes(o.status)).slice().reverse();
   const badge=document.getElementById('pending-badge');
   if(badge) badge.textContent=pending.length||'';
   if(!pending.length){
@@ -4638,16 +4669,24 @@ function renderPendingOrders(){
     const waitHours=o.created_at?Math.round((Date.now()-o.created_at)/3600000):0;
     const waitLabel=waitHours<1?'Vừa tạo':waitHours<24?waitHours+'h trước':Math.round(waitHours/24)+'ngày trước';
     const isLong=waitHours>24;
+    const si=ORDER_STATUSES.find(s=>s.key===(o.status||'Đã lên đơn'))||{icon:'⬤',color:'var(--muted)',bg:'var(--bg)'};
+    const hasTracking=!!(o.tracking_url);
     return`<tr style="${isLong?'background:rgba(230,126,34,.05)':''}">
       <td style="font-weight:700;color:var(--orange)">${o.id}</td>
       <td><strong>${o.customer}</strong></td>
       <td style="font-size:12px;color:var(--muted)">${o.items}</td>
       <td style="font-weight:700;color:var(--orange)">${fmt(o.total||0)}</td>
-      <td style="font-size:11px;color:${isLong?'var(--red)':'var(--muted)'}">${waitLabel}</td>
+      <td style="font-size:11px;color:${isLong?'var(--red)':'var(--muted)'}">
+        ${waitLabel}
+        ${hasTracking?'<div style="margin-top:2px"><span style="font-size:10px;color:var(--teal);font-weight:600">🚚 Có tracking</span></div>':''}
+      </td>
+      <td>
+        <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;background:${si.bg};color:${si.color}">${si.icon} ${o.status||'Đã lên đơn'}</span>
+      </td>
       <td style="font-size:11px;color:var(--muted)">${o.note||'—'}</td>
       <td class="btn-group" style="gap:4px">
         <button class="btn btn-ghost btn-sm" onclick="showOrderDetail('${o.id}')">👁</button>
-        <button class="btn btn-green btn-sm" onclick="collectPending('${o.id}')">💰 Thu tiền</button>
+        ${o.status==='Chờ thanh toán'||o.status==='Đã giao'?`<button class="btn btn-green btn-sm" onclick="collectPending('${o.id}')">💰 Thu tiền</button>`:''}
         <button class="btn btn-pdf btn-sm" onclick="exportPDF('${o.id}')">📄 PDF</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="cancelOrderFromPending('${o.id}')">✕</button>
       </td>
@@ -9002,6 +9041,188 @@ function odCollect() {
     closeM('modal-order-detail');
     collectPending(OD_current.id);
   }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// ORDER STATUS FLOW & TRACKING
+// ═══════════════════════════════════════════════════════════════
+
+const ORDER_STATUSES = [
+  { key: 'Đã lên đơn',     icon: '📝', color: '#8e44ad', bg: 'rgba(142,68,173,.1)',  step: 1 },
+  { key: 'Đã xác nhận',    icon: '✅', color: '#2980b9', bg: 'rgba(41,128,185,.1)',  step: 2 },
+  { key: 'Đang chuẩn bị',  icon: '🧺', color: '#e67e22', bg: 'rgba(230,126,34,.1)', step: 3 },
+  { key: 'Chờ lấy hàng',   icon: '📦', color: '#d35400', bg: 'rgba(211,84,0,.1)',   step: 4 },
+  { key: 'Đang giao',      icon: '🚚', color: '#1abc9c', bg: 'rgba(26,188,156,.1)', step: 5 },
+  { key: 'Đã giao',        icon: '🏠', color: '#27ae60', bg: 'rgba(39,174,96,.1)',  step: 6 },
+  { key: 'Chờ thanh toán', icon: '💳', color: '#FF8C00', bg: 'rgba(255,140,0,.1)',  step: 7 },
+  { key: 'Đã thanh toán',  icon: '💰', color: '#27ae60', bg: 'rgba(39,174,96,.1)',  step: 8 },
+  { key: 'Đã hủy',         icon: '✕',  color: '#c0392b', bg: 'rgba(192,57,43,.1)',  step: -1 },
+];
+
+// Các trạng thái liên quan đến giao hàng (hiện tracking)
+const DELIVERY_STATUSES = ['Chờ lấy hàng','Đang giao','Đã giao'];
+
+function odGetStatusInfo(key) {
+  return ORDER_STATUSES.find(s=>s.key===key) || {key,icon:'⬤',color:'var(--muted)',bg:'var(--bg)',step:0};
+}
+
+// ── PROGRESS BAR ───────────────────────────────────────────────
+function odRenderProgressBar(status) {
+  const el = document.getElementById('od-status-progress');
+  if(!el) return;
+  if(status==='Đã hủy') {
+    el.innerHTML=`<div style="background:rgba(192,57,43,.1);border:1px solid rgba(192,57,43,.3);border-radius:8px;padding:8px 12px;text-align:center;font-size:13px;font-weight:700;color:#c0392b">✕ Đơn hàng đã hủy</div>`;
+    return;
+  }
+  const flow = ORDER_STATUSES.filter(s=>s.step>0).sort((a,b)=>a.step-b.step);
+  const curStep = odGetStatusInfo(status).step || 0;
+  el.innerHTML = `<div style="display:flex;align-items:center;gap:0;min-width:${flow.length*60}px">
+    ${flow.map((s,i)=>{
+      const done = curStep >= s.step;
+      const active = s.key === status;
+      return `
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative">
+          <div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;
+            background:${active?s.color:done?s.color:'var(--dim)'};
+            color:${done?'#fff':'var(--muted)'};
+            box-shadow:${active?'0 2px 8px '+s.color+'80':''};
+            border:2px solid ${done?s.color:'var(--border)'};
+            transition:.2s;flex-shrink:0;z-index:1">
+            ${active?s.icon:(done?'✓':'·')}
+          </div>
+          <div style="font-size:9px;text-align:center;color:${active?s.color:done?'var(--muted)':'var(--border)'};font-weight:${active?700:400};line-height:1.2;max-width:52px">${s.key}</div>
+          ${i<flow.length-1?`<div style="position:absolute;top:13px;left:50%;width:100%;height:2px;background:${done&&curStep>s.step?s.color:'var(--border)'};z-index:0"></div>`:''}
+        </div>`;
+    }).join('')}
+  </div>`;
+}
+
+// ── TRACKING ───────────────────────────────────────────────────
+const TRACKING_PROVIDERS = [
+  { name:'Grab Express',  patterns:['grab.com','grabexpress'], icon:'🟢' },
+  { name:'GHN',           patterns:['ghn.vn','giaohangnhanh'], icon:'🔴' },
+  { name:'GHTK',          patterns:['ghtk.vn','giaohangtietkiem'], icon:'🟠' },
+  { name:'J&T Express',   patterns:['jtexpress','j-t.vn'], icon:'🔵' },
+  { name:'Viettel Post',  patterns:['viettelpost.vn'], icon:'🔴' },
+  { name:'Vietnam Post',  patterns:['vnpost.vn','vietnampost'], icon:'🟡' },
+  { name:'Shopee Express',patterns:['spx.vn','shopee'], icon:'🟠' },
+  { name:'Ninja Van',     patterns:['ninjavan.vn','ninjavan'], icon:'🔴' },
+  { name:'Ahamove',       patterns:['ahamove'], icon:'🟢' },
+];
+
+function odDetectProvider(url) {
+  if(!url) return null;
+  const lower = url.toLowerCase();
+  return TRACKING_PROVIDERS.find(p=>p.patterns.some(pat=>lower.includes(pat))) || {name:'Link tracking',icon:'🔗'};
+}
+
+function odTrackingPreview() {
+  const url = document.getElementById('od-edit-tracking')?.value?.trim()||'';
+  const provEl = document.getElementById('od-tracking-provider');
+  const openBtn = document.getElementById('od-tracking-open-btn');
+  if(!url) {
+    if(provEl) provEl.textContent='';
+    if(openBtn) openBtn.style.display='none';
+    return;
+  }
+  const prov = odDetectProvider(url);
+  if(provEl) provEl.textContent = prov ? `${prov.icon} ${prov.name} đã nhận dạng` : '';
+  if(openBtn) openBtn.style.display = url.startsWith('http') ? '' : 'none';
+}
+
+function odOpenTracking() {
+  const url = document.getElementById('od-edit-tracking')?.value?.trim();
+  if(url) window.open(url,'_blank');
+}
+
+function odOpenTrackingView() {
+  if(OD_current?.tracking_url) window.open(OD_current.tracking_url,'_blank');
+}
+
+function odCopyTracking() {
+  const url = OD_current?.tracking_url;
+  if(!url) return;
+  navigator.clipboard.writeText(url).then(()=>notify('✅ Đã copy link tracking!'));
+}
+
+function odStatusChange() {
+  const status = document.getElementById('od-edit-status')?.value||'';
+  const trackingSection = document.getElementById('od-tracking-section');
+  if(trackingSection) {
+    trackingSection.style.display = DELIVERY_STATUSES.includes(status) ? '' : 'none';
+  }
+}
+
+// ── Patch showOrderDetail để render progress + tracking ────────
+const _origShowOrderDetail = showOrderDetail;
+function showOrderDetail(id) {
+  _origShowOrderDetail(id);
+  const o = OD_current;
+  if(!o) return;
+  // Progress bar
+  odRenderProgressBar(o.status||'Đã lên đơn');
+  // Tracking view
+  const trackView = document.getElementById('od-tracking-view');
+  if(trackView) {
+    if(o.tracking_url) {
+      trackView.style.display='';
+      const prov = odDetectProvider(o.tracking_url);
+      document.getElementById('od-tracking-provider-view').textContent = prov?`${prov.icon} ${prov.name}`:'';
+      document.getElementById('od-tracking-url-display').textContent = o.tracking_url;
+    } else {
+      trackView.style.display='none';
+    }
+  }
+}
+
+// ── Patch odEnterEdit để load tracking + status change ─────────
+const _origOdEnterEdit = odEnterEdit;
+function odEnterEdit() {
+  _origOdEnterEdit();
+  const o = OD_current;
+  if(!o) return;
+  document.getElementById('od-edit-tracking').value = o.tracking_url||'';
+  odTrackingPreview();
+  odStatusChange(); // Show/hide tracking section based on status
+  // Update progress bar in edit too
+  odRenderProgressBar(o.status||'Đã lên đơn');
+}
+
+// ── Patch odSaveEdit để lưu tracking_url & cập nhật status flow ─
+const _origOdSaveEdit = odSaveEdit;
+async function odSaveEdit() {
+  // Inject tracking_url vào order trước khi save
+  const trackingUrl = document.getElementById('od-edit-tracking')?.value?.trim()||'';
+  if(OD_current) OD_current.tracking_url = trackingUrl;
+  await _origOdSaveEdit();
+  // Re-render progress bar
+  if(OD_current) odRenderProgressBar(OD_current.status||'Đã lên đơn');
+  // Gửi TG khi chuyển sang Đang giao / Đã giao
+  const newStatus = document.getElementById('od-edit-status')?.value;
+  if(OD_current && (newStatus==='Đang giao'||newStatus==='Đã giao')) {
+    const prov = trackingUrl?odDetectProvider(trackingUrl):null;
+    tgMsg(`${newStatus==='Đang giao'?'🚚':'🏠'} *${newStatus}!*\n\n` +
+      `📋 Đơn: \`${OD_current.id}\`\n👤 ${OD_current.customer}\n💰 ${fmt(OD_current.total||0)}\n` +
+      (trackingUrl?`\n🔗 Tracking${prov?' ('+prov.name+')':''}:\n${trackingUrl}\n`:'')+
+      `\n_Trương Dáng Hương Academy_`);
+  }
+}
+
+// ── Cập nhật sbUpsert cho orders để lưu tracking_url ──────────
+// (tracking_url được lưu cùng order object nên sbUpsert tự xử lý)
+
+// ── Quick status buttons trong pending orders ──────────────────
+function odQuickStatus(id, newStatus) {
+  const o = D.orders.find(x=>x.id===id);
+  if(!o) return;
+  OD_current = o;
+  showOrderDetail(id);
+  // Mở edit mode với status đã set
+  setTimeout(()=>{
+    odEnterEdit();
+    const sel = document.getElementById('od-edit-status');
+    if(sel) { sel.value=newStatus; odStatusChange(); }
+  }, 200);
 }
 
 boot();
