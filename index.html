@@ -238,6 +238,8 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <button onclick="go('students',this)">Học viên</button>
     <button onclick="go('pos',this)">Bán hàng</button>
     <button onclick="go('products',this)">Hàng hóa</button>
+    <button onclick="go('nvl',this)" style="color:#e67e22">📦 Bán NVL</button>
+    <button onclick="go('schedule',this)" style="color:var(--teal)">📅 Lịch học</button>
     <button onclick="go('inventory',this)">Kho</button>
     <button onclick="go('customers',this)">👥 Khách hàng</button>
     <button onclick="go('reports',this)" style="color:var(--teal)">📊 Báo cáo</button>
@@ -260,6 +262,12 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   </button>
   <button class="bottom-nav-btn" onclick="go('products',this);syncBottomNav(this)">
     <span class="bn-icon">📦</span>Hàng hóa
+  </button>
+  <button class="bottom-nav-btn" onclick="go('nvl',this);syncBottomNav(this)">
+    <span class="bn-icon">🧂</span>Bán NVL
+  </button>
+  <button class="bottom-nav-btn" onclick="go('schedule',this);syncBottomNav(this)">
+    <span class="bn-icon">📅</span>Lịch học
   </button>
   <button class="bottom-nav-btn" onclick="go('inventory',this);syncBottomNav(this)">
     <span class="bn-icon">📦</span>Kho
@@ -641,6 +649,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="tab active" onclick="finTab(this,'all')">Tất cả</div>
     <div class="tab" onclick="finTab(this,'thu')">💚 Thu</div>
     <div class="tab" onclick="finTab(this,'chi')">🔴 Chi</div>
+    <div class="tab" onclick="finTab(this,'nvl')">📦 Thu chi NVL</div>
   </div>
   <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
     <div class="stat" style="--accent:var(--green)"><div class="stat-num" id="fin-thu">0</div><div class="stat-label">Tổng thu (₫)</div></div>
@@ -662,6 +671,27 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
     <table><thead><tr><th>Thời gian</th><th>Loại</th><th>Danh mục</th><th>Số tiền</th><th>Ghi chú</th><th></th></tr></thead>
     <tbody id="fin-list"></tbody></table>
+  </div>
+
+  <!-- Panel Thu chi NVL -->
+  <div id="fin-panel-nvl" style="display:none">
+    <div class="stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px">
+      <div class="stat" style="--accent:var(--teal)"><div class="stat-num" id="fin-nvl-revenue">0</div><div class="stat-label">Doanh thu NVL</div></div>
+      <div class="stat" style="--accent:var(--brand)"><div class="stat-num" id="fin-nvl-cost">0</div><div class="stat-label">Giá vốn NVL</div></div>
+      <div class="stat" style="--accent:var(--green)"><div class="stat-num" id="fin-nvl-profit">0</div><div class="stat-label">Lợi nhuận</div></div>
+      <div class="stat" style="--accent:var(--red)"><div class="stat-num" id="fin-nvl-debt">0</div><div class="stat-label">Còn nợ</div></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table><thead><tr>
+        <th>Mã đơn</th><th>Khách hàng</th>
+        <th style="text-align:right">Tổng tiền</th>
+        <th style="text-align:right">Đã trả</th>
+        <th style="text-align:right">Còn nợ</th>
+        <th style="text-align:center">Trạng thái</th>
+        <th>Ngày</th>
+      </tr></thead>
+      <tbody id="fin-nvl-list"></tbody></table>
+    </div>
   </div>
 </div>
 
@@ -1202,6 +1232,196 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   </div>
 </div>
 
+
+<!-- ══ TRANG BÁN NGUYÊN VẬT LIỆU ══ -->
+<div class="page" id="page-nvl">
+  <!-- Sub-tabs -->
+  <div class="tabs" style="margin-bottom:14px">
+    <div class="tab active" id="nvl-tab-orders" onclick="nvlTab('orders',this)">🛒 Đơn NVL</div>
+    <div class="tab" id="nvl-tab-debt"   onclick="nvlTab('debt',this)">💳 Công nợ</div>
+    <div class="tab" id="nvl-tab-report" onclick="nvlTab('report',this)">📊 Báo cáo</div>
+  </div>
+
+  <!-- Panel: Đơn NVL -->
+  <div id="nvl-panel-orders">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center">
+      <input id="nvl-search" placeholder="🔍 Tìm đơn, khách hàng..." oninput="renderNvlOrders()"
+        style="flex:1;min-width:180px;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit"/>
+      <select id="nvl-filter-status" onchange="renderNvlOrders()" style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;background:#fff;outline:none">
+        <option value="">Tất cả trạng thái</option>
+        <option value="Chờ xác nhận">Chờ xác nhận</option>
+        <option value="Đã xác nhận">Đã xác nhận</option>
+        <option value="Đã giao">Đã giao</option>
+        <option value="Chờ thanh toán">Chờ thanh toán</option>
+        <option value="Đã thanh toán">Đã thanh toán</option>
+        <option value="Đã hủy">Đã hủy</option>
+      </select>
+      <button class="btn btn-sm" onclick="openAddNvlOrder()">+ Tạo đơn NVL</button>
+    </div>
+    <div class="stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px">
+      <div class="stat" style="--accent:var(--teal)"><div class="stat-num" id="nvl-stat-total">0</div><div class="stat-label">Tổng đơn</div></div>
+      <div class="stat" style="--accent:var(--orange)"><div class="stat-num" id="nvl-stat-pending">0</div><div class="stat-label">Chờ thanh toán</div></div>
+      <div class="stat" style="--accent:var(--green)"><div class="stat-num" id="nvl-stat-revenue">0</div><div class="stat-label">Doanh thu (₫)</div></div>
+      <div class="stat" style="--accent:var(--red)"><div class="stat-num" id="nvl-stat-debt">0</div><div class="stat-label">Còn nợ (₫)</div></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table><thead><tr>
+        <th>Mã đơn</th><th>Khách hàng</th><th>Sản phẩm</th>
+        <th style="text-align:right">Tổng tiền</th>
+        <th style="text-align:right">Đã trả</th>
+        <th style="text-align:center">Trạng thái</th>
+        <th>Ngày</th><th></th>
+      </tr></thead>
+      <tbody id="nvl-order-list"></tbody></table>
+    </div>
+  </div>
+
+  <!-- Panel: Công nợ -->
+  <div id="nvl-panel-debt" style="display:none">
+    <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+      <div class="stat" style="--accent:var(--red)"><div class="stat-num" id="nvl-debt-total">0</div><div class="stat-label">Tổng nợ (₫)</div></div>
+      <div class="stat" style="--accent:var(--orange)"><div class="stat-num" id="nvl-debt-customers">0</div><div class="stat-label">Khách đang nợ</div></div>
+      <div class="stat" style="--accent:var(--teal)"><div class="stat-num" id="nvl-debt-overdue">0</div><div class="stat-label">Quá hạn 30 ngày</div></div>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table><thead><tr>
+        <th>Khách hàng</th><th>SĐT</th>
+        <th style="text-align:right">Tổng mua</th>
+        <th style="text-align:right">Đã trả</th>
+        <th style="text-align:right">Còn nợ</th>
+        <th>Đơn gần nhất</th><th></th>
+      </tr></thead>
+      <tbody id="nvl-debt-list"></tbody></table>
+    </div>
+  </div>
+
+  <!-- Panel: Báo cáo -->
+  <div id="nvl-panel-report" style="display:none">
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+      <input type="month" id="nvl-report-month" onchange="renderNvlReport()"
+        style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none"/>
+      <button class="btn btn-ghost btn-sm" onclick="xlExportNvl()">📊 Xuất Excel</button>
+    </div>
+    <div class="stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px">
+      <div class="stat" style="--accent:var(--teal)"><div class="stat-num" id="nvlrp-revenue">0</div><div class="stat-label">Doanh thu</div></div>
+      <div class="stat" style="--accent:var(--brand)"><div class="stat-num" id="nvlrp-cost">0</div><div class="stat-label">Giá vốn</div></div>
+      <div class="stat" style="--accent:var(--green)"><div class="stat-num" id="nvlrp-profit">0</div><div class="stat-label">Lợi nhuận</div></div>
+      <div class="stat" style="--accent:var(--orange)"><div class="stat-num" id="nvlrp-margin">0%</div><div class="stat-label">Biên LN</div></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span class="card-title">Top sản phẩm NVL bán chạy</span></div>
+      <div id="nvlrp-top-products"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal tạo/sửa đơn NVL -->
+<div class="overlay" id="modal-nvl-order">
+  <div class="modal wide" style="max-width:560px;max-height:92vh;overflow-y:auto">
+    <div class="modal-title" id="nvl-order-modal-title">+ Tạo đơn NVL mới</div>
+    <input type="hidden" id="nvl-order-edit-id"/>
+    <div class="form-row">
+      <div class="fg">
+        <label>Khách hàng *</label>
+        <input id="nvl-order-customer" placeholder="Tên quán / khách hàng..." list="nvl-customer-datalist"/>
+        <datalist id="nvl-customer-datalist"></datalist>
+      </div>
+      <div class="fg">
+        <label>SĐT</label>
+        <input id="nvl-order-phone" placeholder="0901234567"/>
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>Địa chỉ giao hàng</label>
+      <input id="nvl-order-address" placeholder="Số nhà, đường, phường..."/>
+    </div>
+    <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:8px">📦 Sản phẩm NVL</div>
+    <div id="nvl-order-items" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+    <button class="btn btn-ghost btn-sm" onclick="nvlAddItem()" style="width:100%;margin-bottom:14px">+ Thêm sản phẩm</button>
+    <div id="nvl-order-summary" style="background:var(--brand-light);border-radius:10px;padding:12px;margin-bottom:14px;display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">
+        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Tổng tiền</div><div style="font-size:18px;font-weight:800;color:var(--brand)" id="nvl-sum-total">0₫</div></div>
+        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Đã trả</div><input id="nvl-sum-paid" type="number" min="0" placeholder="0" oninput="nvlCalcLive()" style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:5px 8px;font-size:14px;font-weight:700;text-align:center;font-family:inherit;outline:none"/></div>
+        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Còn nợ</div><div style="font-size:18px;font-weight:800;color:var(--red)" id="nvl-sum-debt">0₫</div></div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="fg">
+        <label>Trạng thái</label>
+        <select id="nvl-order-status" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;outline:none">
+          <option>Chờ xác nhận</option><option>Đã xác nhận</option>
+          <option>Đã giao</option><option>Chờ thanh toán</option>
+          <option>Đã thanh toán</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Ngày giao hàng</label>
+        <input id="nvl-order-delivery" type="date"/>
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:14px"><label>Ghi chú</label><input id="nvl-order-note" placeholder="Ghi chú thêm..."/></div>
+    <div class="btn-group">
+      <button class="btn btn-green btn-sm" onclick="saveNvlOrder()">💾 Lưu đơn</button>
+      <button class="btn btn-ghost btn-sm" onclick="nvlPrintOrder()">🖨️ In đơn</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-nvl-order')">Hủy</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TRANG LỊCH HỌC ══ -->
+<div class="page" id="page-schedule">
+  <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center">
+    <div style="display:flex;gap:5px">
+      <button class="btn btn-ghost btn-sm" onclick="schedPrev()">← Trước</button>
+      <button class="btn btn-sm" onclick="schedToday()">Hôm nay</button>
+      <button class="btn btn-ghost btn-sm" onclick="schedNext()">Sau →</button>
+    </div>
+    <div style="font-size:15px;font-weight:700;color:var(--brown);flex:1;text-align:center" id="sched-title"></div>
+    <div style="display:flex;gap:5px">
+      <button class="btn btn-ghost btn-sm" id="sched-view-week-btn" onclick="schedSetView('week',this)">Tuần</button>
+      <button class="btn btn-sm" id="sched-view-month-btn" onclick="schedSetView('month',this)">Tháng</button>
+    </div>
+  </div>
+
+  <!-- Stats nhanh -->
+  <div class="stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px">
+    <div class="stat"><div class="stat-num" id="sched-stat-today">0</div><div class="stat-label">Học hôm nay</div></div>
+    <div class="stat" style="--accent:var(--orange)"><div class="stat-num" id="sched-stat-week">0</div><div class="stat-label">Tuần này</div></div>
+    <div class="stat" style="--accent:var(--green)"><div class="stat-num" id="sched-stat-active">0</div><div class="stat-label">Đang học</div></div>
+    <div class="stat" style="--accent:var(--red)"><div class="stat-num" id="sched-stat-unpaid">0</div><div class="stat-label">Chưa TT</div></div>
+  </div>
+
+  <!-- Calendar grid -->
+  <div class="card" style="padding:0;overflow:hidden">
+    <!-- Header ngày trong tuần -->
+    <div id="sched-header" style="display:grid;grid-template-columns:repeat(7,1fr);background:var(--brand);color:#fff;font-size:12px;font-weight:700">
+      <div style="padding:8px;text-align:center">T2</div>
+      <div style="padding:8px;text-align:center">T3</div>
+      <div style="padding:8px;text-align:center">T4</div>
+      <div style="padding:8px;text-align:center">T5</div>
+      <div style="padding:8px;text-align:center">T6</div>
+      <div style="padding:8px;text-align:center;color:rgba(255,255,255,.7)">T7</div>
+      <div style="padding:8px;text-align:center;color:rgba(255,255,255,.7)">CN</div>
+    </div>
+    <div id="sched-grid" style="display:grid;grid-template-columns:repeat(7,1fr);min-height:320px"></div>
+  </div>
+
+  <!-- Danh sách học viên có lịch -->
+  <div class="card" style="margin-top:12px">
+    <div class="card-head">
+      <span class="card-title" id="sched-list-title">Lịch học chi tiết</span>
+      <select id="sched-filter-course" onchange="renderSchedule()" style="padding:5px 9px;border-radius:6px;border:1px solid var(--border);font-size:12px;font-family:inherit;background:var(--bg)">
+        <option value="">Tất cả khóa học</option>
+      </select>
+    </div>
+    <table><thead><tr>
+      <th>Học viên</th><th>Khóa học</th><th>Ngày học</th>
+      <th style="text-align:center">Thanh toán</th>
+      <th style="text-align:center">Trạng thái</th><th></th>
+    </tr></thead>
+    <tbody id="sched-student-list"></tbody></table>
+  </div>
+</div>
 
 <!-- Phiếu thu -->
 <div class="overlay" id="modal-add-thu">
@@ -6909,8 +7129,647 @@ async function initCostCalc() {  // Build initial matMap từ BOM
   renderCostCalc();
 }
 
-// Khởi động sau khi boot xong
-setTimeout(()=>initCostCalc(), 2500);
+// ═══════════════════════════════════════════════════════════════
+// MODULE: BÁN NGUYÊN VẬT LIỆU (NVL)
+// ═══════════════════════════════════════════════════════════════
+let D_nvl = []; // [{id,customer,phone,address,items:[{name,unit,qty,price,cost}],total,paid,status,delivery_date,note,created_at}]
+
+async function loadNvlOrders() {
+  try { D_nvl = (await sbGet('nvl_orders','?order=created_at.desc'))||[]; }
+  catch(e) { D_nvl = []; }
+}
+
+function nvlTab(tab, el) {
+  ['orders','debt','report'].forEach(t=>{
+    document.getElementById('nvl-panel-'+t).style.display = t===tab?'':'none';
+    document.getElementById('nvl-tab-'+t).classList.toggle('active', t===tab);
+  });
+  if(tab==='orders')  renderNvlOrders();
+  if(tab==='debt')    renderNvlDebt();
+  if(tab==='report')  renderNvlReport();
+}
+
+function renderNvlOrders() {
+  const q  = (document.getElementById('nvl-search')?.value||'').toLowerCase();
+  const st = document.getElementById('nvl-filter-status')?.value||'';
+  const filtered = D_nvl.filter(o=>{
+    if(st && o.status!==st) return false;
+    if(q && !(o.customer||'').toLowerCase().includes(q) && !(o.id||'').includes(q)) return false;
+    return true;
+  });
+  // Stats
+  const totalRevenue = D_nvl.reduce((s,o)=>s+(o.total||0),0);
+  const totalPaid    = D_nvl.reduce((s,o)=>s+(o.paid||0),0);
+  const pending      = D_nvl.filter(o=>o.status==='Chờ thanh toán'||o.status==='Đã giao').length;
+  setEl('nvl-stat-total', D_nvl.length);
+  setEl('nvl-stat-pending', pending);
+  setEl('nvl-stat-revenue', (totalRevenue/1000000).toFixed(1)+'M');
+  setEl('nvl-stat-debt', Math.round((totalRevenue-totalPaid)/1000)+'K');
+
+  const tbody = document.getElementById('nvl-order-list');
+  if(!tbody) return;
+  if(!filtered.length){
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;padding:20px;color:var(--muted)">Chưa có đơn NVL nào</td></tr>';
+    return;
+  }
+  const statusColor={'Chờ xác nhận':'var(--muted)','Đã xác nhận':'var(--blue)','Đã giao':'var(--teal)',
+    'Chờ thanh toán':'var(--orange)','Đã thanh toán':'var(--green)','Đã hủy':'var(--red)'};
+  tbody.innerHTML = filtered.map(o=>{
+    const debt = (o.total||0)-(o.paid||0);
+    const items = (o.items||[]).map(i=>i.name+' x'+i.qty).join(', ');
+    const sc = statusColor[o.status]||'var(--muted)';
+    return `<tr>
+      <td style="font-family:monospace;font-size:12px;color:var(--muted)">${o.id?.slice(-6)}</td>
+      <td><div style="font-weight:700">${o.customer}</div>${o.phone?`<div style="font-size:11px;color:var(--muted)">${o.phone}</div>`:''}</td>
+      <td style="font-size:12px;color:var(--muted);max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${items}</td>
+      <td style="text-align:right;font-weight:700">${Math.round(o.total||0).toLocaleString('vi-VN')}₫</td>
+      <td style="text-align:right;color:var(--green)">${Math.round(o.paid||0).toLocaleString('vi-VN')}₫</td>
+      <td style="text-align:center"><span style="font-size:11px;font-weight:600;color:${sc}">${o.status}</span></td>
+      <td style="font-size:12px;color:var(--muted)">${o.created_at?new Date(o.created_at).toLocaleDateString('vi-VN'):'—'}</td>
+      <td>
+        <div style="display:flex;gap:3px">
+          <button class="btn btn-ghost btn-sm" style="padding:3px 7px" onclick="openEditNvlOrder('${o.id}')">✏️</button>
+          <button class="btn btn-ghost btn-sm" style="padding:3px 7px" onclick="nvlPrintOrderById('${o.id}')">🖨️</button>
+          <button class="btn btn-ghost btn-sm" style="padding:3px 7px;color:var(--red)" onclick="deleteNvlOrder('${o.id}')">🗑</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderNvlDebt() {
+  // Group by customer
+  const byCustomer = {};
+  D_nvl.forEach(o=>{
+    if(o.status==='Đã hủy') return;
+    const key = o.customer+(o.phone?'|'+o.phone:'');
+    if(!byCustomer[key]) byCustomer[key]={name:o.customer,phone:o.phone||'',total:0,paid:0,lastDate:null,orders:[]};
+    byCustomer[key].total += (o.total||0);
+    byCustomer[key].paid  += (o.paid||0);
+    byCustomer[key].orders.push(o);
+    if(!byCustomer[key].lastDate || o.created_at > byCustomer[key].lastDate)
+      byCustomer[key].lastDate = o.created_at;
+  });
+  const debtors = Object.values(byCustomer).filter(c=>c.total-c.paid>0).sort((a,b)=>(b.total-b.paid)-(a.total-a.paid));
+  const totalDebt = debtors.reduce((s,c)=>s+(c.total-c.paid),0);
+  const now = Date.now();
+  const overdue = debtors.filter(c=>{
+    const lastOrder = c.orders.sort((a,b)=>b.created_at-a.created_at)[0];
+    return lastOrder && (now - lastOrder.created_at) > 30*24*60*60*1000;
+  }).length;
+  setEl('nvl-debt-total', Math.round(totalDebt/1000)+'K₫');
+  setEl('nvl-debt-customers', debtors.length);
+  setEl('nvl-debt-overdue', overdue);
+  const tbody = document.getElementById('nvl-debt-list');
+  if(!tbody) return;
+  if(!debtors.length){
+    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--green);font-weight:700">🎉 Không có công nợ!</td></tr>';
+    return;
+  }
+  tbody.innerHTML = debtors.map(c=>{
+    const debt = c.total-c.paid;
+    const isOverdue = c.lastDate && (now-c.lastDate)>30*24*60*60*1000;
+    return `<tr style="${isOverdue?'background:rgba(192,57,43,.04)':''}">
+      <td style="font-weight:700">${c.name}</td>
+      <td style="color:var(--muted)">${c.phone||'—'}</td>
+      <td style="text-align:right">${Math.round(c.total).toLocaleString('vi-VN')}₫</td>
+      <td style="text-align:right;color:var(--green)">${Math.round(c.paid).toLocaleString('vi-VN')}₫</td>
+      <td style="text-align:right;font-weight:800;color:var(--red)">${Math.round(debt).toLocaleString('vi-VN')}₫</td>
+      <td style="font-size:12px;color:${isOverdue?'var(--red)':'var(--muted)'}">${c.lastDate?new Date(c.lastDate).toLocaleDateString('vi-VN'):'—'}${isOverdue?' ⚠️ Quá hạn':''}</td>
+      <td>
+        <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 8px" onclick="nvlRemindDebt('${c.name}','${c.phone}',${Math.round(debt)})">📱 Nhắc</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function renderNvlReport() {
+  const sel = document.getElementById('nvl-report-month');
+  if(!sel.value) { const d=new Date(); sel.value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
+  const [y,m] = sel.value.split('-').map(Number);
+  const filtered = D_nvl.filter(o=>{
+    if(o.status==='Đã hủy') return false;
+    const d = new Date(o.created_at);
+    return d.getFullYear()===y && d.getMonth()+1===m;
+  });
+  const revenue = filtered.reduce((s,o)=>s+(o.total||0),0);
+  const paid    = filtered.reduce((s,o)=>s+(o.paid||0),0);
+  const debt    = revenue-paid;
+  // Cost = sum of (qty*cost) for each item
+  let costTotal = 0;
+  filtered.forEach(o=>(o.items||[]).forEach(i=>{ costTotal += (i.cost||0)*(i.qty||0); }));
+  const profit = revenue - costTotal;
+  const margin = revenue>0?Math.round(profit/revenue*100):0;
+  setEl('nvlrp-revenue', Math.round(revenue/1000)+'K');
+  setEl('nvlrp-cost',    Math.round(costTotal/1000)+'K');
+  setEl('nvlrp-profit',  Math.round(profit/1000)+'K');
+  setEl('nvlrp-margin',  margin+'%');
+  // Top products
+  const byProd = {};
+  filtered.forEach(o=>(o.items||[]).forEach(i=>{
+    if(!byProd[i.name]) byProd[i.name]={qty:0,revenue:0};
+    byProd[i.name].qty += i.qty||0;
+    byProd[i.name].revenue += (i.price||0)*(i.qty||0);
+  }));
+  const top = Object.entries(byProd).sort((a,b)=>b[1].revenue-a[1].revenue).slice(0,8);
+  const maxRev = top[0]?.[1]?.revenue||1;
+  document.getElementById('nvlrp-top-products').innerHTML = top.map(([name,d],i)=>{
+    const pct = Math.round(d.revenue/maxRev*100);
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border)">
+      <div style="width:20px;font-size:12px;font-weight:700;color:${i<3?'var(--gold2)':'var(--muted)'};text-align:center">${i+1}</div>
+      <div style="flex:1;font-size:13px;font-weight:600">${name}</div>
+      <div style="width:100px;background:var(--dim);border-radius:4px;height:6px">
+        <div style="height:6px;border-radius:4px;background:var(--teal);width:${pct}%"></div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:var(--teal);min-width:60px;text-align:right">${Math.round(d.qty)} đv</div>
+      <div style="font-size:12px;color:var(--muted);min-width:70px;text-align:right">${Math.round(d.revenue/1000)}K₫</div>
+    </div>`;
+  }).join('') || '<div style="color:var(--muted);text-align:center;padding:20px">Không có dữ liệu tháng này</div>';
+}
+
+function openAddNvlOrder() {
+  document.getElementById('nvl-order-modal-title').textContent = '+ Tạo đơn NVL mới';
+  document.getElementById('nvl-order-edit-id').value = '';
+  ['nvl-order-customer','nvl-order-phone','nvl-order-address','nvl-order-note'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('nvl-order-items').innerHTML = '';
+  document.getElementById('nvl-order-summary').style.display = 'none';
+  document.getElementById('nvl-order-status').value = 'Chờ xác nhận';
+  document.getElementById('nvl-order-delivery').value = '';
+  document.getElementById('nvl-sum-paid').value = '';
+  // Fill datalist
+  const dl = document.getElementById('nvl-customer-datalist');
+  const names = [...new Set(D_nvl.map(o=>o.customer))];
+  D.customers.forEach(c=>{ if(!names.includes(c.name)) names.push(c.name); });
+  dl.innerHTML = names.map(n=>`<option value="${n}">`).join('');
+  nvlAddItem();
+  showM('modal-nvl-order');
+}
+
+function openEditNvlOrder(id) {
+  const o = D_nvl.find(x=>x.id===id);
+  if(!o) return;
+  document.getElementById('nvl-order-modal-title').textContent = '✏️ Sửa đơn NVL';
+  document.getElementById('nvl-order-edit-id').value = id;
+  document.getElementById('nvl-order-customer').value = o.customer||'';
+  document.getElementById('nvl-order-phone').value = o.phone||'';
+  document.getElementById('nvl-order-address').value = o.address||'';
+  document.getElementById('nvl-order-note').value = o.note||'';
+  document.getElementById('nvl-order-status').value = o.status||'Chờ xác nhận';
+  document.getElementById('nvl-order-delivery').value = o.delivery_date||'';
+  document.getElementById('nvl-sum-paid').value = o.paid||'';
+  document.getElementById('nvl-order-items').innerHTML = '';
+  (o.items||[]).forEach(i=>nvlAddItem(i));
+  nvlCalcLive();
+  showM('modal-nvl-order');
+}
+
+function nvlAddItem(item={}) {
+  const container = document.getElementById('nvl-order-items');
+  // Build product options from D.inventory (NVL) + D.products
+  const matOpts = D.inventory.map(m=>
+    `<option value="${m.name}" data-cost="${m.cost||0}" data-unit="${m.unit||'kg'}">${m.name} — ${m.unit||''}</option>`
+  ).join('');
+  const row = document.createElement('div');
+  row.className = 'nvl-item-row';
+  row.style.cssText = 'display:grid;grid-template-columns:2fr 80px 80px 100px auto;gap:6px;align-items:center;background:var(--bg);border-radius:8px;padding:8px;border:1px solid var(--border)';
+  row.innerHTML = `
+    <input class="nvl-i-name" list="nvl-mat-datalist" value="${item.name||''}" placeholder="Tên NVL..." oninput="nvlItemNameChange(this);nvlCalcLive()"
+      style="border:1.5px solid var(--border);border-radius:6px;padding:7px 9px;font-size:12px;font-family:inherit;outline:none"/>
+    <input class="nvl-i-qty" type="number" min="1" step="0.1" value="${item.qty||1}" oninput="nvlCalcLive()"
+      style="border:1.5px solid var(--border);border-radius:6px;padding:7px 6px;font-size:12px;font-family:inherit;outline:none;text-align:right"/>
+    <span class="nvl-i-unit" style="font-size:12px;color:var(--muted);font-weight:600">${item.unit||''}</span>
+    <input class="nvl-i-price" type="number" min="0" value="${item.price||0}" oninput="nvlCalcLive()" placeholder="Giá bán"
+      style="border:1.5px solid var(--border);border-radius:6px;padding:7px 6px;font-size:12px;font-family:inherit;outline:none;text-align:right"/>
+    <button onclick="this.closest('.nvl-item-row').remove();nvlCalcLive()"
+      style="background:var(--red);color:#fff;border:none;border-radius:6px;width:26px;height:26px;cursor:pointer;font-size:12px">✕</button>`;
+  container.appendChild(row);
+  nvlCalcLive();
+}
+// Datalist cho NVL
+document.addEventListener('DOMContentLoaded', ()=>{
+  const dl = document.createElement('datalist');
+  dl.id = 'nvl-mat-datalist';
+  document.body.appendChild(dl);
+});
+function nvlItemNameChange(inp) {
+  const row = inp.closest('.nvl-item-row');
+  const mat = D.inventory.find(m=>m.name===inp.value);
+  if(mat && row) {
+    row.querySelector('.nvl-i-unit').textContent = mat.unit||'';
+    const priceInp = row.querySelector('.nvl-i-price');
+    if(priceInp && !priceInp.value) priceInp.value = mat.cost ? Math.round(mat.cost*1.2) : '';
+  }
+}
+function nvlCalcLive() {
+  let total = 0;
+  document.querySelectorAll('.nvl-item-row').forEach(row=>{
+    const qty   = parseFloat(row.querySelector('.nvl-i-qty')?.value)||0;
+    const price = parseFloat(row.querySelector('.nvl-i-price')?.value)||0;
+    total += qty*price;
+  });
+  const paid = parseFloat(document.getElementById('nvl-sum-paid')?.value)||0;
+  const debt = Math.max(0, total-paid);
+  const sumEl = document.getElementById('nvl-order-summary');
+  if(sumEl) sumEl.style.display = total>0?'':'none';
+  setEl('nvl-sum-total', Math.round(total).toLocaleString('vi-VN')+'₫');
+  setEl('nvl-sum-debt',  Math.round(debt).toLocaleString('vi-VN')+'₫');
+}
+
+async function saveNvlOrder() {
+  const customer = (document.getElementById('nvl-order-customer').value||'').trim();
+  if(!customer){ notify('Nhập tên khách hàng!',false); return; }
+  const items = [];
+  let total = 0;
+  document.querySelectorAll('.nvl-item-row').forEach(row=>{
+    const name  = row.querySelector('.nvl-i-name')?.value?.trim();
+    const qty   = parseFloat(row.querySelector('.nvl-i-qty')?.value)||0;
+    const price = parseFloat(row.querySelector('.nvl-i-price')?.value)||0;
+    const unit  = row.querySelector('.nvl-i-unit')?.textContent||'';
+    if(!name||qty<=0) return;
+    const mat = D.inventory.find(m=>m.name===name);
+    const cost = mat?mat.cost||0:0;
+    items.push({name,qty,price,unit,cost});
+    total += qty*price;
+  });
+  if(!items.length){ notify('Thêm ít nhất 1 sản phẩm!',false); return; }
+  const editId = document.getElementById('nvl-order-edit-id').value;
+  const record = {
+    id: editId||('NVL'+Date.now()),
+    customer,
+    phone: document.getElementById('nvl-order-phone').value||'',
+    address: document.getElementById('nvl-order-address').value||'',
+    items, total,
+    paid: parseFloat(document.getElementById('nvl-sum-paid').value)||0,
+    status: document.getElementById('nvl-order-status').value,
+    delivery_date: document.getElementById('nvl-order-delivery').value||'',
+    note: document.getElementById('nvl-order-note').value||'',
+    created_at: editId ? (D_nvl.find(o=>o.id===editId)?.created_at||Date.now()) : Date.now()
+  };
+  try {
+    await sbUpsert('nvl_orders',record);
+    const idx = D_nvl.findIndex(o=>o.id===record.id);
+    if(idx>=0) D_nvl[idx]=record; else D_nvl.unshift(record);
+    closeM('modal-nvl-order');
+    renderNvlOrders();
+    // Ghi nhận thu vào finance nếu đã thanh toán
+    if(record.paid>0 && record.status==='Đã thanh toán') {
+      const tx={id:'tx_nvl_'+record.id,type:'thu',category:'Bán NVL',
+        amount:record.paid,note:`Đơn NVL - ${customer}`,time:nowDT(),auto:true};
+      try { await sbPost('transactions',tx); D.transactions.unshift(tx); } catch(e){}
+    }
+    notify('✅ Đã lưu đơn NVL: '+customer);
+    tgMsg(`📦 *Đơn NVL mới!*\n\n👤 Khách: ${customer}\n💰 Tổng: ${Math.round(total).toLocaleString('vi-VN')}₫\n💳 Đã trả: ${Math.round(record.paid).toLocaleString('vi-VN')}₫\n📋 TT: ${record.status}\n\n_Trương Dáng Hương Academy_`);
+  } catch(e){ notify('Lỗi lưu: '+e.message,false); }
+}
+
+async function deleteNvlOrder(id) {
+  const o = D_nvl.find(x=>x.id===id);
+  if(!o||!confirm(`Xóa đơn của "${o.customer}"?`)) return;
+  try { await sbDel('nvl_orders','?id=eq.'+id); }
+  catch(e){}
+  D_nvl = D_nvl.filter(x=>x.id!==id);
+  renderNvlOrders();
+  notify('Đã xóa đơn NVL');
+}
+
+function nvlRemindDebt(name, phone, debt) {
+  tgMsg(`💸 *Nhắc nợ NVL!*\n\n👤 ${name}${phone?' ('+phone+')':''}\n❌ Còn nợ: ${debt.toLocaleString('vi-VN')}₫\n\n_Trương Dáng Hương Academy_`);
+  notify('Đã gửi nhắc nợ qua Telegram cho '+name);
+}
+
+function nvlPrintOrder() {
+  const id = document.getElementById('nvl-order-edit-id').value;
+  const customer = document.getElementById('nvl-order-customer').value;
+  if(!customer) return;
+  // Build from form
+  const items = [];
+  let total = 0;
+  document.querySelectorAll('.nvl-item-row').forEach(row=>{
+    const name=row.querySelector('.nvl-i-name')?.value?.trim();
+    const qty=parseFloat(row.querySelector('.nvl-i-qty')?.value)||0;
+    const price=parseFloat(row.querySelector('.nvl-i-price')?.value)||0;
+    const unit=row.querySelector('.nvl-i-unit')?.textContent||'';
+    if(name&&qty>0){items.push({name,qty,price,unit});total+=qty*price;}
+  });
+  const paid=parseFloat(document.getElementById('nvl-sum-paid')?.value)||0;
+  _nvlPrint({customer,phone:document.getElementById('nvl-order-phone').value,items,total,paid,
+    status:document.getElementById('nvl-order-status').value,id:id||'NEW'});
+}
+function nvlPrintOrderById(id) {
+  const o = D_nvl.find(x=>x.id===id);
+  if(o) _nvlPrint(o);
+}
+function _nvlPrint(o) {
+  const rows = (o.items||[]).map(i=>
+    `<tr><td>${i.name}</td><td style="text-align:right">${i.qty} ${i.unit||''}</td>
+    <td style="text-align:right">${Math.round(i.price).toLocaleString('vi-VN')}₫</td>
+    <td style="text-align:right;font-weight:600">${Math.round((i.price||0)*(i.qty||0)).toLocaleString('vi-VN')}₫</td></tr>`
+  ).join('');
+  const debt = (o.total||0)-(o.paid||0);
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Đơn NVL</title>
+  <style>body{font-family:Arial,sans-serif;font-size:11px;color:#222;width:80mm;margin:0 auto;padding:5mm 3mm}
+  h1{text-align:center;font-size:13px;font-weight:700;color:#FF8C00;margin:0 0 2px}
+  .sub{text-align:center;font-size:10px;color:#888;margin-bottom:10px}
+  table{width:100%;border-collapse:collapse;margin-bottom:8px}
+  th{background:#FF8C00;color:#fff;padding:5px;text-align:left;font-size:10px}
+  td{padding:4px 5px;border-bottom:1px solid #eee}
+  .total-row{font-weight:700;background:#fff3e0}
+  .footer{text-align:center;font-size:9px;color:#aaa;margin-top:8px;border-top:1px solid #eee;padding-top:4px}
+  @page{size:80mm auto;margin:0}@media print{body{padding:3mm 2mm}}</style>
+  </head><body>
+  <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
+  <div class="sub">ĐƠN HÀNG NGUYÊN VẬT LIỆU</div>
+  <div style="font-size:10px;margin-bottom:6px">
+    <div>Mã đơn: <b>${(o.id||'').slice(-8)}</b></div>
+    <div>KH: <b>${o.customer}</b>${o.phone?' — '+o.phone:''}</div>
+    ${o.address?`<div>Địa chỉ: ${o.address}</div>`:''}
+    <div>Ngày: ${new Date().toLocaleDateString('vi-VN')}</div>
+    <div>TT: <b>${o.status||'—'}</b></div>
+  </div>
+  <table><thead><tr><th>Sản phẩm</th><th style="text-align:right">SL</th><th style="text-align:right">Đơn giá</th><th style="text-align:right">Thành tiền</th></tr></thead>
+  <tbody>${rows}</tbody>
+  <tfoot>
+    <tr class="total-row"><td colspan="3" style="text-align:right">Tổng cộng</td><td style="text-align:right">${Math.round(o.total||0).toLocaleString('vi-VN')}₫</td></tr>
+    <tr><td colspan="3" style="text-align:right;color:green">Đã thanh toán</td><td style="text-align:right;color:green">${Math.round(o.paid||0).toLocaleString('vi-VN')}₫</td></tr>
+    ${debt>0?`<tr><td colspan="3" style="text-align:right;color:red;font-weight:700">Còn nợ</td><td style="text-align:right;color:red;font-weight:700">${Math.round(debt).toLocaleString('vi-VN')}₫</td></tr>`:''}
+  </tfoot></table>
+  <div class="footer">Cảm ơn quý khách! — Trương Dáng Hương Academy</div>
+  </body></html>`;
+  const w=window.open('','_blank','width=420,height=600');
+  w.document.write(html);w.document.close();w.onload=()=>setTimeout(()=>w.print(),400);
+}
+
+function xlExportNvl() {
+  const wb=XLSX.utils.book_new();
+  const data=[['Mã đơn','Khách hàng','SĐT','Sản phẩm','Tổng tiền','Đã trả','Còn nợ','Trạng thái','Ngày']];
+  D_nvl.forEach(o=>{
+    const items=(o.items||[]).map(i=>i.name+' x'+i.qty+i.unit).join('; ');
+    data.push([o.id,o.customer,o.phone,items,o.total||0,o.paid||0,(o.total||0)-(o.paid||0),o.status,
+      o.created_at?new Date(o.created_at).toLocaleDateString('vi-VN'):'']);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:14},{wch:20},{wch:13},{wch:40},{wch:13},{wch:13},{wch:13},{wch:16},{wch:12}];
+  XLSX.utils.book_append_sheet(wb,ws,'Đơn NVL');
+  XLSX.writeFile(wb,'DonNVL_'+new Date().toLocaleDateString('vi-VN').replace(/\//g,'-')+'.xlsx');
+  notify('✅ Đã xuất Excel đơn NVL!');
+}
+
+// Patch finTab to show NVL panel
+const _origFinTab = finTab;
+function finTab(el, type) {
+  const nvlPanel = document.getElementById('fin-panel-nvl');
+  if(type==='nvl') {
+    document.querySelectorAll('#page-finance .tab').forEach(t=>t.classList.remove('active'));
+    el.classList.add('active');
+    document.querySelectorAll('#page-finance .card, #page-finance .stats, #page-finance .btn-group').forEach(e=>{
+      if(!e.closest('#fin-panel-nvl')) e.style.display='none';
+    });
+    if(nvlPanel) { nvlPanel.style.display=''; renderNvlFinance(); }
+    return;
+  }
+  if(nvlPanel) nvlPanel.style.display='none';
+  document.querySelectorAll('#page-finance .card, #page-finance .stats, #page-finance .btn-group').forEach(e=>{
+    if(!e.closest('#fin-panel-nvl')) e.style.display='';
+  });
+  _origFinTab(el, type);
+}
+
+function renderNvlFinance() {
+  const revenue = D_nvl.filter(o=>o.status!=='Đã hủy').reduce((s,o)=>s+(o.total||0),0);
+  const paid    = D_nvl.filter(o=>o.status!=='Đã hủy').reduce((s,o)=>s+(o.paid||0),0);
+  let costTotal = 0;
+  D_nvl.forEach(o=>{ if(o.status!=='Đã hủy') (o.items||[]).forEach(i=>{costTotal+=(i.cost||0)*(i.qty||0);}); });
+  setEl('fin-nvl-revenue', Math.round(revenue/1000)+'K₫');
+  setEl('fin-nvl-cost',    Math.round(costTotal/1000)+'K₫');
+  setEl('fin-nvl-profit',  Math.round((revenue-costTotal)/1000)+'K₫');
+  setEl('fin-nvl-debt',    Math.round((revenue-paid)/1000)+'K₫');
+  const tbody = document.getElementById('fin-nvl-list');
+  if(!tbody) return;
+  const statusColor={'Đã thanh toán':'var(--green)','Chờ thanh toán':'var(--orange)','Đã hủy':'var(--red)'};
+  tbody.innerHTML = D_nvl.slice(0,50).map(o=>{
+    const debt=(o.total||0)-(o.paid||0);
+    const sc=statusColor[o.status]||'var(--muted)';
+    return `<tr>
+      <td style="font-family:monospace;font-size:11px;color:var(--muted)">${o.id?.slice(-6)}</td>
+      <td style="font-weight:600">${o.customer}</td>
+      <td style="text-align:right">${Math.round(o.total||0).toLocaleString('vi-VN')}₫</td>
+      <td style="text-align:right;color:var(--green)">${Math.round(o.paid||0).toLocaleString('vi-VN')}₫</td>
+      <td style="text-align:right;color:var(--red);font-weight:${debt>0?700:400}">${debt>0?Math.round(debt).toLocaleString('vi-VN')+'₫':'—'}</td>
+      <td style="text-align:center"><span style="font-size:11px;font-weight:600;color:${sc}">${o.status}</span></td>
+      <td style="font-size:11px;color:var(--muted)">${o.created_at?new Date(o.created_at).toLocaleDateString('vi-VN'):'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE: LỊCH HỌC
+// ═══════════════════════════════════════════════════════════════
+let SCHED_DATE   = new Date();
+let SCHED_VIEW   = 'month'; // 'week' | 'month'
+
+function schedSetView(v, btn) {
+  SCHED_VIEW = v;
+  document.getElementById('sched-view-week-btn').className  = v==='week'?'btn btn-sm':'btn btn-ghost btn-sm';
+  document.getElementById('sched-view-month-btn').className = v==='month'?'btn btn-sm':'btn btn-ghost btn-sm';
+  renderSchedule();
+}
+function schedPrev()  { if(SCHED_VIEW==='week') SCHED_DATE.setDate(SCHED_DATE.getDate()-7); else SCHED_DATE.setMonth(SCHED_DATE.getMonth()-1); renderSchedule(); }
+function schedNext()  { if(SCHED_VIEW==='week') SCHED_DATE.setDate(SCHED_DATE.getDate()+7); else SCHED_DATE.setMonth(SCHED_DATE.getMonth()+1); renderSchedule(); }
+function schedToday() { SCHED_DATE=new Date(); renderSchedule(); }
+
+function renderSchedule() {
+  const today = new Date(); today.setHours(0,0,0,0);
+
+  // Fill course filter
+  const cSel = document.getElementById('sched-filter-course');
+  if(cSel && cSel.options.length<=1) {
+    D.courses.forEach(c=>{ const o=document.createElement('option'); o.value=c.id; o.textContent=c.name; cSel.appendChild(o); });
+  }
+  const filterCourse = cSel?.value||'';
+
+  // Students with class_date
+  const studs = D.students.filter(s=>{
+    if(!s.class_date) return false;
+    if(filterCourse && s.course_id!==filterCourse) return false;
+    return true;
+  });
+
+  // Stats
+  const todayStr = dateStr(today);
+  setEl('sched-stat-today',  studs.filter(s=>s.class_date===todayStr).length);
+  // This week
+  const weekStart = new Date(today); weekStart.setDate(today.getDate()-today.getDay()+1);
+  const weekEnd   = new Date(weekStart); weekEnd.setDate(weekStart.getDate()+6);
+  setEl('sched-stat-week', studs.filter(s=>{const d=new Date(s.class_date);return d>=weekStart&&d<=weekEnd;}).length);
+  setEl('sched-stat-active', D.students.filter(s=>s.status==='Đang học').length);
+  setEl('sched-stat-unpaid', D.students.filter(s=>s.status==='Đang học'&&s.fee>0&&!s.paid1).length);
+
+  // Build calendar grid
+  let startDate, endDate;
+  if(SCHED_VIEW==='week') {
+    startDate = new Date(SCHED_DATE);
+    startDate.setDate(SCHED_DATE.getDate() - ((SCHED_DATE.getDay()||7)-1)); // Mon
+    endDate = new Date(startDate); endDate.setDate(startDate.getDate()+6);
+    document.getElementById('sched-title').textContent =
+      startDate.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit'})+' — '+endDate.toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'});
+  } else {
+    startDate = new Date(SCHED_DATE.getFullYear(), SCHED_DATE.getMonth(), 1);
+    endDate   = new Date(SCHED_DATE.getFullYear(), SCHED_DATE.getMonth()+1, 0);
+    document.getElementById('sched-title').textContent =
+      'Tháng '+String(SCHED_DATE.getMonth()+1).padStart(2,'0')+'/'+SCHED_DATE.getFullYear();
+  }
+  setEl('sched-list-title', 'Lịch học — '+document.getElementById('sched-title').textContent);
+
+  // Build event map
+  const eventMap = {};
+  studs.forEach(s=>{
+    if(!eventMap[s.class_date]) eventMap[s.class_date] = [];
+    const course = D.courses.find(c=>c.id===s.course_id);
+    eventMap[s.class_date].push({name:s.name, course:course?.name||s.course||'—', paid:!!(s.paid1), status:s.status});
+  });
+
+  // Render grid
+  const grid = document.getElementById('sched-grid');
+  if(!grid) return;
+
+  // Pad start to Monday
+  const firstDay = new Date(startDate);
+  const dow = (firstDay.getDay()||7)-1; // 0=Mon
+  const cells = [];
+  for(let i=0;i<dow;i++) cells.push(null); // padding
+  for(let d=new Date(startDate);d<=endDate;d.setDate(d.getDate()+1)) cells.push(new Date(d));
+
+  grid.style.gridTemplateColumns = 'repeat(7,1fr)';
+  grid.innerHTML = cells.map(d=>{
+    if(!d) return `<div style="min-height:80px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);background:var(--dim)"></div>`;
+    const ds = dateStr(d);
+    const events = eventMap[ds]||[];
+    const isToday = ds===dateStr(today);
+    const isCurrentMonth = d.getMonth()===SCHED_DATE.getMonth();
+    const isSun = d.getDay()===0;
+    const isSat = d.getDay()===6;
+    return `<div style="min-height:80px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:4px;
+      background:${isToday?'rgba(255,140,0,.08)':(!isCurrentMonth&&SCHED_VIEW==='month'?'var(--dim)':'#fff')}">
+      <div style="font-size:12px;font-weight:${isToday?800:600};color:${isToday?'var(--brand)':(isSun||isSat)?'rgba(128,128,128,.6)':'var(--brown)'};
+        margin-bottom:3px;${isToday?'background:var(--brand);color:#fff;border-radius:50%;width:20px;height:20px;display:flex;align-items:center;justify-content:center;':''}">${d.getDate()}</div>
+      ${events.slice(0,3).map(e=>`
+        <div style="font-size:10px;padding:1px 4px;border-radius:3px;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+          background:${e.paid?'rgba(39,174,96,.12)':'rgba(255,140,0,.12)'};
+          color:${e.paid?'#27ae60':'var(--brown)'}">
+          ${e.name}
+        </div>`).join('')}
+      ${events.length>3?`<div style="font-size:9px;color:var(--muted);padding:1px 4px">+${events.length-3} thêm</div>`:''}
+    </div>`;
+  }).join('');
+
+  // Render list below calendar
+  const listStuds = studs.filter(s=>{
+    const d = new Date(s.class_date);
+    return d>=startDate && d<=endDate;
+  }).sort((a,b)=>a.class_date.localeCompare(b.class_date));
+  const tbody = document.getElementById('sched-student-list');
+  if(!tbody) return;
+  if(!listStuds.length){
+    tbody.innerHTML='<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">Không có lịch học trong khoảng thời gian này</td></tr>';
+    return;
+  }
+  tbody.innerHTML = listStuds.map(s=>{
+    const course = D.courses.find(c=>c.id===s.course_id);
+    const courseName = course?.name||s.course||'—';
+    const d = new Date(s.class_date);
+    const isToday  = s.class_date===dateStr(today);
+    const isPast   = d<today;
+    const paidStatus = s.paid1&&s.paid2?'✅ Đã đủ':s.paid1?'⚡ Đợt 1':s.fee>0?'❌ Chưa TT':'—';
+    const paidColor  = s.paid1&&s.paid2?'var(--green)':s.paid1?'var(--orange)':s.fee>0?'var(--red)':'var(--muted)';
+    return `<tr style="${isToday?'background:rgba(255,140,0,.06)':''}">
+      <td>
+        <div style="font-weight:700">${s.name}</div>
+        ${s.phone?`<div style="font-size:11px;color:var(--muted)">${s.phone}</div>`:''}
+      </td>
+      <td><span class="tag" style="background:var(--dim);color:var(--brown);font-size:10px">${courseName}</span></td>
+      <td>
+        <div style="font-weight:${isToday?800:600};color:${isToday?'var(--brand)':isPast?'var(--muted)':'var(--brown)'}">
+          ${isToday?'📌 HÔM NAY':d.toLocaleDateString('vi-VN',{weekday:'short',day:'2-digit',month:'2-digit'})}
+        </div>
+      </td>
+      <td style="text-align:center"><span style="font-size:12px;font-weight:600;color:${paidColor}">${paidStatus}</span></td>
+      <td style="text-align:center">
+        <span class="tag ${s.status==='Đang học'?'t-pending':s.status==='Hoàn thành'?'t-paid':'t-offline'}">${s.status}</span>
+      </td>
+      <td>
+        <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:3px 8px" onclick="tgMsg('📅 *Nhắc lịch học!*\\n\\n👤 ${s.name}\\n📚 ${courseName}\\n🗓 ${s.class_date}\\n\\n_Trương Dáng Hương Academy_');notify('Đã nhắc lịch ${s.name}')">📱</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════════════════════════════
+// NHẮC NHỞ TỰ ĐỘNG NÂNG CAO
+// ═══════════════════════════════════════════════════════════════
+// Nhắc công nợ NVL quá hạn
+async function checkNvlDebtReminders() {
+  const now = Date.now();
+  const overdueOrders = D_nvl.filter(o=>{
+    if(o.status==='Đã hủy'||o.status==='Đã thanh toán') return false;
+    const debt = (o.total||0)-(o.paid||0);
+    if(debt<=0) return false;
+    return (now - o.created_at) > 7*24*60*60*1000; // Quá 7 ngày
+  });
+  if(!overdueOrders.length) return;
+  // Group by customer
+  const byCustomer = {};
+  overdueOrders.forEach(o=>{
+    if(!byCustomer[o.customer]) byCustomer[o.customer]={name:o.customer,phone:o.phone||'',debt:0};
+    byCustomer[o.customer].debt += (o.total||0)-(o.paid||0);
+  });
+  for(const c of Object.values(byCustomer)) {
+    await tgMsg(`⚠️ *Nhắc nợ NVL quá hạn!*\n\n👤 ${c.name}${c.phone?' ('+c.phone+')':''}\n❌ Còn nợ: ${Math.round(c.debt).toLocaleString('vi-VN')}₫\n\n_Trương Dáng Hương Academy_`);
+  }
+  notify(`✅ Đã gửi nhắc nợ NVL (${Object.keys(byCustomer).length} khách)`);
+}
+
+// Patch checkReminders để thêm nhắc NVL
+const _origCheckReminders = checkReminders;
+async function checkReminders() {
+  await _origCheckReminders();
+  await checkNvlDebtReminders();
+}
+
+// Patch sendDailyReport để thêm tóm tắt NVL
+const _origSendDailyReport = sendDailyReport;
+function sendDailyReport() {
+  _origSendDailyReport();
+  // Thêm summary NVL vào báo cáo hàng ngày
+  const pendingNvl = D_nvl.filter(o=>o.status==='Chờ thanh toán'||o.status==='Chờ xác nhận').length;
+  const totalDebt  = D_nvl.reduce((s,o)=>Math.max(0,s+(o.total||0)-(o.paid||0)),0);
+  if(pendingNvl>0||totalDebt>0) {
+    tgMsg(`📦 *Tóm tắt NVL hôm nay:*\n\n📋 Đơn chờ xử lý: ${pendingNvl}\n💳 Tổng công nợ: ${Math.round(totalDebt).toLocaleString('vi-VN')}₫\n\n_Trương Dáng Hương Academy_`);
+  }
+}
+
+// Thêm nút nhắc nợ NVL vào Cài đặt
+setTimeout(()=>{
+  const remindBtn = document.querySelector("button[onclick=\"checkReminders()\"]");
+  if(remindBtn&&remindBtn.parentNode) {
+    const btn2 = document.createElement('button');
+    btn2.className='btn btn-tg btn-sm';
+    btn2.textContent='📦 Nhắc nợ NVL';
+    btn2.onclick=()=>checkNvlDebtReminders();
+    remindBtn.parentNode.insertBefore(btn2, remindBtn.nextSibling);
+  }
+}, 1500);
+
+// Patch initCostCalc để load NVL data
+const _origInit3 = initCostCalc;
+async function initCostCalc() {
+  await _origInit3();
+  await loadNvlOrders();
+  // Init datalist NVL
+  const dl = document.getElementById('nvl-mat-datalist');
+  if(dl) dl.innerHTML = D.inventory.map(m=>`<option value="${m.name}">`).join('');
+  // Init schedule
+  renderSchedule();
+}
 
 // ═══════════════════════════════════════════════════════════════
 // MODULE: BÁN THÀNH PHẨM (SUB-RECIPE)
