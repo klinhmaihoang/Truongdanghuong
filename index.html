@@ -577,9 +577,17 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 <!-- TÍNH COST MÓN NƯỚC — BOM MODEL -->
 <div class="page" id="page-costcalc">
 
+  <!-- Sub-tabs: Món nước / Nguyên liệu -->
+  <div class="tabs" style="margin-bottom:14px">
+    <div class="tab active" id="cc-tab-drinks" onclick="ccSwitchTab('drinks',this)">🧋 Danh sách món</div>
+    <div class="tab" id="cc-tab-mats" onclick="ccSwitchTab('mats',this)">🧂 Nguyên liệu (DMHH)</div>
+  </div>
+
+  <!-- ══ PANEL: DANH SÁCH MÓN ══ -->
+  <div id="cc-panel-drinks">
+
   <!-- Toolbar -->
   <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center">
-    <!-- Filter nhóm -->
     <div id="cc-group-tabs" style="display:flex;gap:4px;flex-wrap:wrap"></div>
     <div style="margin-left:auto;display:flex;gap:7px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="ccToggleView()"><span id="cc-view-icon">🔲</span> <span id="cc-view-label">Lưới</span></button>
@@ -603,19 +611,31 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       style="width:100%;padding:9px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit"/>
   </div>
 
-  <!-- View: TABLE (default) -->
+  <!-- View: TABLE (default) -->\
+  <!-- Thanh action khi chọn nhiều -->
+  <div id="cc-bulk-bar" style="display:none;position:sticky;top:60px;z-index:50;background:var(--brown);color:#fff;border-radius:10px;padding:10px 16px;margin-bottom:10px;display:none;align-items:center;gap:12px;box-shadow:0 4px 16px rgba(0,0,0,.25);animation:fadeIn .15s ease">
+    <span style="font-size:13px;font-weight:700"><span id="cc-bulk-count">0</span> món được chọn</span>
+    <div style="flex:1"></div>
+    <button class="btn btn-ghost btn-sm" style="color:#fff;border-color:rgba(255,255,255,.4);font-size:12px" onclick="ccSelectAll()"><span id="cc-sel-all-label">Chọn tất cả</span></button>
+    <button onclick="ccBulkDelete()" style="background:#c0392b;color:#fff;border:none;padding:6px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:700">🗑 Xóa (<span id="cc-bulk-count2">0</span>)</button>
+    <button onclick="ccClearSelection()" style="background:rgba(255,255,255,.15);color:#fff;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:12px">✕ Bỏ chọn</button>
+  </div>
+
   <div id="cc-table-view">
     <div class="card" style="padding:0;overflow:hidden">
       <table id="cc-main-table">
         <thead><tr>
-          <th style="width:28%">Tên món</th>
+          <th style="width:4%;text-align:center;padding:8px 6px">
+            <input type="checkbox" id="cc-chk-all" onchange="ccToggleAll(this)" style="width:15px;height:15px;cursor:pointer;accent-color:var(--brand)"/>
+          </th>
+          <th style="width:26%">Tên món</th>
           <th style="width:8%;text-align:center">Size</th>
           <th style="width:12%;text-align:right">Giá bán</th>
-          <th style="width:12%;text-align:right">Cost NL</th>
-          <th style="width:10%;text-align:center">% Cost</th>
-          <th style="width:12%;text-align:right">LN/ly</th>
+          <th style="width:11%;text-align:right">Cost NL</th>
+          <th style="width:9%;text-align:center">% Cost</th>
+          <th style="width:11%;text-align:right">LN/ly</th>
           <th style="width:10%;text-align:center">Đánh giá</th>
-          <th style="width:8%"></th>
+          <th style="width:9%"></th>
         </tr></thead>
         <tbody id="cc-list"></tbody>
       </table>
@@ -632,9 +652,92 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     💡 <strong>Chuẩn cost F&B đồ uống:</strong>&nbsp;
     🟢 Tốt &lt;25% &nbsp;|&nbsp; 🟡 Chấp nhận 25–35% &nbsp;|&nbsp; 🔴 Cần xem lại &gt;35%
   </div>
-</div>
 
-<!-- Modal chi tiết BOM -->
+  </div><!-- /cc-panel-drinks -->
+
+  <!-- ══ PANEL: NGUYÊN LIỆU (DMHH) ══ -->
+  <div id="cc-panel-mats" style="display:none">
+
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center">
+      <input id="mat-search" placeholder="🔍 Tìm tên nguyên liệu, mã, NCC..." oninput="renderMatList()"
+        style="flex:1;min-width:200px;padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit"/>
+      <button class="btn btn-sm" onclick="openAddMat()">+ Thêm nguyên liệu</button>
+    </div>
+
+    <!-- Stats nguyên liệu -->
+    <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+      <div class="stat"><div class="stat-num" id="mat-stat-total">0</div><div class="stat-label">Tổng NL</div></div>
+      <div class="stat" style="--accent:var(--orange)"><div class="stat-num" id="mat-stat-custom">0</div><div class="stat-label">NL mới thêm</div></div>
+      <div class="stat" style="--accent:var(--red)"><div class="stat-num" id="mat-stat-noprice">0</div><div class="stat-label">Chưa có giá</div></div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <table>
+        <thead><tr>
+          <th style="width:8%">Mã</th>
+          <th style="width:30%">Tên nguyên liệu</th>
+          <th style="width:10%;text-align:center">Đơn vị</th>
+          <th style="width:17%;text-align:right">Giá (₫/đv)</th>
+          <th style="width:18%">Nhà CC</th>
+          <th style="width:9%;text-align:center">Nguồn</th>
+          <th style="width:8%"></th>
+        </tr></thead>
+        <tbody id="mat-list"></tbody>
+      </table>
+    </div>
+
+    <div class="guide" style="margin-top:12px">
+      💡 <strong>Lưu ý:</strong> Nguyên liệu từ <strong>BOM gốc (Excel)</strong> chỉ chỉnh sửa được giá và NCC. Nguyên liệu mới thêm có thể xóa hoàn toàn.
+    </div>
+
+  </div><!-- /cc-panel-mats -->
+
+</div><!-- /page-costcalc -->
+
+<!-- Modal Thêm / Sửa Nguyên Liệu -->
+<div class="overlay" id="modal-mat-edit">
+  <div class="modal" style="max-width:440px">
+    <div class="modal-title" id="mat-modal-title">+ Thêm nguyên liệu mới</div>
+    <input type="hidden" id="mat-edit-ma"/>
+
+    <div class="form-row">
+      <div class="fg">
+        <label>Mã nguyên liệu *</label>
+        <input id="mat-edit-ma-show" placeholder="VD: A50, B01..." style="font-family:monospace;font-weight:700"/>
+      </div>
+      <div class="fg">
+        <label>Đơn vị *</label>
+        <input id="mat-edit-don-vi" placeholder="gram / ml / cái / gói..."/>
+      </div>
+    </div>
+
+    <div class="fg" style="margin-bottom:12px">
+      <label>Tên nguyên liệu *</label>
+      <input id="mat-edit-ten" placeholder="VD: Syrup dâu tây Monin"/>
+    </div>
+
+    <div class="form-row">
+      <div class="fg">
+        <label>Giá nhập (₫/đv) *</label>
+        <input id="mat-edit-gia" type="number" min="0" step="0.01" placeholder="50000"/>
+      </div>
+      <div class="fg">
+        <label>Nhà cung cấp</label>
+        <input id="mat-edit-ncc" placeholder="VD: Tân Đại Hải"/>
+      </div>
+    </div>
+
+    <div class="fg" style="margin-bottom:14px">
+      <label>Ghi chú</label>
+      <input id="mat-edit-note" placeholder="VD: 1kg/gói, giá cập nhật 12/2024..."/>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-green btn-sm" onclick="saveMat()">💾 Lưu nguyên liệu</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-mat-edit')">Hủy</button>
+    </div>
+  </div>
+</div>
 <!-- Modal chi tiết + chỉnh sửa BOM -->
 <div class="overlay" id="modal-bom-detail">
   <div class="modal wide" style="max-width:580px;max-height:92vh;overflow-y:auto">
@@ -4772,37 +4875,6 @@ let CC_filter   = 'Tất cả';
 let CC_currentId = null;
 
 // ── KHỞI TẠO ─────────────────────────────────────────────────
-async function initCostCalc() {
-  // Build material map từ DMHH
-  BOM_DATA.materials.forEach(m => { CC_matMap[m.ma] = m; });
-  // Merge BOM gốc + món custom từ Supabase (D_drinks)
-  CC_products = [...BOM_DATA.products];
-  // Load custom drinks từ Supabase
-  try {
-    const rows = await sbGet('drink_recipes','?order=created_at.asc');
-    if (rows && rows.length) {
-      rows.forEach(r => {
-        // Check trùng tên
-        if (!CC_products.find(p => p.ten === r.name)) {
-          CC_products.push({
-            id: r.id, ten: r.name,
-            nhom: r.nhom||'Khác', size: r.size||'—',
-            cost: calcCustomCost(r.ingredients||[]),
-            gia_ban: r.sale_price||0,
-            ingredients: (r.ingredients||[]).map(i=>({
-              ma_nl:'', ten_nl:i.mat_name||'', don_vi:i.mat_unit||'',
-              so_luong:i.qty||0, don_gia:i.cost_snapshot||0,
-              thanh_tien:(i.qty||0)*(i.cost_snapshot||0)
-            })),
-            _custom: true
-          });
-        }
-      });
-    }
-  } catch(e) { /* offline, dùng BOM gốc */ }
-  renderCostCalcGroups();
-  renderCostCalc();
-}
 function calcCustomCost(ings) {
   return ings.reduce((s,i)=>{
     const mat = D.inventory.find(m=>m.id===i.mat_id||m.name===i.mat_name);
@@ -4885,7 +4957,7 @@ function renderTable(filtered) {
   const tbody = document.getElementById('cc-list');
   if (!tbody) return;
   if (!filtered.length) {
-    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:24px">Không có món nào</td></tr>';
+    tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;color:var(--muted);padding:24px">Không có món nào</td></tr>`;
     return;
   }
   tbody.innerHTML = filtered.map(p => {
@@ -4894,7 +4966,12 @@ function renderTable(filtered) {
     const pct = gb>0 ? Math.round(cost/gb*100) : null;
     const ln = gb>0 ? gb-cost : null;
     const b = costBadge(pct);
-    return `<tr style="cursor:pointer" onclick="showBomDetail('${p.id}')">
+    const checked = CC_selected.has(p.id);
+    return `<tr style="cursor:pointer;${checked?'background:rgba(255,140,0,.08)':''}" onclick="showBomDetail('${p.id}')" id="ccrow-${p.id}">
+      <td style="text-align:center;padding:8px 6px" onclick="event.stopPropagation()">
+        <input type="checkbox" class="cc-chk" data-id="${p.id}" ${checked?'checked':''} onchange="ccToggleOne(this)"
+          style="width:15px;height:15px;cursor:pointer;accent-color:var(--brand)"/>
+      </td>
       <td>
         <div style="font-weight:700;font-size:13px">${p.ten}</div>
         <div style="font-size:10px;color:var(--muted)">${p.nhom}${p._custom?' · Tự thêm':''}</div>
@@ -4902,19 +4979,22 @@ function renderTable(filtered) {
       <td style="text-align:center"><span class="tag" style="background:var(--dim);color:var(--brown);font-size:10px">${p.size||'—'}</span></td>
       <td style="text-align:right;font-weight:600">${gb>0?fmtVND(gb):'—'}</td>
       <td style="text-align:right;font-weight:700;color:var(--brand)">${fmtVND(cost)}</td>
-      <td style="text-align:center">
-        ${pct!==null?`<span style="font-weight:800;color:${b.color}">${pct}%</span>`:'—'}
-      </td>
+      <td style="text-align:center">${pct!==null?`<span style="font-weight:800;color:${b.color}">${pct}%</span>`:'—'}</td>
       <td style="text-align:right;color:var(--green);font-weight:700">${ln!==null?fmtVND(ln):'—'}</td>
       <td style="text-align:center"><span style="font-size:12px;font-weight:600;color:${b.color}">${b.icon}</span></td>
       <td>
-        <div style="display:flex;gap:4px">
-          <button class="btn btn-ghost btn-sm" style="padding:3px 8px" onclick="event.stopPropagation();showBomDetail('${p.id}')">👁</button>
-          ${p._custom?`<button class="btn btn-ghost btn-sm" style="padding:3px 8px;color:var(--red)" onclick="event.stopPropagation();deleteCustomDrink('${p.id}')">🗑</button>`:''}
-        </div>
+        <button class="btn btn-ghost btn-sm" style="padding:3px 8px" onclick="event.stopPropagation();showBomDetail('${p.id}')">👁</button>
       </td>
     </tr>`;
   }).join('');
+  // Sync select-all checkbox
+  const allChk = document.getElementById('cc-chk-all');
+  if (allChk) {
+    const ids = filtered.map(p=>p.id);
+    allChk.checked = ids.length > 0 && ids.every(id=>CC_selected.has(id));
+    allChk.indeterminate = !allChk.checked && ids.some(id=>CC_selected.has(id));
+  }
+  updateBulkBar();
 }
 
 // ── GRID VIEW ────────────────────────────────────────────────
@@ -4926,31 +5006,161 @@ function renderGrid(filtered) {
     const gb = p.gia_ban||0;
     const pct = gb>0 ? Math.round(cost/gb*100) : null;
     const b = costBadge(pct);
-    return `<div onclick="showBomDetail('${p.id}')" style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:14px;cursor:pointer;transition:.18s;box-shadow:0 2px 8px rgba(255,140,0,.06)"
-        onmouseover="this.style.borderColor='var(--brand)';this.style.transform='translateY(-2px)'" 
-        onmouseout="this.style.borderColor='var(--border)';this.style.transform='none'">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-        <div style="font-weight:700;font-size:13px;line-height:1.3;flex:1">${p.ten}</div>
-        <span style="font-size:10px;background:var(--dim);color:var(--brown);padding:2px 7px;border-radius:10px;margin-left:6px;white-space:nowrap">${p.size||''}</span>
+    const checked = CC_selected.has(p.id);
+    return `<div id="cccard-${p.id}" style="background:#fff;border:${checked?'2px solid var(--brand)':'1.5px solid var(--border)'};border-radius:12px;padding:12px;transition:.18s;box-shadow:0 2px 8px rgba(255,140,0,.06);position:relative;${checked?'background:rgba(255,140,0,.04)':''}">
+      <!-- Checkbox góc trên trái -->
+      <div style="position:absolute;top:10px;left:10px;z-index:2" onclick="event.stopPropagation()">
+        <input type="checkbox" class="cc-chk" data-id="${p.id}" ${checked?'checked':''}
+          onchange="ccToggleOne(this)"
+          style="width:16px;height:16px;cursor:pointer;accent-color:var(--brand)"/>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
-        <div style="background:var(--bg);border-radius:6px;padding:6px;text-align:center">
-          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost</div>
-          <div style="font-size:15px;font-weight:800;color:var(--brand)">${fmtVND(cost)}</div>
+      <!-- Card body -->
+      <div onclick="showBomDetail('${p.id}')" style="cursor:pointer;padding-left:22px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+          <div style="font-weight:700;font-size:12px;line-height:1.3;flex:1">${p.ten}</div>
+          <span style="font-size:10px;background:var(--dim);color:var(--brown);padding:2px 6px;border-radius:10px;margin-left:5px;white-space:nowrap">${p.size||''}</span>
         </div>
-        <div style="background:var(--bg);border-radius:6px;padding:6px;text-align:center">
-          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:600">Giá bán</div>
-          <div style="font-size:15px;font-weight:800;color:var(--brown)">${gb>0?fmtVND(gb):'—'}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:8px">
+          <div style="background:var(--bg);border-radius:6px;padding:5px;text-align:center">
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost</div>
+            <div style="font-size:14px;font-weight:800;color:var(--brand)">${fmtVND(cost)}</div>
+          </div>
+          <div style="background:var(--bg);border-radius:6px;padding:5px;text-align:center">
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;font-weight:600">Giá bán</div>
+            <div style="font-size:14px;font-weight:800;color:var(--brown)">${gb>0?fmtVND(gb):'—'}</div>
+          </div>
         </div>
-      </div>
-      <div style="display:flex;justify-content:space-between;align-items:center">
-        <span style="font-size:12px;font-weight:700;color:${b.color};background:${b.bg};padding:3px 10px;border-radius:20px">
-          ${pct!==null?pct+'% — ':''} ${b.icon}
-        </span>
-        <span style="font-size:11px;color:var(--muted)">${p.nhom}</span>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span style="font-size:11px;font-weight:700;color:${b.color};background:${b.bg};padding:2px 9px;border-radius:20px">
+            ${pct!==null?pct+'% ':''} ${b.icon}
+          </span>
+          <span style="font-size:10px;color:var(--muted)">${p.nhom}</span>
+        </div>
       </div>
     </div>`;
   }).join('');
+  updateBulkBar();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// BULK SELECT / DELETE
+// ═══════════════════════════════════════════════════════════════
+let CC_selected = new Set(); // Set of product ids
+
+function ccToggleOne(chk) {
+  const id = chk.dataset.id;
+  if (chk.checked) CC_selected.add(id);
+  else CC_selected.delete(id);
+  // Highlight row / card
+  const row = document.getElementById('ccrow-' + id);
+  if (row) row.style.background = chk.checked ? 'rgba(255,140,0,.08)' : '';
+  const card = document.getElementById('cccard-' + id);
+  if (card) {
+    card.style.border = chk.checked ? '2px solid var(--brand)' : '1.5px solid var(--border)';
+    card.style.background = chk.checked ? 'rgba(255,140,0,.04)' : '#fff';
+  }
+  // Sync select-all
+  const allChk = document.getElementById('cc-chk-all');
+  if (allChk) {
+    const allVisible = [...document.querySelectorAll('.cc-chk')].map(c=>c.dataset.id);
+    allChk.checked = allVisible.length > 0 && allVisible.every(id=>CC_selected.has(id));
+    allChk.indeterminate = !allChk.checked && allVisible.some(id=>CC_selected.has(id));
+  }
+  updateBulkBar();
+}
+
+function ccToggleAll(chk) {
+  document.querySelectorAll('.cc-chk').forEach(c => {
+    c.checked = chk.checked;
+    if (chk.checked) CC_selected.add(c.dataset.id);
+    else CC_selected.delete(c.dataset.id);
+    // Update visual
+    const row = document.getElementById('ccrow-' + c.dataset.id);
+    if (row) row.style.background = chk.checked ? 'rgba(255,140,0,.08)' : '';
+    const card = document.getElementById('cccard-' + c.dataset.id);
+    if (card) {
+      card.style.border = chk.checked ? '2px solid var(--brand)' : '1.5px solid var(--border)';
+      card.style.background = chk.checked ? 'rgba(255,140,0,.04)' : '#fff';
+    }
+  });
+  updateBulkBar();
+}
+
+function ccSelectAll() {
+  // Chọn tất cả CC_products (không chỉ trang hiện tại)
+  const allSelected = CC_products.every(p => CC_selected.has(p.id));
+  if (allSelected) {
+    CC_selected.clear();
+  } else {
+    CC_products.forEach(p => CC_selected.add(p.id));
+  }
+  document.getElementById('cc-sel-all-label').textContent =
+    CC_selected.size === CC_products.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả';
+  renderCostCalc();
+}
+
+function ccClearSelection() {
+  CC_selected.clear();
+  renderCostCalc();
+}
+
+function updateBulkBar() {
+  const n = CC_selected.size;
+  const bar = document.getElementById('cc-bulk-bar');
+  if (!bar) return;
+  bar.style.display = n > 0 ? 'flex' : 'none';
+  const c1 = document.getElementById('cc-bulk-count');
+  const c2 = document.getElementById('cc-bulk-count2');
+  if (c1) c1.textContent = n;
+  if (c2) c2.textContent = n;
+  const selAllLabel = document.getElementById('cc-sel-all-label');
+  if (selAllLabel) {
+    selAllLabel.textContent = CC_selected.size === CC_products.length ? 'Bỏ chọn tất cả' : 'Chọn tất cả';
+  }
+}
+
+async function ccBulkDelete() {
+  const ids = [...CC_selected];
+  if (!ids.length) return;
+
+  const names = ids.map(id => {
+    const p = CC_products.find(x => x.id === id);
+    return p ? p.ten : id;
+  });
+
+  // Phân loại: custom (Supabase) vs BOM gốc (chỉ local)
+  const customIds = ids.filter(id => {
+    const p = CC_products.find(x => x.id === id);
+    return p && p._custom;
+  });
+  const bomIds = ids.filter(id => {
+    const p = CC_products.find(x => x.id === id);
+    return p && !p._custom;
+  });
+
+  let msg = `Xóa ${ids.length} món đã chọn?\n\n`;
+  if (bomIds.length) msg += `• ${bomIds.length} món từ BOM gốc → chỉ ẩn trong phiên này\n`;
+  if (customIds.length) msg += `• ${customIds.length} món tự thêm → xóa hoàn toàn\n`;
+  msg += `\nDanh sách:\n${names.slice(0,10).map(n=>'  - '+n).join('\n')}${names.length>10?`\n  ...và ${names.length-10} món khác`:''}`;
+
+  if (!confirm(msg)) return;
+
+  // Xóa custom từ Supabase
+  let errCount = 0;
+  for (const id of customIds) {
+    try { await sbDel('drink_recipes', '?id=eq.' + id); }
+    catch(e) { errCount++; }
+  }
+
+  // Xóa tất cả khỏi local CC_products
+  CC_products = CC_products.filter(p => !CC_selected.has(p.id));
+  CC_selected.clear();
+
+  renderCostCalcGroups();
+  renderCostCalc();
+
+  if (errCount > 0) notify(`Đã xóa — ${errCount} món lỗi khi xóa Supabase`, false);
+  else notify(`✅ Đã xóa ${ids.length} món`);
 }
 
 // ── TOGGLE VIEW ──────────────────────────────────────────────
@@ -5486,7 +5696,253 @@ async function deleteCustomDrink(id){
   }catch(e){notify('Lỗi: '+e.message,false);}
 }
 
-// Gọi initCostCalc sau khi boot xong (2.5s)
+// ═══════════════════════════════════════════════════════════════
+// MODULE: QUẢN LÝ NGUYÊN LIỆU (DMHH)
+// ═══════════════════════════════════════════════════════════════
+
+// Runtime list nguyên liệu — merge BOM gốc + custom từ Supabase
+let CC_mats = []; // [{ma, ten, don_vi, gia, ncc, note, _custom}]
+
+// ── SWITCH SUB-TAB ──────────────────────────────────────────
+function ccSwitchTab(tab, el) {
+  document.getElementById('cc-panel-drinks').style.display = tab==='drinks' ? '' : 'none';
+  document.getElementById('cc-panel-mats').style.display   = tab==='mats'   ? '' : 'none';
+  document.querySelectorAll('#page-costcalc .tabs .tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  if (tab === 'mats') renderMatList();
+}
+
+// ── LOAD nguyên liệu từ Supabase + merge với BOM gốc ────────
+async function loadMaterials() {
+  // Khởi từ BOM gốc
+  CC_mats = BOM_DATA.materials.map(m => ({...m, _custom: false}));
+  // Cập nhật CC_matMap
+  CC_mats.forEach(m => { CC_matMap[m.ma] = m; });
+
+  // Load thêm từ Supabase (bảng dmhh)
+  try {
+    const rows = await sbGet('dmhh', '?order=created_at.asc');
+    if (rows && rows.length) {
+      rows.forEach(r => {
+        const existing = CC_mats.findIndex(m => m.ma === r.ma);
+        const mat = {
+          ma: r.ma, ten: r.ten||'', don_vi: r.don_vi||'',
+          gia: r.gia||0, ncc: r.ncc||'', note: r.note||'',
+          _custom: r._custom !== false // mặc định là custom nếu từ Supabase
+        };
+        if (existing >= 0) {
+          // Ghi đè giá + NCC từ Supabase (cho phép cập nhật NL gốc)
+          CC_mats[existing] = {...CC_mats[existing], ...mat};
+        } else {
+          CC_mats.push(mat);
+        }
+        CC_matMap[mat.ma] = mat;
+      });
+    }
+  } catch(e) { /* offline */ }
+}
+
+// ── RENDER BẢNG NGUYÊN LIỆU ─────────────────────────────────
+function renderMatList() {
+  const q = (document.getElementById('mat-search')?.value||'').toLowerCase();
+  const filtered = CC_mats.filter(m =>
+    !q ||
+    (m.ten||'').toLowerCase().includes(q) ||
+    (m.ma||'').toLowerCase().includes(q) ||
+    (m.ncc||'').toLowerCase().includes(q)
+  );
+
+  // Stats
+  const noPrice = CC_mats.filter(m => !m.gia || m.gia <= 0).length;
+  const custom  = CC_mats.filter(m => m._custom).length;
+  const el = id => document.getElementById(id);
+  if (el('mat-stat-total'))   el('mat-stat-total').textContent  = CC_mats.length;
+  if (el('mat-stat-custom'))  el('mat-stat-custom').textContent = custom;
+  if (el('mat-stat-noprice')) el('mat-stat-noprice').textContent= noPrice;
+
+  const tbody = document.getElementById('mat-list');
+  if (!tbody) return;
+
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted)">Không tìm thấy nguyên liệu nào</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map(m => {
+    const noPriceWarn = (!m.gia || m.gia <= 0);
+    return `<tr style="${noPriceWarn ? 'background:rgba(192,57,43,.04)' : ''}">
+      <td style="font-family:monospace;font-size:12px;font-weight:700;color:var(--muted)">${m.ma}</td>
+      <td style="font-weight:600">${m.ten}
+        ${m.note ? `<div style="font-size:11px;color:var(--muted);font-weight:400">${m.note}</div>` : ''}
+      </td>
+      <td style="text-align:center"><span class="tag" style="background:var(--dim);color:var(--brown);font-size:10px">${m.don_vi||'—'}</span></td>
+      <td style="text-align:right;font-weight:700;color:${noPriceWarn?'var(--red)':'var(--brand)'}">
+        ${noPriceWarn ? '⚠️ Chưa có' : Math.round(m.gia*100)/100 + '₫'}
+      </td>
+      <td style="font-size:12px;color:var(--muted)">${m.ncc||'—'}</td>
+      <td style="text-align:center">
+        <span style="font-size:10px;padding:2px 7px;border-radius:10px;font-weight:600;
+          background:${m._custom?'rgba(41,128,185,.1)':'rgba(39,174,96,.1)'};
+          color:${m._custom?'#2980b9':'#27ae60'}">
+          ${m._custom ? 'Mới thêm' : 'BOM gốc'}
+        </span>
+      </td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" style="padding:3px 8px" onclick="openEditMat('${m.ma}')">✏️</button>
+          ${m._custom ? `<button class="btn btn-ghost btn-sm" style="padding:3px 8px;color:var(--red)" onclick="deleteMat('${m.ma}')">🗑</button>` : ''}
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── MỞ MODAL THÊM ───────────────────────────────────────────
+function openAddMat() {
+  document.getElementById('mat-modal-title').textContent = '+ Thêm nguyên liệu mới';
+  document.getElementById('mat-edit-ma').value = '';
+  // Tự sinh mã tiếp theo
+  const lastNums = CC_mats
+    .map(m => parseInt((m.ma||'').replace(/\D/g,''))||0)
+    .filter(Boolean);
+  const nextNum = lastNums.length ? Math.max(...lastNums) + 1 : 50;
+  document.getElementById('mat-edit-ma-show').value = 'A' + nextNum;
+  document.getElementById('mat-edit-ma-show').readOnly = false;
+  document.getElementById('mat-edit-ten').value = '';
+  document.getElementById('mat-edit-don-vi').value = '';
+  document.getElementById('mat-edit-gia').value = '';
+  document.getElementById('mat-edit-ncc').value = '';
+  document.getElementById('mat-edit-note').value = '';
+  showM('modal-mat-edit');
+}
+
+// ── MỞ MODAL SỬA ────────────────────────────────────────────
+function openEditMat(ma) {
+  const m = CC_mats.find(x => x.ma === ma);
+  if (!m) return;
+  document.getElementById('mat-modal-title').textContent = '✏️ Sửa nguyên liệu';
+  document.getElementById('mat-edit-ma').value = ma;
+  document.getElementById('mat-edit-ma-show').value = ma;
+  document.getElementById('mat-edit-ma-show').readOnly = true; // không đổi mã
+  document.getElementById('mat-edit-ten').value = m.ten||'';
+  document.getElementById('mat-edit-don-vi').value = m.don_vi||'';
+  document.getElementById('mat-edit-gia').value = m.gia||'';
+  document.getElementById('mat-edit-ncc').value = m.ncc||'';
+  document.getElementById('mat-edit-note').value = m.note||'';
+  showM('modal-mat-edit');
+}
+
+// ── LƯU NGUYÊN LIỆU ─────────────────────────────────────────
+async function saveMat() {
+  const editMa  = document.getElementById('mat-edit-ma').value.trim();
+  const ma      = (document.getElementById('mat-edit-ma-show').value||'').trim().toUpperCase();
+  const ten     = (document.getElementById('mat-edit-ten').value||'').trim();
+  const don_vi  = (document.getElementById('mat-edit-don-vi').value||'').trim();
+  const gia     = parseFloat(document.getElementById('mat-edit-gia').value)||0;
+  const ncc     = (document.getElementById('mat-edit-ncc').value||'').trim();
+  const note    = (document.getElementById('mat-edit-note').value||'').trim();
+
+  if (!ma)  { notify('Nhập mã nguyên liệu!', false); return; }
+  if (!ten) { notify('Nhập tên nguyên liệu!', false); return; }
+  if (!don_vi) { notify('Nhập đơn vị!', false); return; }
+
+  const isNew = !editMa; // thêm mới hay sửa
+  // Check trùng mã khi thêm mới
+  if (isNew && CC_mats.find(m => m.ma === ma)) {
+    notify(`Mã "${ma}" đã tồn tại! Chọn mã khác.`, false); return;
+  }
+
+  const matObj = { ma, ten, don_vi, gia, ncc, note, _custom: true };
+
+  // Lưu lên Supabase
+  try {
+    await sbUpsert('dmhh', {
+      ma, ten, don_vi, gia, ncc, note,
+      _custom: true,
+      created_at: new Date().toISOString()
+    });
+  } catch(e) {
+    notify('⚠️ Lưu offline — chỉ trên máy này');
+  }
+
+  // Cập nhật local
+  const idx = CC_mats.findIndex(m => m.ma === ma);
+  if (idx >= 0) CC_mats[idx] = {...CC_mats[idx], ...matObj};
+  else CC_mats.push(matObj);
+  CC_matMap[ma] = matObj;
+
+  closeM('modal-mat-edit');
+  renderMatList();
+
+  // Nếu cập nhật giá NL gốc → recalc cost các món liên quan
+  CC_products.forEach(p => {
+    if ((p.ingredients||[]).some(i => i.ma_nl === ma || i.ten_nl === ten)) {
+      p.ingredients.forEach(i => {
+        if (i.ma_nl === ma || i.ten_nl === ten) {
+          i.don_gia = gia;
+          i.thanh_tien = Math.round(gia * i.so_luong * 100)/100;
+        }
+      });
+      p.cost = (p.ingredients||[]).reduce((s,i)=>s+i.thanh_tien,0);
+    }
+  });
+  renderCostCalc();
+  notify(`✅ Đã lưu: ${ten}`);
+}
+
+// ── XÓA NGUYÊN LIỆU ─────────────────────────────────────────
+async function deleteMat(ma) {
+  const m = CC_mats.find(x => x.ma === ma);
+  if (!m) return;
+  // Kiểm tra xem NL này có đang được dùng trong BOM không
+  const usedIn = CC_products.filter(p => (p.ingredients||[]).some(i => i.ma_nl===ma||i.ten_nl===m.ten));
+  if (usedIn.length > 0) {
+    if (!confirm(`"${m.ten}" đang được dùng trong ${usedIn.length} món:\n${usedIn.map(p=>p.ten).join(', ')}\n\nVẫn xóa khỏi danh mục?`)) return;
+  } else {
+    if (!confirm(`Xóa nguyên liệu "${m.ten}"?`)) return;
+  }
+  try { await sbDel('dmhh', '?ma=eq.' + encodeURIComponent(ma)); } catch(e) {}
+  CC_mats = CC_mats.filter(x => x.ma !== ma);
+  delete CC_matMap[ma];
+  renderMatList();
+  notify('Đã xóa: ' + m.ten);
+}
+
+// ── PATCH initCostCalc để load cả materials ──────────────────
+const _origInitCostCalc = initCostCalc;
+async function initCostCalc() {  // Build initial matMap từ BOM
+  BOM_DATA.materials.forEach(m => { CC_matMap[m.ma] = m; });
+  CC_mats = BOM_DATA.materials.map(m => ({...m, _custom: false}));
+  // Load custom materials từ Supabase
+  await loadMaterials();
+  // Gọi phần còn lại của init gốc (load products + drinks)
+  CC_products = [...BOM_DATA.products];
+  try {
+    const rows = await sbGet('drink_recipes','?order=created_at.asc');
+    if (rows && rows.length) {
+      rows.forEach(r => {
+        if (!CC_products.find(p => p.ten === r.name)) {
+          CC_products.push({
+            id: r.id, ten: r.name,
+            nhom: r.nhom||'Khác', size: r.size||'—',
+            cost: (r.ingredients||[]).reduce((s,i)=>s+(i.cost_snapshot||0)*(i.qty||0),0),
+            gia_ban: r.sale_price||0,
+            ingredients: (r.ingredients||[]).map(i=>({
+              ma_nl: i.mat_id||'', ten_nl: i.mat_name||'', don_vi: i.mat_unit||'',
+              so_luong: i.qty||0, don_gia: i.cost_snapshot||0,
+              thanh_tien: (i.qty||0)*(i.cost_snapshot||0)
+            })),
+            _custom: true
+          });
+        }
+      });
+    }
+  } catch(e) {}
+  renderCostCalcGroups();
+  renderCostCalc();
+}
+
+// Khởi động sau khi boot xong
 setTimeout(()=>initCostCalc(), 2500);
 
 boot();
