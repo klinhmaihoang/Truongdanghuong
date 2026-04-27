@@ -1749,6 +1749,56 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
   </div>
 
+  <!-- ══ ĐỔI MẬT KHẨU ══ -->
+  <div class="card" style="border-color:rgba(255,140,0,.3)">
+    <div class="card-head"><span class="card-title">🔑 Đổi mật khẩu</span></div>
+    <div id="chpw-account-info" style="font-size:13px;color:var(--muted);margin-bottom:14px">
+      Đang đăng nhập: <strong id="chpw-username" style="color:var(--brown)">—</strong>
+    </div>
+    <div class="form-row">
+      <div class="fg">
+        <label>Mật khẩu hiện tại *</label>
+        <div style="position:relative">
+          <input id="chpw-old" type="password" placeholder="Nhập mật khẩu hiện tại..."
+            style="width:100%;padding:9px 36px 9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"/>
+          <button onclick="togglePw('chpw-old')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted)">👁</button>
+        </div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="fg">
+        <label>Mật khẩu mới *</label>
+        <div style="position:relative">
+          <input id="chpw-new" type="password" placeholder="Tối thiểu 6 ký tự..." oninput="chpwStrength()"
+            style="width:100%;padding:9px 36px 9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"/>
+          <button onclick="togglePw('chpw-new')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted)">👁</button>
+        </div>
+        <!-- Thanh độ mạnh mật khẩu -->
+        <div id="chpw-strength-bar" style="height:4px;border-radius:2px;margin-top:5px;background:var(--dim);overflow:hidden">
+          <div id="chpw-strength-fill" style="height:4px;border-radius:2px;width:0%;transition:.3s"></div>
+        </div>
+        <div id="chpw-strength-label" style="font-size:11px;color:var(--muted);margin-top:3px"></div>
+      </div>
+      <div class="fg">
+        <label>Xác nhận mật khẩu mới *</label>
+        <div style="position:relative">
+          <input id="chpw-confirm" type="password" placeholder="Nhập lại mật khẩu mới..." oninput="chpwCheckMatch()"
+            style="width:100%;padding:9px 36px 9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"/>
+          <button onclick="togglePw('chpw-confirm')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted)">👁</button>
+        </div>
+        <div id="chpw-match-label" style="font-size:11px;margin-top:3px"></div>
+      </div>
+    </div>
+    <div id="chpw-error" style="display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;font-size:12px;color:#dc2626;margin-bottom:12px"></div>
+    <div class="btn-group">
+      <button class="btn btn-green btn-sm" onclick="changePassword()">💾 Đổi mật khẩu</button>
+      <button class="btn btn-ghost btn-sm" onclick="chpwClear()">Hủy</button>
+    </div>
+    <div class="guide" style="margin-top:12px">
+      💡 Mật khẩu được lưu trên trình duyệt này. Nếu muốn đổi trên thiết bị khác, cần thực hiện lại trên thiết bị đó.
+    </div>
+  </div>
+
   <!-- ══ BACKUP & RESTORE ══ -->
   <div class="card" style="border-color:rgba(39,174,96,.3)">
     <div class="card-head"><span class="card-title">💾 Backup &amp; Restore dữ liệu</span></div>
@@ -8216,7 +8266,157 @@ const AUTH_USERS = [
 ];
 let AUTH_CURRENT = null; // {user, role}
 
-function doLogin() {
+// Cache mật khẩu tải từ Supabase — {username: hashedPass}
+const _pwCache = {};
+
+// Hash đơn giản (không cần crypto mạnh vì đây là app nội bộ)
+async function _hashPw(pw) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(pw + 'tdh_salt_2024'));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+// Load mật khẩu từ Supabase lúc boot
+async function _authLoadPasswords() {
+  try {
+    const rows = await sbGet('app_users', '?select=username,pass_hash');
+    if(rows) rows.forEach(r => { if(r.username) _pwCache[r.username] = r.pass_hash; });
+  } catch(e) { /* offline — dùng mật khẩu mặc định */ }
+}
+
+// Lấy mật khẩu: ưu tiên Supabase, fallback về hardcode
+async function _authGetPass(username) {
+  if(_pwCache[username]) return _pwCache[username]; // đã hash
+  // Chưa có trong cache → hash mật khẩu mặc định để so sánh
+  const defaultPass = AUTH_USERS.find(a=>a.user===username)?.pass || null;
+  if(!defaultPass) return null;
+  return await _hashPw(defaultPass);
+}
+
+// Lưu mật khẩu mới lên Supabase
+async function _authSavePass(username, newPass) {
+  const hash = await _hashPw(newPass);
+  _pwCache[username] = hash;
+  await sbUpsert('app_users', { username, pass_hash: hash, updated_at: new Date().toISOString() });
+}
+
+// ── ĐỔI MẬT KHẨU ──────────────────────────────────────────────
+function togglePw(inputId) {
+  const inp = document.getElementById(inputId);
+  if(inp) inp.type = inp.type==='password' ? 'text' : 'password';
+}
+
+function chpwStrength() {
+  const pw = document.getElementById('chpw-new')?.value||'';
+  const fill = document.getElementById('chpw-strength-fill');
+  const label = document.getElementById('chpw-strength-label');
+  if(!fill||!label) return;
+  let score = 0;
+  if(pw.length >= 6)  score++;
+  if(pw.length >= 10) score++;
+  if(/[A-Z]/.test(pw)) score++;
+  if(/[0-9]/.test(pw)) score++;
+  if(/[^A-Za-z0-9]/.test(pw)) score++;
+  const levels = [
+    {w:'0%',  color:'transparent', text:''},
+    {w:'25%', color:'var(--red)',   text:'Yếu'},
+    {w:'50%', color:'#e67e22',      text:'Trung bình'},
+    {w:'75%', color:'var(--teal)',  text:'Khá mạnh'},
+    {w:'100%',color:'var(--green)', text:'Mạnh'},
+  ];
+  const lv = levels[Math.min(score, 4)];
+  fill.style.width = lv.w;
+  fill.style.background = lv.color;
+  label.textContent = lv.text;
+  label.style.color = lv.color;
+  chpwCheckMatch();
+}
+
+function chpwCheckMatch() {
+  const pw1 = document.getElementById('chpw-new')?.value||'';
+  const pw2 = document.getElementById('chpw-confirm')?.value||'';
+  const label = document.getElementById('chpw-match-label');
+  if(!label||!pw2) return;
+  if(pw1===pw2) {
+    label.textContent = '✅ Mật khẩu khớp';
+    label.style.color = 'var(--green)';
+  } else {
+    label.textContent = '❌ Chưa khớp';
+    label.style.color = 'var(--red)';
+  }
+}
+
+function chpwClear() {
+  ['chpw-old','chpw-new','chpw-confirm'].forEach(id=>{
+    const el = document.getElementById(id);
+    if(el) el.value='';
+  });
+  const fill = document.getElementById('chpw-strength-fill');
+  if(fill) fill.style.width='0%';
+  ['chpw-strength-label','chpw-match-label'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el) el.textContent='';
+  });
+  const err=document.getElementById('chpw-error');
+  if(err) err.style.display='none';
+}
+
+async function changePassword() {
+  if(!AUTH_CURRENT) { notify('Bạn chưa đăng nhập!', false); return; }
+  const oldPw  = document.getElementById('chpw-old')?.value||'';
+  const newPw  = document.getElementById('chpw-new')?.value||'';
+  const confPw = document.getElementById('chpw-confirm')?.value||'';
+  const errEl  = document.getElementById('chpw-error');
+
+  const showErr = (msg) => {
+    errEl.textContent = msg;
+    errEl.style.display = 'block';
+  };
+  errEl.style.display = 'none';
+
+  // Validation
+  if(!oldPw)  { showErr('Nhập mật khẩu hiện tại!'); return; }
+  if(!newPw)  { showErr('Nhập mật khẩu mới!'); return; }
+  if(!confPw) { showErr('Xác nhận mật khẩu mới!'); return; }
+  if(newPw.length < 6)     { showErr('Mật khẩu mới phải có ít nhất 6 ký tự!'); return; }
+  if(newPw !== confPw)     { showErr('Mật khẩu xác nhận không khớp!'); return; }
+  if(newPw === oldPw)      { showErr('Mật khẩu mới phải khác mật khẩu cũ!'); return; }
+
+  // Verify mật khẩu cũ — có thể là plain text (lần đầu) hoặc đã hash (đã đổi trước đó)
+  const storedHash = await _authGetPass(AUTH_CURRENT.user);
+  const inputHash  = await _hashPw(oldPw);
+  const defaultPw  = AUTH_USERS.find(a=>a.user===AUTH_CURRENT.user)?.pass;
+  const isDefaultStored = !_pwCache[AUTH_CURRENT.user]; // chưa đổi lần nào → so plain text
+  const passOk = isDefaultStored ? (oldPw === defaultPw) : (inputHash === storedHash);
+  if(!passOk) {
+    showErr('Mật khẩu hiện tại không đúng!');
+    document.getElementById('chpw-old').value = '';
+    document.getElementById('chpw-old').focus();
+    return;
+  }
+
+  // Lưu mật khẩu mới
+  await _authSavePass(AUTH_CURRENT.user, newPw);
+  // Cập nhật session
+  sessionStorage.setItem('tdh_auth', JSON.stringify({...AUTH_CURRENT, ts: Date.now()}));
+
+  chpwClear();
+  notify(`✅ Đổi mật khẩu thành công! Lần đăng nhập sau dùng mật khẩu mới.`);
+  tgMsg(`🔑 *Đổi mật khẩu thành công!*\n\n👤 Tài khoản: ${AUTH_CURRENT.user}\n🕐 ${new Date().toLocaleString('vi-VN')}\n\n_Trương Dáng Hương Academy_`);
+}
+
+// Cập nhật tên user trong card đổi mật khẩu khi vào trang Cài đặt
+function _chpwUpdateInfo() {
+  const el = document.getElementById('chpw-username');
+  if(el && AUTH_CURRENT) el.textContent = AUTH_CURRENT.user + (AUTH_CURRENT.role==='admin'?' 👑 Admin':' 👤 Nhân viên');
+}
+// Gọi mỗi khi render page
+const _origGo = go;
+function go(page, el) {
+  _origGo(page, el);
+  if(page==='telegram') setTimeout(_chpwUpdateInfo, 100);
+}
+
+async function doLogin() {
   const u = (document.getElementById('auth-user')?.value||'').trim();
   const p = (document.getElementById('auth-pass')?.value||'');
   const errEl = document.getElementById('auth-error');
@@ -8227,8 +8427,28 @@ function doLogin() {
     errEl.style.display = 'block'; return;
   }
 
-  // Thử so khớp
-  const found = AUTH_USERS.find(a => a.user===u && a.pass===p);
+  // Thử so khớp — dùng mật khẩu đã đổi nếu có
+  const userObj = AUTH_USERS.find(a => a.user===u);
+  if(!userObj) {
+    errEl.textContent = 'Tên đăng nhập hoặc mật khẩu không đúng!';
+    errEl.style.display = 'block';
+    document.getElementById('auth-pass').value = '';
+    document.getElementById('auth-pass').focus();
+    btnEl.style.transform='translateX(-4px)';
+    setTimeout(()=>{btnEl.style.transform='translateX(4px)';
+    setTimeout(()=>{btnEl.style.transform='none';},100);},100);
+    return;
+  }
+  const currentPass = await _authGetPass(u);
+  // Nếu chưa đổi MK lần nào → so plain text. Đã đổi → so hash SHA-256
+  const isDefaultStored = !_pwCache[u];
+  let passMatch = false;
+  if(isDefaultStored) {
+    passMatch = (p === userObj.pass); // chưa đổi: so plain
+  } else {
+    passMatch = (await _hashPw(p) === currentPass); // đã đổi: so hash
+  }
+  const found = passMatch ? userObj : null;
   if (!found) {
     errEl.textContent = 'Tên đăng nhập hoặc mật khẩu không đúng!';
     errEl.style.display = 'block';
@@ -8319,6 +8539,7 @@ function _authCheckSession() {
     return true;
   } catch(e) { return false; }
 }
+_authLoadPasswords(); // Load mật khẩu từ Supabase
 _authCheckSession();
 
 // ═══════════════════════════════════════════════════════════════
