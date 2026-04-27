@@ -2016,6 +2016,37 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="guide" style="margin-bottom:14px">
       🛡️ <strong>Backup định kỳ để tránh mất dữ liệu.</strong> File JSON có thể dùng để khôi phục toàn bộ. File Excel để xem và lưu trữ lâu dài.
     </div>
+    <!-- SQL Migration notice -->
+    <div id="sql-migration-notice" style="background:rgba(41,128,185,.06);border:1px solid rgba(41,128,185,.3);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:12px">
+      <div style="font-weight:700;color:#2980b9;margin-bottom:6px">🔧 Cần chạy SQL migration (1 lần) nếu chưa làm</div>
+      <div style="color:var(--muted);margin-bottom:8px">Nếu gặp lỗi "could not find column phone/address/payment...", chạy SQL này trong Supabase → SQL Editor:</div>
+      <pre style="background:#1e293b;color:#e2e8f0;border-radius:6px;padding:10px;font-size:10px;overflow-x:auto;margin:0;line-height:1.5">ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS phone TEXT DEFAULT '',
+  ADD COLUMN IF NOT EXISTS address TEXT DEFAULT '',
+  ADD COLUMN IF NOT EXISTS payment TEXT DEFAULT '',
+  ADD COLUMN IF NOT EXISTS shipping TEXT DEFAULT '',
+  ADD COLUMN IF NOT EXISTS tracking_url TEXT DEFAULT '',
+  ADD COLUMN IF NOT EXISTS discount NUMERIC DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS subtotal NUMERIC DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS app_users (
+  username TEXT PRIMARY KEY,
+  pass_hash TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE app_users ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "allow_all" ON app_users FOR ALL USING (true) WITH CHECK (true);
+
+CREATE TABLE IF NOT EXISTS nvl_orders (
+  id TEXT PRIMARY KEY, customer TEXT, phone TEXT, address TEXT,
+  items JSONB DEFAULT '[]', total NUMERIC DEFAULT 0, paid NUMERIC DEFAULT 0,
+  status TEXT DEFAULT 'Chờ xác nhận', delivery_date TEXT, note TEXT,
+  created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())*1000
+);
+ALTER TABLE nvl_orders ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "allow_all" ON nvl_orders FOR ALL USING (true) WITH CHECK (true);</pre>
+      <button class="btn btn-ghost btn-sm" style="margin-top:8px;font-size:11px" onclick="document.getElementById('sql-migration-notice').style.display='none'">Đã chạy rồi, ẩn đi</button>
+    </div>
 
     <!-- Backup buttons -->
     <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Xuất backup</div>
@@ -5052,8 +5083,9 @@ async function checkout(){
     ${discount>0?`<div><span>Chiết khấu bill</span><span style="color:var(--red)">-${fmt(discountAmt)} (-${discount}%)</span></div>`:''}
     <div><span>Tổng thanh toán</span><span style="color:var(--gold2);font-size:16px">${fmt(total)}</span></div>`;
   // Lưu đơn chờ
-  const pendingOrder={id,customer:name,email:'',items,total,time:nowDT(),note,status:'Chờ xác nhận',
-    address,payment,shipping,discount,subtotal,created_at:Date.now()};
+  const phone_val=document.getElementById('c-phone')?.value?.trim()||'';
+  const pendingOrder={id,customer:name,phone:phone_val,email:'',items,total,time:nowDT(),note,status:'Chờ xác nhận',
+    address,payment,shipping,discount,subtotal,tracking_url:'',created_at:Date.now()};
   await sbUpsert('orders',pendingOrder);
   D.orders.push(pendingOrder);
   showM('modal-qr');
@@ -5298,8 +5330,9 @@ async function saveDraft(){
   const payment=document.getElementById('c-payment')?.value||'Tiền mặt';
   const shipping=document.getElementById('c-shipping')?.value||'Khách tới lấy';
   const note=document.getElementById('c-note')?.value?.trim()||'';
-  const order={id,customer:name,email:'',items,total,time:nowDT(),note,status:'Chờ xác nhận',
-    address,payment,shipping,discount,subtotal,created_at:Date.now()};
+  const order_phone=document.getElementById('c-phone')?.value?.trim()||'';
+  const order={id,customer:name,phone:order_phone,email:'',items,total,time:nowDT(),note,status:'Chờ xác nhận',
+    address,payment,shipping,discount,subtotal,tracking_url:'',created_at:Date.now()};
   try{
     await sbUpsert('orders',order);
     D.orders.push(order);
@@ -9712,28 +9745,35 @@ function odGetStatusInfo(key) {
 function odRenderProgressBar(status) {
   const el = document.getElementById('od-status-progress');
   if(!el) return;
-  if(status==='Đã hủy') {
+  // Map legacy status
+  const legacyMap = {'Chờ thanh toán':'Chờ thu tiền','Đã lên đơn':'Chờ xác nhận','Chờ lấy hàng':'Đã book ship'};
+  const mappedStatus = legacyMap[status] || status;
+  if(mappedStatus==='Đã hủy') {
     el.innerHTML=`<div style="background:rgba(192,57,43,.1);border:1px solid rgba(192,57,43,.3);border-radius:8px;padding:8px 12px;text-align:center;font-size:13px;font-weight:700;color:#c0392b">✕ Đơn hàng đã hủy</div>`;
     return;
   }
   const flow = ORDER_STATUSES.filter(s=>s.step>0).sort((a,b)=>a.step-b.step);
-  const curStep = odGetStatusInfo(status).step || 0;
-  el.innerHTML = `<div style="display:flex;align-items:center;gap:0;min-width:${flow.length*60}px">
+  const curStep = ORDER_STATUSES.find(s=>s.key===mappedStatus)?.step || 0;
+  el.innerHTML = `<div style="display:flex;align-items:center;gap:0;min-width:${flow.length*58}px;padding:4px 0">
     ${flow.map((s,i)=>{
-      const done = curStep >= s.step;
-      const active = s.key === status;
+      const done   = s.step < curStep;   // bước trước: đã xong
+      const active = s.key === mappedStatus; // bước hiện tại
+      const future = s.step > curStep;   // bước sau: chưa tới
       return `
-        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative">
-          <div style="width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative;min-width:0">
+          ${i<flow.length-1?`<div style="position:absolute;top:13px;left:50%;width:100%;height:2px;z-index:0;background:${done?s.color:'var(--border)'}"></div>`:''}
+          <div style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:${active?14:12}px;
             background:${active?s.color:done?s.color:'var(--dim)'};
-            color:${done?'#fff':'var(--muted)'};
-            box-shadow:${active?'0 2px 8px '+s.color+'80':''};
-            border:2px solid ${done?s.color:'var(--border)'};
-            transition:.2s;flex-shrink:0;z-index:1">
-            ${active?s.icon:(done?'✓':'·')}
+            color:${active||done?'#fff':'var(--muted)'};
+            box-shadow:${active?'0 0 0 3px '+s.color+'33':''};
+            border:2px solid ${active||done?s.color:'var(--border)'};
+            flex-shrink:0;z-index:1;transition:.2s">
+            ${active?s.icon:done?'✓':'·'}
           </div>
-          <div style="font-size:9px;text-align:center;color:${active?s.color:done?'var(--muted)':'var(--border)'};font-weight:${active?700:400};line-height:1.2;max-width:52px">${s.key}</div>
-          ${i<flow.length-1?`<div style="position:absolute;top:13px;left:50%;width:100%;height:2px;background:${done&&curStep>s.step?s.color:'var(--border)'};z-index:0"></div>`:''}
+          <div style="font-size:9px;text-align:center;font-weight:${active?700:400};line-height:1.2;max-width:54px;word-break:keep-all;
+            color:${active?s.color:done?'#aaa':'var(--border)'}">
+            ${s.key}
+          </div>
         </div>`;
     }).join('')}
   </div>`;
