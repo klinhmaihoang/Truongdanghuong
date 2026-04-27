@@ -5115,7 +5115,7 @@ function filterOrders(){
     (o.items||'').toLowerCase().includes(q)
   );
   // Render filtered into current active panel
-  const retailFiltered=filtered.filter(o=>!o.id.startsWith('HP')&&o.status!=='Đã hủy'&&o.status!=='Chờ thanh toán');
+  const retailFiltered=filtered.filter(o=>!o.id.startsWith('HP')&&o.status!=='Đã hủy');
   const elR=document.getElementById('retail-orders');
   if(elR&&document.getElementById('panel-retail-orders').style.display!=='none'){
     elR.innerHTML=retailFiltered.slice().reverse().map(o=>`<tr>
@@ -5255,7 +5255,7 @@ function renderPendingOrders(){
       <td style="font-size:11px;color:var(--muted)">${o.note||'—'}</td>
       <td class="btn-group" style="gap:4px">
         <button class="btn btn-ghost btn-sm" onclick="showOrderDetail('${o.id}')">👁</button>
-        ${o.status==='Chờ thanh toán'||o.status==='Đã giao'?`<button class="btn btn-green btn-sm" onclick="collectPending('${o.id}')">💰 Thu tiền</button>`:''}
+        ${['Chờ thu tiền','Chờ thanh toán','Đã giao'].includes(o.status)?`<button class="btn btn-green btn-sm" onclick="collectPending('${o.id}')">💰 Thu tiền</button>`:''}
         <button class="btn btn-pdf btn-sm" onclick="exportPDF('${o.id}')">📄 PDF</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="cancelOrderFromPending('${o.id}')">✕</button>
       </td>
@@ -9429,21 +9429,13 @@ function showOrderDetail(id) {
   waitEl.textContent = waitHours<1?'Vừa tạo':waitHours<24?waitHours+'h':Math.round(waitHours/24)+'ngày';
   waitEl.style.color = waitHours>24?'var(--red)':'var(--muted)';
   // Status badge
+  // Status badge — dùng si từ ORDER_STATUSES với legacy mapping
   const badge = document.getElementById('od-status-badge');
-  const statusColors = {
-    'Đã thanh toán':'var(--green)','Chờ thanh toán':'var(--orange)','Đã hủy':'var(--red)',
-    'Chờ xác nhận':'#8e44ad','Đã xác nhận':'#2980b9','Đang chuẩn bị':'#e67e22',
-    'Đã book ship':'#d35400','Đang giao':'#1abc9c','Đã giao':'#27ae60','Chờ thu tiền':'#FF8C00',
-  };
-  const statusBg = {
-    'Đã thanh toán':'rgba(39,174,96,.1)','Chờ thanh toán':'rgba(255,140,0,.1)','Đã hủy':'rgba(192,57,43,.1)',
-    'Chờ xác nhận':'rgba(142,68,173,.1)','Đã xác nhận':'rgba(41,128,185,.1)','Đang chuẩn bị':'rgba(230,126,34,.1)',
-    'Đã book ship':'rgba(211,84,0,.1)','Đang giao':'rgba(26,188,156,.1)','Đã giao':'rgba(39,174,96,.1)','Chờ thu tiền':'rgba(255,140,0,.1)',
-  };
+  const si = odGetStatusInfo(o.status);
   badge.textContent = o.status;
-  badge.style.color  = statusColors[o.status]||'var(--muted)';
-  badge.style.background = statusBg[o.status]||'var(--bg)';
-  badge.style.border = `1.5px solid ${statusColors[o.status]||'var(--border)'}`;
+  badge.style.color      = si.color || 'var(--muted)';
+  badge.style.background = si.bg    || 'var(--bg)';
+  badge.style.border     = `1.5px solid ${si.color||'var(--border)'}`;
   // Show/hide thu tiền button — hiện khi COD đã giao HOẶC chờ thu tiền
   const isCOD = o.payment==='COD';
   const collectBtn = document.getElementById('od-collect-btn');
@@ -9502,7 +9494,10 @@ function showOrderDetail(id) {
   } else discEl.style.display='none';
   showM('modal-order-detail');
   // Progress bar + tracking (inlined từ patch)
-  odRenderProgressBar(o.status||'Đã lên đơn');
+  // Map legacy status cho progress bar
+  const legacyMap = {'Chờ thanh toán':'Chờ thu tiền','Đã lên đơn':'Chờ xác nhận','Chờ lấy hàng':'Đã book ship'};
+  const displayStatus = legacyMap[o.status] || o.status || 'Chờ xác nhận';
+  odRenderProgressBar(displayStatus);
   const trackView = document.getElementById('od-tracking-view');
   if(trackView) {
     if(o.tracking_url) {
@@ -9527,7 +9522,10 @@ function odEnterEdit() {
   document.getElementById('od-edit-address').value  = o.address||'';
   document.getElementById('od-edit-discount').value = o.discount||'';
   document.getElementById('od-edit-note').value     = o.note||'';
-  document.getElementById('od-edit-status').value   = o.status||'Chờ xác nhận';
+  // Map legacy status → new status options
+  const legacyStatusMap = {'Chờ thanh toán':'Chờ thu tiền','Đã lên đơn':'Chờ xác nhận','Chờ lấy hàng':'Đã book ship'};
+  const currentStatus = legacyStatusMap[o.status] || o.status || 'Chờ xác nhận';
+  document.getElementById('od-edit-status').value = currentStatus;
   // Load payment/shipping (inlined)
   const payEl2 = document.getElementById('od-edit-payment');
   if(payEl2) payEl2.value = o.payment||'Chuyển khoản trước';
@@ -9699,12 +9697,15 @@ const ORDER_STATUSES = [
 const DELIVERY_STATUSES = ['Đã book ship','Đang giao','Đã giao','Chờ thu tiền'];
 
 // Trạng thái "chưa xong" — hiện trong tab "Chờ xử lý"
-const ACTIVE_STATUSES = ['Chờ xác nhận','Đã xác nhận','Đang chuẩn bị','Đã book ship','Đang giao','Đã giao','Chờ thu tiền'];
+const ACTIVE_STATUSES = ['Chờ xác nhận','Đã xác nhận','Đang chuẩn bị','Đã book ship','Đang giao','Đã giao','Chờ thu tiền','Chờ thanh toán'/* backward compat */];
 
 // Các trạng thái liên quan đến giao hàng (hiện tracking)
 
 function odGetStatusInfo(key) {
-  return ORDER_STATUSES.find(s=>s.key===key) || {key,icon:'⬤',color:'var(--muted)',bg:'var(--bg)',step:0};
+  // Map trạng thái cũ → mới để backward compat
+  const legacyMap = {'Chờ thanh toán':'Chờ thu tiền','Đã lên đơn':'Chờ xác nhận','Chờ lấy hàng':'Đã book ship'};
+  const mappedKey = legacyMap[key] || key;
+  return ORDER_STATUSES.find(s=>s.key===mappedKey) || ORDER_STATUSES.find(s=>s.key===key) || {key,icon:'⬤',color:'var(--muted)',bg:'var(--bg)',step:0};
 }
 
 // ── PROGRESS BAR ───────────────────────────────────────────────
