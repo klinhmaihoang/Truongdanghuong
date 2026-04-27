@@ -388,9 +388,27 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <button class="btn btn-tg btn-sm" onclick="tgReport('inventory')">📦 Telegram</button>
     <button class="btn btn-excel btn-sm" onclick="xlExport('inventory')">📊 Excel</button>
   </div>
+  <!-- Tổng giá trị kho -->
+  <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+    <div class="stat" style="--accent:var(--teal)">
+      <div class="stat-num" id="inv-total-value">—</div>
+      <div class="stat-label">Tổng giá trị kho (₫)</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num" id="inv-total-items">—</div>
+      <div class="stat-label">Loại nguyên liệu</div>
+    </div>
+    <div class="stat" style="--accent:var(--red)">
+      <div class="stat-num" id="inv-low-items">—</div>
+      <div class="stat-label">Sắp hết hàng</div>
+    </div>
+  </div>
   <div class="card">
     <div class="card-head"><span class="card-title">Tình trạng tồn kho</span></div>
-    <table><thead><tr><th>Nguyên liệu</th><th>Đơn vị</th><th>Tồn kho</th><th>Tối thiểu</th><th>Mức tồn</th><th></th></tr></thead>
+    <table><thead><tr>
+      <th>Mã HH</th><th>Nguyên liệu</th><th>Nhà CC</th><th>Đơn vị</th>
+      <th>Tồn kho</th><th>Tối thiểu</th><th>Giá nhập</th><th>Giá trị HH</th><th>Mức tồn</th><th></th>
+    </tr></thead>
     <tbody id="inv-list"></tbody></table>
   </div>
   <div class="card">
@@ -1196,11 +1214,15 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
 
 <!-- Thêm nguyên liệu mới -->
 <div class="overlay" id="modal-add-mat">
-  <div class="modal">
+  <div class="modal wide">
     <div class="modal-title">+ Thêm nguyên liệu mới</div>
     <div class="form-row">
+      <div class="fg"><label>Mã hàng hóa</label><input id="am-sku" placeholder="TDH001 (tự động nếu trống)"/></div>
       <div class="fg"><label>Tên nguyên liệu *</label><input id="am-name" placeholder="VD: Trà bá tước"/></div>
+    </div>
+    <div class="form-row">
       <div class="fg"><label>Đơn vị *</label><input id="am-unit" placeholder="kg, gói, chai, lít..."/></div>
+      <div class="fg"><label>Nhà cung cấp</label><input id="am-supplier" placeholder="VD: Công ty ABC"/></div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Số lượng ban đầu</label><input id="am-qty" type="number" placeholder="0" min="0" step="0.01"/></div>
@@ -1216,12 +1238,16 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
 
 <!-- Edit Material -->
 <div class="overlay" id="modal-edit-mat">
-  <div class="modal">
+  <div class="modal wide">
     <div class="modal-title">✏️ Sửa nguyên liệu</div>
     <input type="hidden" id="em-id"/>
     <div class="form-row">
+      <div class="fg"><label>Mã hàng hóa</label><input id="em-sku" placeholder="TDH001"/></div>
       <div class="fg"><label>Tên nguyên liệu *</label><input id="em-name" placeholder="VD: Trà bá tước"/></div>
+    </div>
+    <div class="form-row">
       <div class="fg"><label>Đơn vị *</label><input id="em-unit" placeholder="kg, gói, chai, lít..."/></div>
+      <div class="fg"><label>Nhà cung cấp</label><input id="em-supplier" placeholder="VD: Công ty ABC"/></div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Tồn kho hiện tại</label><input id="em-qty" type="number" min="0" step="0.01"/></div>
@@ -3292,41 +3318,73 @@ async function directPay(id){
 // ── INVENTORY ──
 function renderInventory(){
   const el=document.getElementById('inv-list');if(!el)return;
+
+  // Tính tổng giá trị kho
+  const totalValue=D.inventory.reduce((a,i)=>(a+(i.qty||0)*(i.cost||0)),0);
+  const totalItems=D.inventory.length;
+  const lowItems=D.inventory.filter(i=>i.qty<=i.min).length;
+
+  // Update stats nếu có
+  const tvEl=document.getElementById('inv-total-value');
+  if(tvEl) tvEl.textContent=fmt(totalValue);
+  const tiEl=document.getElementById('inv-total-items');
+  if(tiEl) tiEl.textContent=totalItems;
+  const liEl=document.getElementById('inv-low-items');
+  if(liEl) liEl.textContent=lowItems;
+
   el.innerHTML=D.inventory.map(item=>{
-    const max=Math.max(item.qty,item.min*3);
+    const max=Math.max(item.qty,item.min*3,1);
     const pct=Math.round(item.qty/max*100);
-    const cls=item.qty<=item.min?'danger':item.qty<=item.min*1.5?'warn':'';
     const col=item.qty<=item.min?'var(--red)':item.qty<=item.min*1.5?'var(--orange)':'var(--teal)';
+    const value=(item.qty||0)*(item.cost||0);
+    const sku=item.sku||'—';
     return`<tr>
-      <td><strong>${item.name}</strong></td><td style="color:var(--muted)">${item.unit}</td>
+      <td><span style="font-size:11px;font-weight:600;color:var(--brand);background:rgba(255,140,0,.1);padding:2px 6px;border-radius:4px">${sku}</span></td>
+      <td><strong>${item.name}</strong></td>
+      <td style="font-size:12px;color:var(--muted)">${item.supplier||'—'}</td>
+      <td style="color:var(--muted)">${item.unit}</td>
       <td><strong style="color:${col}">${item.qty}</strong></td>
       <td style="color:var(--muted)">${item.min}</td>
-      <td style="width:120px"><div class="pb"><div class="pf ${cls}" style="width:${pct}%"></div></div></td>
-      <td class="btn-group" style="gap:5px">
-        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('im-mat').value='${item.id}';showM('modal-import')">📥 Nhập</button>
+      <td style="color:var(--muted)">${item.cost?fmt(item.cost):'—'}</td>
+      <td style="font-weight:700;color:var(--teal)">${value>0?fmt(value):'—'}</td>
+      <td style="min-width:80px">
+        <div style="background:var(--border);border-radius:4px;height:6px;overflow:hidden">
+          <div style="background:${col};height:100%;width:${Math.min(pct,100)}%;transition:.3s"></div>
+        </div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">${pct}%</div>
+      </td>
+      <td class="btn-group" style="gap:4px">
+        <button class="btn btn-green btn-sm" onclick="showImportModal('${item.id}')">📥</button>
         <button class="btn btn-ghost btn-sm" onclick="openEditMat('${item.id}')">✏️</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteMat('${item.id}')">🗑</button>
       </td>
     </tr>`;
-  }).join('');
+  }).join('')||'<tr><td colspan="10" style="text-align:center;padding:18px;color:var(--muted)">Chưa có nguyên liệu</td></tr>';
 }
 
 async function addMaterial(){
   const name=document.getElementById('am-name').value.trim();
   const unit=document.getElementById('am-unit').value.trim();
   if(!name||!unit){notify('Nhập tên và đơn vị!',false);return;}
-  const mat={id:uid(),name,unit,
-    qty:+document.getElementById('am-qty').value||0,
-    min:+document.getElementById('am-min').value||0,
-    cost:+document.getElementById('am-cost').value||0,
+  // Auto-generate SKU nếu trống: TDH001, TDH002...
+  const skuInput=document.getElementById('am-sku').value.trim();
+  const sku=skuInput||('TDH'+String(D.inventory.length+1).padStart(3,'0'));
+  const mat={id:uid(),sku,name,unit,supplier:document.getElementById('am-supplier').value.trim()||'',
+    qty:parseFloat(document.getElementById('am-qty').value)||0,
+    min:parseFloat(document.getElementById('am-min').value)||0,
+    cost:parseFloat(document.getElementById('am-cost').value)||0,
     created_at:Date.now()};
   try{
     await sbUpsert('inventory',mat);
     D.inventory.push(mat);
     closeM('modal-add-mat');
-    ['am-name','am-unit','am-qty','am-min','am-cost'].forEach(id=>document.getElementById(id).value='');
-    render();notify('Đã thêm nguyên liệu: '+name);
+    ['am-name','am-unit','am-qty','am-min','am-cost','am-sku','am-supplier'].forEach(id=>{
+      const el=document.getElementById(id);if(el)el.value='';
+    });
+    fillMatSelects();renderInventory();renderDash();
+    notify('✓ Đã thêm: '+name+' ('+sku+')');
     if(document.getElementById('at-mat').checked)
-      tgMsg(`🧪 *Thêm nguyên liệu mới!*\n\n📦 ${name}\n📏 Đơn vị: ${unit}\n🔢 Số lượng: ${mat.qty}\n💰 Giá nhập: ${mat.cost?fmt(mat.cost):'-'}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+      tgMsg('📦 *Thêm nguyên liệu!*\n\n🔖 Mã: '+sku+'\n📦 '+name+' — '+unit+'\n💰 Giá nhập: '+fmt(mat.cost)+'/'+unit+'\n🏭 NCC: '+(mat.supplier||'—')+'\n🕐 '+nowDT()+'\n\n_Trương Dáng Hương Academy_');
     gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
   }catch(e){notify('Lỗi: '+e.message,false);}
 }
@@ -3834,8 +3892,10 @@ function scheduleDaily8am(){
 function openEditMat(id){
   const m=D.inventory.find(x=>x.id===id);if(!m)return;
   document.getElementById('em-id').value=m.id;
+  document.getElementById('em-sku').value=m.sku||'';
   document.getElementById('em-name').value=m.name||'';
   document.getElementById('em-unit').value=m.unit||'';
+  document.getElementById('em-supplier').value=m.supplier||'';
   document.getElementById('em-qty').value=m.qty||0;
   document.getElementById('em-min').value=m.min||0;
   document.getElementById('em-cost').value=m.cost||0;
@@ -3848,8 +3908,10 @@ async function saveEditMat(){
   const name=document.getElementById('em-name').value.trim();
   if(!name){notify('Nhập tên nguyên liệu!',false);return;}
   const upd={
+    sku:document.getElementById('em-sku').value.trim()||m.sku||('TDH'+String(D.inventory.indexOf(m)+1).padStart(3,'0')),
     name,
     unit:document.getElementById('em-unit').value.trim(),
+    supplier:document.getElementById('em-supplier').value.trim(),
     qty:parseFloat(document.getElementById('em-qty').value)||0,
     min:parseFloat(document.getElementById('em-min').value)||0,
     cost:parseFloat(document.getElementById('em-cost').value)||0,
