@@ -201,6 +201,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <button onclick="go('customers',this)">👥 Khách hàng</button>
     <button onclick="go('reports',this)" style="color:var(--teal)">📊 Báo cáo</button>
       <button onclick="go('finance',this)" style="color:var(--green)">💵 Thu chi</button>
+    <button onclick="go('costcalc',this)" style="color:#e67e22">💧 Tính Cost</button>
     <button onclick="go('telegram',this)" style="color:#5bc8f0">⚡ Telegram</button>
   </div>
 </div>
@@ -230,6 +231,9 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   </button>
   <button class="bottom-nav-btn" onclick="go('finance',this);syncBottomNav(this)">
     <span class="bn-icon">💵</span>Thu chi
+  </button>
+  <button class="bottom-nav-btn" onclick="go('costcalc',this);syncBottomNav(this)">
+    <span class="bn-icon">💧</span>Tính Cost
   </button>
   <button class="bottom-nav-btn" onclick="go('telegram',this);syncBottomNav(this)">
     <span class="bn-icon">⚡</span>Cài đặt
@@ -568,6 +572,80 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <tbody id="fin-list"></tbody></table>
   </div>
 </div>
+
+
+<!-- TÍNH COST MÓN NƯỚC -->
+<div class="page" id="page-costcalc">
+  <div class="btn-group" style="margin-bottom:14px">
+    <button class="btn btn-sm" onclick="showM('modal-add-drink')">+ Thêm món mới</button>
+    <button class="btn btn-ghost btn-sm" onclick="printCostTable()">🖨️ In bảng cost</button>
+    <button class="btn btn-excel btn-sm" onclick="xlExportDrinkCost()">📊 Xuất Excel</button>
+  </div>
+  <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+    <div class="stat" style="--accent:var(--teal)"><div class="stat-num" id="cost-total-drinks">0</div><div class="stat-label">Số món nước</div></div>
+    <div class="stat" style="--accent:var(--orange)"><div class="stat-num" id="cost-avg-pct">0%</div><div class="stat-label">% Cost trung bình</div></div>
+    <div class="stat" style="--accent:var(--green)"><div class="stat-num" id="cost-avg-profit">0</div><div class="stat-label">Lợi nhuận TB/ly (₫)</div></div>
+  </div>
+  <div class="card">
+    <div class="card-head">
+      <span class="card-title">📋 Danh sách món nước &amp; cost</span>
+      <input id="cost-search" placeholder="🔍 Tìm tên món..." oninput="renderCostCalc()"
+        style="padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit;min-width:200px"/>
+    </div>
+    <table>
+      <thead><tr>
+        <th>Tên món</th><th>Giá bán</th><th>Cost nguyên liệu</th><th>% Cost</th><th>Lợi nhuận/ly</th><th>Đánh giá</th><th></th>
+      </tr></thead>
+      <tbody id="cost-list"></tbody>
+    </table>
+  </div>
+  <div class="guide" style="margin-top:12px">
+    💡 <strong>Mục tiêu cost lý tưởng cho đồ uống:</strong>
+    &nbsp;🟢 Tốt: &lt; 25% &nbsp;|&nbsp; 🟡 Chấp nhận: 25–35% &nbsp;|&nbsp; 🔴 Cao: &gt; 35%
+  </div>
+</div>
+
+<!-- Modal thêm/sửa món nước -->
+<div class="overlay" id="modal-add-drink">
+  <div class="modal wide">
+    <div class="modal-title" id="drink-modal-title">+ Thêm món nước mới</div>
+    <input type="hidden" id="drink-edit-id"/>
+    <div class="form-row">
+      <div class="fg"><label>Tên món *</label><input id="drink-name" placeholder="VD: Trà sữa Oolong, Bạc xỉu..."/></div>
+      <div class="fg"><label>Giá bán (₫)</label><input id="drink-price" type="number" placeholder="45000" oninput="recalcDrinkLive()"/></div>
+    </div>
+    <div class="fg" style="margin-bottom:14px"><label>Ghi chú (size, cách pha...)</label><input id="drink-note" placeholder="VD: Size M 350ml, dùng 70% sữa đặc..."/></div>
+    <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:8px">🧂 Nguyên liệu (giá lấy tự động từ kho)</div>
+    <div id="drink-ingredient-rows" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+    <button class="btn btn-ghost btn-sm" onclick="addDrinkIngredient()" style="width:100%;margin-bottom:14px">+ Thêm nguyên liệu</button>
+    <div id="drink-cost-summary" style="background:var(--brand-light);border-radius:10px;padding:14px;margin-bottom:14px;display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">
+        <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost NL</div><div style="font-size:20px;font-weight:800;color:var(--brand)" id="summary-cost">0₫</div></div>
+        <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">% Cost</div><div style="font-size:20px;font-weight:800" id="summary-pct">—</div></div>
+        <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Lợi nhuận/ly</div><div style="font-size:20px;font-weight:800;color:var(--green)" id="summary-profit">0₫</div></div>
+      </div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-green btn-sm" onclick="saveDrinkRecipe()">💾 Lưu công thức</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-drink')">Hủy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal chi tiết công thức -->
+<div class="overlay" id="modal-drink-detail">
+  <div class="modal wide">
+    <div class="modal-title" id="dd-title">Chi tiết công thức</div>
+    <div id="dd-content"></div>
+    <div class="btn-group" style="margin-top:16px">
+      <button class="btn btn-sm" onclick="editDrinkFromDetail()">✏️ Sửa</button>
+      <button class="btn btn-red btn-sm" onclick="deleteDrinkFromDetail()">🗑 Xóa</button>
+      <button class="btn btn-ghost btn-sm" onclick="printSingleDrink()">🖨️ In phiếu</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-drink-detail')">Đóng</button>
+    </div>
+  </div>
+</div>
+
 
 <!-- Phiếu thu -->
 <div class="overlay" id="modal-add-thu">
@@ -1977,7 +2055,8 @@ async function autoUpdateStudentStatus(){
   window._pendingRemind2=unpaidReminders;
 }
 
-function render(){autoUpdateStudentStatus();renderDash();renderStudents();renderDeletedStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();renderCourses();renderCustomers();fillMatSelects();}
+function render(){
+  setTimeout(()=>{if(document.getElementById('cost-list'))renderCostCalc();},0);autoUpdateStudentStatus();renderDash();renderStudents();renderDeletedStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();renderCourses();renderCustomers();fillMatSelects();}
 
 // ══════════════════════════════════════════════════
 // CUSTOMERS
@@ -4539,6 +4618,251 @@ window.addEventListener('offline', ()=>{
   notify('⚠️ Mất kết nối Internet!',false);
   if(_pollInterval) clearInterval(_pollInterval);
 });
+
+
+// ════════════════════════════════════════════════════
+// MODULE: TÍNH COST MÓN NƯỚC — Trương Dáng Hương Academy
+// ════════════════════════════════════════════════════
+let D_drinks = [];
+
+async function loadDrinkRecipes() {
+  try { D_drinks = (await sbGet('drink_recipes','?order=created_at.asc')) || []; }
+  catch(e) { D_drinks = []; }
+}
+
+function renderCostCalc() {
+  const q = (document.getElementById('cost-search')?.value||'').toLowerCase();
+  const filtered = D_drinks.filter(d=>!q||(d.name||'').toLowerCase().includes(q));
+  let sumPct=0, sumProfit=0, pctCount=0;
+  filtered.forEach(d=>{
+    const {costPerServing,profitPerServing}=calcDrinkCost(d);
+    if(d.sale_price>0){sumPct+=costPerServing/d.sale_price*100;sumProfit+=profitPerServing;pctCount++;}
+  });
+  const el=id=>document.getElementById(id);
+  if(el('cost-total-drinks')) el('cost-total-drinks').textContent=filtered.length;
+  if(el('cost-avg-pct')) el('cost-avg-pct').textContent=pctCount>0?Math.round(sumPct/pctCount)+'%':'—';
+  if(el('cost-avg-profit')) el('cost-avg-profit').textContent=pctCount>0?Math.round(sumProfit/pctCount).toLocaleString('vi-VN'):'—';
+  const tbody=el('cost-list');
+  if(!tbody) return;
+  if(!filtered.length){
+    tbody.innerHTML='<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:24px">Chưa có món nào — Nhấn "+ Thêm món mới" để bắt đầu!</td></tr>';
+    return;
+  }
+  tbody.innerHTML=filtered.map(d=>{
+    const {costPerServing,profitPerServing}=calcDrinkCost(d);
+    const pct=d.sale_price>0?Math.round(costPerServing/d.sale_price*100):null;
+    let badge='',pctColor='#888';
+    if(pct!==null){if(pct<25){badge='🟢 Tốt';pctColor='var(--green)';}else if(pct<=35){badge='🟡 Chấp nhận';pctColor='#e67e22';}else{badge='🔴 Cao';pctColor='var(--red)';}}
+    return `<tr style="cursor:pointer" onclick="showDrinkDetail('${d.id}')">
+      <td><strong>${d.name}</strong>${d.note?`<div style="font-size:11px;color:var(--muted)">${d.note}</div>`:''}
+      </td>
+      <td>${d.sale_price>0?d.sale_price.toLocaleString('vi-VN')+'₫':'—'}</td>
+      <td><strong>${Math.round(costPerServing).toLocaleString('vi-VN')}₫</strong></td>
+      <td style="color:${pctColor};font-weight:700">${pct!==null?pct+'%':'—'}</td>
+      <td style="color:var(--green);font-weight:700">${d.sale_price>0?Math.round(profitPerServing).toLocaleString('vi-VN')+'₫':'—'}</td>
+      <td>${badge}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();openEditDrink('${d.id}')">✏️</button></td>
+    </tr>`;
+  }).join('');
+}
+
+function calcDrinkCost(drink){
+  let cost=0;
+  (drink.ingredients||[]).forEach(ing=>{
+    const mat=D.inventory.find(m=>m.id===ing.mat_id||m.name===ing.mat_name);
+    const unitCost=mat?(mat.cost||0):(ing.cost_snapshot||0);
+    cost+=unitCost*(ing.qty||0);
+  });
+  return{costPerServing:cost,profitPerServing:(drink.sale_price||0)-cost};
+}
+
+function addDrinkIngredient(matId='',qty=''){
+  const container=document.getElementById('drink-ingredient-rows');
+  const matOpts=D.inventory.map(m=>`<option value="${m.id}" data-cost="${m.cost||0}" data-unit="${m.unit||''}" ${m.id===matId?'selected':''}>${m.name} (${(m.cost||0).toLocaleString('vi-VN')}₫/${m.unit||'đv'})</option>`).join('');
+  const row=document.createElement('div');
+  row.className='drink-ing-row';
+  row.style.cssText='display:grid;grid-template-columns:1fr 120px 80px auto;gap:8px;align-items:center;background:var(--bg);border-radius:8px;padding:8px 10px;border:1px solid var(--border)';
+  row.innerHTML=`
+    <select class="ing-mat" onchange="updateIngUnit(this);recalcDrinkLive()" style="border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-size:13px;font-family:inherit;background:#fff;outline:none">
+      <option value="">-- Chọn nguyên liệu --</option>${matOpts}
+    </select>
+    <input class="ing-qty" type="number" step="0.001" min="0" placeholder="0.05" value="${qty}" oninput="recalcDrinkLive()"
+      style="border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-size:13px;font-family:inherit;width:100%;outline:none"/>
+    <div class="ing-unit" style="font-size:12px;color:var(--muted);font-weight:600"></div>
+    <button onclick="this.closest('.drink-ing-row').remove();recalcDrinkLive()"
+      style="background:var(--red);color:#fff;border:none;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;flex-shrink:0">✕</button>`;
+  container.appendChild(row);
+  if(matId){const sel=row.querySelector('.ing-mat');sel.value=matId;updateIngUnit(sel);}
+  recalcDrinkLive();
+}
+function updateIngUnit(sel){
+  const row=sel.closest('.drink-ing-row');
+  if(!row) return;
+  const opt=sel.options[sel.selectedIndex];
+  row.querySelector('.ing-unit').textContent=opt?(opt.dataset.unit||''):'';
+}
+function recalcDrinkLive(){
+  let total=0;
+  document.querySelectorAll('.drink-ing-row').forEach(row=>{
+    const sel=row.querySelector('.ing-mat');
+    const qty=parseFloat(row.querySelector('.ing-qty').value)||0;
+    if(sel&&sel.value){const opt=sel.options[sel.selectedIndex];total+=(parseFloat(opt.dataset.cost)||0)*qty;}
+  });
+  const price=parseFloat(document.getElementById('drink-price')?.value)||0;
+  const summary=document.getElementById('drink-cost-summary');
+  if(!summary) return;
+  summary.style.display=total>0?'block':'none';
+  document.getElementById('summary-cost').textContent=Math.round(total).toLocaleString('vi-VN')+'₫';
+  if(price>0){
+    const pct=Math.round(total/price*100);
+    const pctEl=document.getElementById('summary-pct');
+    pctEl.textContent=pct+'%';
+    pctEl.style.color=pct<25?'var(--green)':pct<=35?'#e67e22':'var(--red)';
+    document.getElementById('summary-profit').textContent=Math.round(price-total).toLocaleString('vi-VN')+'₫';
+  }else{
+    document.getElementById('summary-pct').textContent='—';
+    document.getElementById('summary-profit').textContent='—';
+  }
+}
+function openEditDrink(id){
+  const d=D_drinks.find(x=>x.id===id);
+  if(!d) return;
+  document.getElementById('drink-modal-title').textContent='✏️ Sửa công thức';
+  document.getElementById('drink-edit-id').value=d.id;
+  document.getElementById('drink-name').value=d.name||'';
+  document.getElementById('drink-price').value=d.sale_price||'';
+  document.getElementById('drink-note').value=d.note||'';
+  document.getElementById('drink-ingredient-rows').innerHTML='';
+  (d.ingredients||[]).forEach(ing=>addDrinkIngredient(ing.mat_id,ing.qty));
+  recalcDrinkLive();
+  showM('modal-add-drink');
+}
+async function saveDrinkRecipe(){
+  const name=(document.getElementById('drink-name').value||'').trim();
+  if(!name){notify('Vui lòng nhập tên món!',false);return;}
+  const ingredients=[];
+  document.querySelectorAll('.drink-ing-row').forEach(row=>{
+    const sel=row.querySelector('.ing-mat');
+    const qty=parseFloat(row.querySelector('.ing-qty').value)||0;
+    if(sel&&sel.value&&qty>0){
+      const mat=D.inventory.find(m=>m.id===sel.value);
+      ingredients.push({mat_id:sel.value,mat_name:mat?mat.name:'',mat_unit:mat?mat.unit:'',qty,cost_snapshot:mat?(mat.cost||0):0});
+    }
+  });
+  const editId=document.getElementById('drink-edit-id').value;
+  const row={id:editId||('dr'+Date.now()),name,sale_price:parseFloat(document.getElementById('drink-price').value)||0,note:(document.getElementById('drink-note').value||'').trim(),ingredients};
+  try{
+    await sbUpsert('drink_recipes',row);
+    const idx=D_drinks.findIndex(x=>x.id===row.id);
+    if(idx>=0)D_drinks[idx]=row;else D_drinks.push(row);
+    closeM('modal-add-drink');
+    renderCostCalc();
+    notify('✅ Đã lưu công thức: '+name);
+  }catch(e){notify('Lỗi lưu: '+e.message,false);}
+}
+let _currentDrinkId=null;
+function showDrinkDetail(id){
+  const d=D_drinks.find(x=>x.id===id);
+  if(!d) return;
+  _currentDrinkId=id;
+  document.getElementById('dd-title').textContent='🧪 '+d.name;
+  const{costPerServing,profitPerServing}=calcDrinkCost(d);
+  const pct=d.sale_price>0?Math.round(costPerServing/d.sale_price*100):null;
+  const pctColor=pct===null?'#888':pct<25?'var(--green)':pct<=35?'#e67e22':'var(--red)';
+  const badge=pct===null?'':pct<25?'🟢 Tốt (<25%)':pct<=35?'🟡 Chấp nhận (25–35%)':'🔴 Cost cao (>35%)';
+  const ingRows=(d.ingredients||[]).map(ing=>{
+    const mat=D.inventory.find(m=>m.id===ing.mat_id);
+    const c=mat?(mat.cost||0):(ing.cost_snapshot||0);
+    return`<tr><td>${ing.mat_name||'—'}</td><td style="text-align:right">${ing.qty} ${ing.mat_unit||''}</td><td style="text-align:right">${c.toLocaleString('vi-VN')}₫/${ing.mat_unit||'đv'}</td><td style="text-align:right;font-weight:600">${Math.round(c*ing.qty).toLocaleString('vi-VN')}₫</td></tr>`;
+  }).join('');
+  document.getElementById('dd-content').innerHTML=`
+    ${d.note?`<div style="font-size:12px;color:var(--muted);margin-bottom:12px;background:var(--bg);padding:8px 12px;border-radius:8px">📝 ${d.note}</div>`:''}
+    <table style="margin-bottom:14px">
+      <thead><tr><th>Nguyên liệu</th><th style="text-align:right">Định lượng</th><th style="text-align:right">Đơn giá</th><th style="text-align:right">Thành tiền</th></tr></thead>
+      <tbody>${ingRows||'<tr><td colspan="4" style="text-align:center;color:var(--muted)">Chưa có nguyên liệu</td></tr>'}</tbody>
+    </table>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;background:var(--brand-light);border-radius:10px;padding:14px;text-align:center">
+      <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Giá bán</div><div style="font-size:22px;font-weight:800;color:var(--brown)">${d.sale_price>0?d.sale_price.toLocaleString('vi-VN')+'₫':'—'}</div></div>
+      <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost NL</div><div style="font-size:22px;font-weight:800;color:var(--brand)">${Math.round(costPerServing).toLocaleString('vi-VN')}₫</div><div style="font-size:13px;font-weight:700;color:${pctColor}">${pct!==null?pct+'% — '+badge:'—'}</div></div>
+      <div><div style="font-size:11px;color:var(--muted);text-transform:uppercase;font-weight:600">Lợi nhuận</div><div style="font-size:22px;font-weight:800;color:var(--green)">${d.sale_price>0?Math.round(profitPerServing).toLocaleString('vi-VN')+'₫':'—'}</div></div>
+    </div>`;
+  showM('modal-drink-detail');
+}
+function editDrinkFromDetail(){closeM('modal-drink-detail');openEditDrink(_currentDrinkId);}
+async function deleteDrinkFromDetail(){
+  if(!confirm('Xóa công thức này?')) return;
+  try{
+    await sbDel('drink_recipes','?id=eq.'+_currentDrinkId);
+    D_drinks=D_drinks.filter(x=>x.id!==_currentDrinkId);
+    closeM('modal-drink-detail');renderCostCalc();notify('Đã xóa công thức');
+  }catch(e){notify('Lỗi xóa: '+e.message,false);}
+}
+function printCostTable(){
+  const rows=D_drinks.map(d=>{
+    const{costPerServing,profitPerServing}=calcDrinkCost(d);
+    const pct=d.sale_price>0?Math.round(costPerServing/d.sale_price*100):null;
+    const pc=pct===null?'#888':pct<25?'#27ae60':pct<=35?'#e67e22':'#c0392b';
+    const ingList=(d.ingredients||[]).map(i=>`${i.mat_name}: ${i.qty}${i.mat_unit||''}`).join(', ');
+    return`<tr><td style="font-weight:600">${d.name}${d.note?`<div style="font-size:10px;color:#666">${d.note}</div>`:''}</td><td style="text-align:right">${d.sale_price>0?d.sale_price.toLocaleString('vi-VN')+'₫':'—'}</td><td style="font-size:11px;color:#555">${ingList}</td><td style="text-align:right;font-weight:700">${Math.round(costPerServing).toLocaleString('vi-VN')}₫</td><td style="text-align:right;font-weight:700;color:${pc}">${pct!==null?pct+'%':'—'}</td><td style="text-align:right;color:#27ae60;font-weight:700">${d.sale_price>0?Math.round(profitPerServing).toLocaleString('vi-VN')+'₫':'—'}</td></tr>`;
+  }).join('');
+  const d=new Date(),ds=`${d.getDate()}/${d.getMonth()+1}/${d.getFullYear()}`;
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Bảng Cost Món Nước</title>
+  <style>body{font-family:Arial,sans-serif;font-size:12px;color:#222;margin:0;padding:14mm}h1{text-align:center;font-size:18px;color:#FF8C00;margin-bottom:4px}.sub{text-align:center;font-size:11px;color:#888;margin-bottom:16px}table{width:100%;border-collapse:collapse}th{background:#FF8C00;color:#fff;padding:8px 10px;text-align:left;font-size:11px}td{padding:7px 10px;border-bottom:1px solid #eee;vertical-align:top}tr:nth-child(even){background:#fafafa}.legend{display:flex;gap:20px;justify-content:center;font-size:11px;margin-bottom:12px}.footer{text-align:center;font-size:10px;color:#aaa;margin-top:16px;border-top:1px solid #eee;padding-top:8px}@media print{body{padding:8mm}}</style>
+  </head><body>
+  <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
+  <div class="sub">BẢNG GIÁ COST NGUYÊN LIỆU ĐỒ UỐNG — Ngày ${ds}</div>
+  <div class="legend"><span>🟢 Cost tốt (&lt;25%)</span><span>🟡 Chấp nhận (25–35%)</span><span>🔴 Cost cao (&gt;35%)</span></div>
+  <table><thead><tr><th>Tên món</th><th>Giá bán</th><th>Công thức nguyên liệu</th><th>Cost NL</th><th>% Cost</th><th>Lợi nhuận/ly</th></tr></thead><tbody>${rows}</tbody></table>
+  <div class="footer">Trương Dáng Hương Academy — Bảng cost xuất tự động</div>
+  </body></html>`;
+  const w=window.open('','_blank','width=900,height=700');
+  w.document.write(html);w.document.close();w.onload=()=>setTimeout(()=>w.print(),400);
+}
+function printSingleDrink(){
+  const d=D_drinks.find(x=>x.id===_currentDrinkId);
+  if(!d) return;
+  const{costPerServing,profitPerServing}=calcDrinkCost(d);
+  const pct=d.sale_price>0?Math.round(costPerServing/d.sale_price*100):null;
+  const pc=pct===null?'#888':pct<25?'#27ae60':pct<=35?'#e67e22':'#c0392b';
+  const ingRows=(d.ingredients||[]).map(i=>{
+    const mat=D.inventory.find(m=>m.id===i.mat_id);
+    const c=mat?(mat.cost||0):(i.cost_snapshot||0);
+    return`<tr><td>${i.mat_name}</td><td style="text-align:right">${i.qty} ${i.mat_unit||''}</td><td style="text-align:right">${c.toLocaleString('vi-VN')}₫</td><td style="text-align:right;font-weight:600">${Math.round(c*i.qty).toLocaleString('vi-VN')}₫</td></tr>`;
+  }).join('');
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Công thức ${d.name}</title>
+  <style>body{font-family:Arial,sans-serif;font-size:13px;color:#222;width:148mm;margin:0 auto;padding:10mm}.header{background:#FF8C00;color:#fff;text-align:center;padding:10px;border-radius:8px;margin-bottom:14px}.header h1{font-size:15px;font-weight:700;margin:0 0 2px}.header p{font-size:10px;opacity:.85;margin:0}.drink-name{font-size:20px;font-weight:800;color:#FF8C00;text-align:center;margin:10px 0 4px}.drink-note{text-align:center;font-size:11px;color:#888;margin-bottom:14px}table{width:100%;border-collapse:collapse;margin-bottom:14px}th{background:#fff3e0;color:#cc5500;padding:7px 10px;text-align:left;font-size:11px;border-bottom:2px solid #FF8C00}td{padding:6px 10px;border-bottom:1px solid #eee;font-size:12px}.summary{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;background:#fff3e0;border-radius:8px;padding:12px;text-align:center}.summary .label{font-size:10px;color:#888;text-transform:uppercase;font-weight:600}.summary .val{font-size:18px;font-weight:800}.footer{text-align:center;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:14px}@media print{body{width:100%}}</style>
+  </head><body>
+  <div class="header"><h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1><p>Chuyên Gia F&B</p></div>
+  <div class="drink-name">${d.name}</div>
+  ${d.note?`<div class="drink-note">📝 ${d.note}</div>`:''}
+  <table><thead><tr><th>Nguyên liệu</th><th style="text-align:right">Định lượng</th><th style="text-align:right">Đơn giá</th><th style="text-align:right">Thành tiền</th></tr></thead><tbody>${ingRows}</tbody></table>
+  <div class="summary">
+    <div><div class="label">Giá bán</div><div class="val" style="color:#5c3a1e">${d.sale_price>0?d.sale_price.toLocaleString('vi-VN')+'₫':'—'}</div></div>
+    <div><div class="label">Cost NL</div><div class="val" style="color:#FF8C00">${Math.round(costPerServing).toLocaleString('vi-VN')}₫</div>${pct!==null?`<div style="font-size:12px;font-weight:700;color:${pc}">${pct}%</div>`:''}</div>
+    <div><div class="label">Lợi nhuận</div><div class="val" style="color:#27ae60">${d.sale_price>0?Math.round(profitPerServing).toLocaleString('vi-VN')+'₫':'—'}</div></div>
+  </div>
+  <div class="footer">Trương Dáng Hương Academy — Phiếu công thức xuất tự động</div>
+  </body></html>`;
+  const w=window.open('','_blank','width=600,height=750');
+  w.document.write(html);w.document.close();w.onload=()=>setTimeout(()=>w.print(),400);
+}
+function xlExportDrinkCost(){
+  if(!D_drinks.length){notify('Chưa có công thức nào!',false);return;}
+  const wb=XLSX.utils.book_new();
+  const data=[['Tên món','Ghi chú','Giá bán (₫)','Nguyên liệu','Cost NL (₫)','% Cost','Lợi nhuận/ly (₫)']];
+  D_drinks.forEach(d=>{
+    const{costPerServing,profitPerServing}=calcDrinkCost(d);
+    const pct=d.sale_price>0?Math.round(costPerServing/d.sale_price*100)+'%':'';
+    data.push([d.name,d.note||'',d.sale_price||0,(d.ingredients||[]).map(i=>`${i.mat_name}: ${i.qty}${i.mat_unit||''}`).join('; '),Math.round(costPerServing),pct,d.sale_price>0?Math.round(profitPerServing):'']);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:22},{wch:25},{wch:12},{wch:45},{wch:14},{wch:10},{wch:16}];
+  XLSX.utils.book_append_sheet(wb,ws,'Cost Món Nước');
+  XLSX.writeFile(wb,'BangCost_'+new Date().toLocaleDateString('vi-VN').replace(/\//g,'-')+'.xlsx');
+  notify('✅ Đã xuất Excel bảng cost!');
+}
+// Load công thức sau 2s (không cần sửa hàm boot)
+setTimeout(()=>loadDrinkRecipes().then(()=>renderCostCalc()),2000);
 
 boot();
 </script>
