@@ -366,7 +366,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <div class="fg" style="margin-bottom:8px"><label>Địa chỉ giao hàng</label><input id="c-address" placeholder="Số nhà, đường, phường/xã..."/></div>
       <div class="form-row">
         <div class="fg"><label>Hình thức thanh toán</label>
-          <select id="c-payment">
+          <select id="c-payment" onchange="updateCartTotal()">
             <option value="Tiền mặt">💵 Tiền mặt</option>
             <option value="Chuyển khoản">🏦 Chuyển khoản</option>
             <option value="QR VietQR">📱 QR VietQR</option>
@@ -387,7 +387,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       </div>
       <div class="form-row">
         <div class="fg"><label>VAT</label>
-          <select id="c-vat">
+          <select id="c-vat" onchange="updateCartTotal()">
             <option value="0">Không VAT</option>
             <option value="8">VAT 8%</option>
             <option value="10">VAT 10%</option>
