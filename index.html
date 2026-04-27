@@ -1423,6 +1423,124 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   </div>
 </div>
 
+<!-- Modal Chi tiết & Chỉnh sửa Đơn hàng -->
+<div class="overlay" id="modal-order-detail">
+  <div class="modal wide" style="max-width:580px;max-height:92vh;overflow-y:auto">
+
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;gap:10px">
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">Mã đơn hàng</div>
+        <div style="font-size:18px;font-weight:800;color:var(--orange)" id="od-id"></div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+        <span id="od-status-badge" style="font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px"></span>
+        <div style="display:flex;gap:5px" id="od-action-buttons">
+          <button class="btn btn-sm" onclick="odEnterEdit()">✏️ Sửa</button>
+          <button class="btn btn-green btn-sm" id="od-collect-btn" style="display:none" onclick="odCollect()">💰 Thu tiền</button>
+          <button class="btn btn-pdf btn-sm" onclick="exportPDF(document.getElementById('od-id').textContent)">📄 PDF</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Summary box -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;background:var(--brand-light);border-radius:10px;padding:12px;margin-bottom:14px;text-align:center">
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Tổng tiền</div>
+        <div style="font-size:20px;font-weight:800;color:var(--orange)" id="od-total"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Thời gian</div>
+        <div style="font-size:13px;font-weight:600;color:var(--brown)" id="od-time"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Chờ</div>
+        <div style="font-size:13px;font-weight:700" id="od-wait"></div>
+      </div>
+    </div>
+
+    <!-- VIEW mode -->
+    <div id="od-view">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div>
+          <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Khách hàng</div>
+          <div style="font-weight:700;font-size:14px" id="od-customer"></div>
+          <div style="font-size:12px;color:var(--muted)" id="od-phone-view"></div>
+        </div>
+        <div>
+          <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Thanh toán / Giao hàng</div>
+          <div style="font-size:12px" id="od-payment-view"></div>
+          <div style="font-size:12px;color:var(--muted)" id="od-address-view"></div>
+        </div>
+      </div>
+      <!-- Sản phẩm -->
+      <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:8px">Sản phẩm đã đặt</div>
+      <div id="od-items-view" style="background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:13px;line-height:1.8"></div>
+      <!-- Ghi chú -->
+      <div id="od-note-view" style="display:none;background:rgba(255,140,0,.06);border-radius:8px;padding:8px 12px;font-size:12px;color:var(--muted)"></div>
+      <!-- Discount / Subtotal nếu có -->
+      <div id="od-discount-view" style="display:none;margin-top:10px;font-size:13px;color:var(--muted);text-align:right"></div>
+    </div>
+
+    <!-- EDIT mode -->
+    <div id="od-edit" style="display:none">
+      <div class="form-row">
+        <div class="fg">
+          <label>Tên khách *</label>
+          <input id="od-edit-customer" placeholder="Tên khách hàng..."/>
+        </div>
+        <div class="fg">
+          <label>SĐT</label>
+          <input id="od-edit-phone" placeholder="0901234567"/>
+        </div>
+      </div>
+      <div class="fg" style="margin-bottom:12px">
+        <label>Địa chỉ giao hàng</label>
+        <input id="od-edit-address" placeholder="Địa chỉ..."/>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:var(--brown);margin-bottom:8px">Sản phẩm đã đặt</div>
+      <div id="od-edit-items" style="display:flex;flex-direction:column;gap:7px;margin-bottom:10px"></div>
+      <button class="btn btn-ghost btn-sm" onclick="odAddItem()" style="width:100%;margin-bottom:12px">+ Thêm sản phẩm</button>
+      <!-- Discount -->
+      <div class="form-row">
+        <div class="fg">
+          <label>Giảm giá (%)</label>
+          <input id="od-edit-discount" type="number" min="0" max="100" step="1" placeholder="0" oninput="odCalcLive()"/>
+        </div>
+        <div class="fg">
+          <label>Trạng thái</label>
+          <select id="od-edit-status" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;outline:none">
+            <option>Chờ thanh toán</option>
+            <option>Đã thanh toán</option>
+            <option>Đã hủy</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg" style="margin-bottom:12px">
+        <label>Ghi chú</label>
+        <input id="od-edit-note" placeholder="Ghi chú đơn hàng..."/>
+      </div>
+      <!-- Live calc -->
+      <div id="od-edit-summary" style="background:var(--brand-light);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px">
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Tạm tính</span><span id="od-edit-subtotal" style="font-weight:600"></span></div>
+        <div id="od-edit-discount-row" style="display:none;display:flex;justify-content:space-between"><span style="color:var(--muted)">Giảm giá</span><span id="od-edit-discount-amt" style="color:var(--red)"></span></div>
+        <div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
+          <span style="font-weight:700">Tổng cộng</span>
+          <span id="od-edit-total" style="font-weight:800;color:var(--orange);font-size:16px"></span>
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-green btn-sm" onclick="odSaveEdit()">💾 Lưu thay đổi</button>
+        <button class="btn btn-ghost btn-sm" onclick="odCancelEdit()">Huỷ</button>
+      </div>
+    </div>
+
+    <div class="btn-group" style="margin-top:10px">
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-order-detail')">Đóng</button>
+    </div>
+  </div>
+</div>
+
 <!-- Phiếu thu -->
 <div class="overlay" id="modal-add-thu">
   <div class="modal">
@@ -4475,6 +4593,7 @@ function renderOrders(){
     <td style="font-size:12px;color:var(--muted)">${o.time}</td>
     <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':'t-pending'}">${o.status}</span></td>
     <td class="btn-group" style="gap:4px">
+      <button class="btn btn-ghost btn-sm" onclick="showOrderDetail('${o.id}')">👁</button>
       <button class="btn btn-pdf btn-sm" onclick="exportPDF('${o.id}')">📄 PDF</button>
     </td>
   </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;padding:18px;color:var(--muted)">Chưa có đơn bán lẻ</td></tr>';
@@ -4499,7 +4618,10 @@ function renderOrders(){
     <td style="font-weight:700">${fmt(o.total||0)}</td>
     <td style="font-size:12px;color:var(--muted)">${o.time}</td>
     <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':o.status==='Chờ thanh toán'?'t-pending':'t-done'}">${o.status}</span></td>
-    <td>${o.status==='Chờ thanh toán'?`<button class="btn btn-green btn-sm" onclick="collectPending('${o.id}')">💰 Thu tiền</button>`:''}</td>
+    <td class="btn-group" style="gap:4px">
+      <button class="btn btn-ghost btn-sm" onclick="showOrderDetail('${o.id}')">👁</button>
+      ${o.status==='Chờ thanh toán'?`<button class="btn btn-green btn-sm" onclick="collectPending('${o.id}')">💰 Thu tiền</button>`:''}
+    </td>
   </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;padding:18px;color:var(--muted)">Chưa có đơn hàng</td></tr>';
 }
 
@@ -4524,6 +4646,7 @@ function renderPendingOrders(){
       <td style="font-size:11px;color:${isLong?'var(--red)':'var(--muted)'}">${waitLabel}</td>
       <td style="font-size:11px;color:var(--muted)">${o.note||'—'}</td>
       <td class="btn-group" style="gap:4px">
+        <button class="btn btn-ghost btn-sm" onclick="showOrderDetail('${o.id}')">👁</button>
         <button class="btn btn-green btn-sm" onclick="collectPending('${o.id}')">💰 Thu tiền</button>
         <button class="btn btn-pdf btn-sm" onclick="exportPDF('${o.id}')">📄 PDF</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="cancelOrderFromPending('${o.id}')">✕</button>
@@ -8669,6 +8792,217 @@ function _updateLastBackupInfo() {
 }
 // Gọi khi load
 setTimeout(_updateLastBackupInfo, 1000);
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE: CHI TIẾT & CHỈNH SỬA ĐƠN HÀNG
+// ═══════════════════════════════════════════════════════════════
+let OD_current = null; // order đang xem
+
+function showOrderDetail(id) {
+  const o = D.orders.find(x => x.id === id);
+  if(!o) return;
+  OD_current = o;
+  // Reset về view mode
+  odCancelEdit();
+  // Populate header
+  document.getElementById('od-id').textContent = o.id;
+  document.getElementById('od-total').textContent = fmt(o.total||0);
+  document.getElementById('od-time').textContent = o.time||'—';
+  // Wait time
+  const waitHours = o.created_at ? Math.round((Date.now()-o.created_at)/3600000) : 0;
+  const waitEl = document.getElementById('od-wait');
+  waitEl.textContent = waitHours<1?'Vừa tạo':waitHours<24?waitHours+'h':Math.round(waitHours/24)+'ngày';
+  waitEl.style.color = waitHours>24?'var(--red)':'var(--muted)';
+  // Status badge
+  const badge = document.getElementById('od-status-badge');
+  const statusColors = {'Đã thanh toán':'var(--green)','Chờ thanh toán':'var(--orange)','Đã hủy':'var(--red)'};
+  const statusBg     = {'Đã thanh toán':'rgba(39,174,96,.1)','Chờ thanh toán':'rgba(255,140,0,.1)','Đã hủy':'rgba(192,57,43,.1)'};
+  badge.textContent = o.status;
+  badge.style.color  = statusColors[o.status]||'var(--muted)';
+  badge.style.background = statusBg[o.status]||'var(--bg)';
+  badge.style.border = `1.5px solid ${statusColors[o.status]||'var(--border)'}`;
+  // Show/hide thu tiền button
+  document.getElementById('od-collect-btn').style.display = o.status==='Chờ thanh toán'?'':'none';
+  // Customer info
+  document.getElementById('od-customer').textContent = o.customer||'—';
+  const phoneEl = document.getElementById('od-phone-view');
+  phoneEl.textContent = o.phone||'';
+  phoneEl.style.display = o.phone?'':'none';
+  // Payment / shipping
+  const payEl = document.getElementById('od-payment-view');
+  payEl.innerHTML = [o.payment, o.shipping].filter(Boolean).map(v=>`<span class="tag" style="background:var(--dim);color:var(--brown);font-size:10px">${v}</span>`).join(' ');
+  const addrEl = document.getElementById('od-address-view');
+  addrEl.textContent = o.address||'';
+  addrEl.style.display = o.address?'':'none';
+  // Items — parse "Sản phẩm x3, Sản phẩm2" into tags
+  const itemsEl = document.getElementById('od-items-view');
+  const itemList = (o.items||'').split(',').map(s=>s.trim()).filter(Boolean);
+  itemsEl.innerHTML = itemList.map(item => {
+    const m = item.match(/^(.+?)(?:\s+x(\d+))?$/);
+    const name = m?.[1]||item, qty = m?.[2]||'1';
+    const prod = D.products.find(p=>p.name===name);
+    const price = prod?.price||0;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
+      <span style="font-weight:600">${name}</span>
+      <span style="display:flex;align-items:center;gap:10px">
+        <span style="color:var(--muted);font-size:12px">x${qty}</span>
+        ${price>0?`<span style="font-weight:700;color:var(--brand)">${fmt(price*+qty)}</span>`:''}
+      </span>
+    </div>`;
+  }).join('');
+  // Note
+  const noteEl = document.getElementById('od-note-view');
+  if(o.note) { noteEl.innerHTML = '📝 '+o.note; noteEl.style.display=''; }
+  else noteEl.style.display='none';
+  // Discount
+  const discEl = document.getElementById('od-discount-view');
+  if(o.discount>0) {
+    discEl.innerHTML = `<span style="color:var(--muted)">Giảm giá ${o.discount}%:</span> <span style="color:var(--red);font-weight:700">-${fmt(Math.round((o.subtotal||o.total)*o.discount/100))}</span>`;
+    discEl.style.display='';
+  } else discEl.style.display='none';
+  showM('modal-order-detail');
+}
+
+function odEnterEdit() {
+  const o = OD_current;
+  if(!o) return;
+  document.getElementById('od-view').style.display = 'none';
+  document.getElementById('od-edit').style.display = '';
+  document.getElementById('od-action-buttons').style.display = 'none';
+  document.getElementById('od-edit-customer').value = o.customer||'';
+  document.getElementById('od-edit-phone').value    = o.phone||'';
+  document.getElementById('od-edit-address').value  = o.address||'';
+  document.getElementById('od-edit-discount').value = o.discount||'';
+  document.getElementById('od-edit-note').value     = o.note||'';
+  document.getElementById('od-edit-status').value   = o.status||'Chờ thanh toán';
+  // Build item rows from items string
+  const itemsContainer = document.getElementById('od-edit-items');
+  itemsContainer.innerHTML = '';
+  const itemList = (o.items||'').split(',').map(s=>s.trim()).filter(Boolean);
+  itemList.forEach(item => {
+    const m = item.match(/^(.+?)(?:\s+x(\d+))?$/);
+    odAddItem(m?.[1]||item, +(m?.[2]||1));
+  });
+  odCalcLive();
+}
+
+function odCancelEdit() {
+  document.getElementById('od-view').style.display = '';
+  document.getElementById('od-edit').style.display = 'none';
+  document.getElementById('od-action-buttons').style.display = 'flex';
+}
+
+function odAddItem(name='', qty=1) {
+  const container = document.getElementById('od-edit-items');
+  const prodOpts = D.products.filter(p=>p.price>0).map(p=>
+    `<option value="${p.name}" data-price="${p.price}">${p.name} — ${fmt(p.price)}</option>`
+  ).join('');
+  const row = document.createElement('div');
+  row.className = 'od-item-row';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 80px 90px auto;gap:7px;align-items:center;background:var(--bg);border-radius:8px;padding:7px 10px;border:1px solid var(--border)';
+  row.innerHTML = `
+    <input class="od-i-name" list="od-prod-datalist" value="${name}" placeholder="Tên sản phẩm..." oninput="odItemChange(this);odCalcLive()"
+      style="border:1.5px solid var(--border);border-radius:6px;padding:6px 9px;font-size:13px;font-family:inherit;outline:none"/>
+    <input class="od-i-qty" type="number" min="1" step="1" value="${qty}" oninput="odCalcLive()"
+      style="border:1.5px solid var(--border);border-radius:6px;padding:6px 6px;font-size:13px;font-family:inherit;outline:none;text-align:right"/>
+    <input class="od-i-price" type="number" min="0" placeholder="Đơn giá"
+      style="border:1.5px solid var(--border);border-radius:6px;padding:6px 6px;font-size:13px;font-family:inherit;outline:none;text-align:right"
+      oninput="odCalcLive()"/>
+    <button onclick="this.closest('.od-item-row').remove();odCalcLive()"
+      style="background:var(--red);color:#fff;border:none;border-radius:6px;width:27px;height:27px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>`;
+  container.appendChild(row);
+  // Set price if product known
+  const priceInp = row.querySelector('.od-i-price');
+  const prod = D.products.find(p=>p.name===name);
+  if(prod) priceInp.value = prod.price;
+  odCalcLive();
+}
+// Datalist cho sản phẩm trong edit đơn
+setTimeout(()=>{
+  if(!document.getElementById('od-prod-datalist')) {
+    const dl=document.createElement('datalist'); dl.id='od-prod-datalist';
+    D.products.filter(p=>p.price>0).forEach(p=>{const o=document.createElement('option');o.value=p.name;dl.appendChild(o);});
+    document.body.appendChild(dl);
+  }
+},1000);
+
+function odItemChange(inp) {
+  const row = inp.closest('.od-item-row');
+  const prod = D.products.find(p=>p.name===inp.value);
+  if(prod&&row) row.querySelector('.od-i-price').value = prod.price;
+}
+
+function odCalcLive() {
+  let subtotal = 0;
+  document.querySelectorAll('.od-item-row').forEach(row=>{
+    const qty   = parseFloat(row.querySelector('.od-i-qty')?.value)||1;
+    const price = parseFloat(row.querySelector('.od-i-price')?.value)||0;
+    subtotal += qty*price;
+  });
+  const disc    = Math.min(100,Math.max(0,parseFloat(document.getElementById('od-edit-discount')?.value)||0));
+  const discAmt = Math.round(subtotal*disc/100);
+  const total   = subtotal-discAmt;
+  document.getElementById('od-edit-subtotal').textContent = fmt(subtotal);
+  const discRow = document.getElementById('od-edit-discount-row');
+  discRow.style.display = disc>0?'flex':'none';
+  document.getElementById('od-edit-discount-amt').textContent = '-'+fmt(discAmt);
+  document.getElementById('od-edit-total').textContent = fmt(total);
+}
+
+async function odSaveEdit() {
+  const o = OD_current;
+  if(!o) return;
+  const customer = (document.getElementById('od-edit-customer').value||'').trim();
+  if(!customer){notify('Nhập tên khách!',false);return;}
+  // Collect items
+  const items = [];
+  document.querySelectorAll('.od-item-row').forEach(row=>{
+    const name  = row.querySelector('.od-i-name')?.value?.trim();
+    const qty   = parseInt(row.querySelector('.od-i-qty')?.value)||1;
+    if(name) items.push(name+(qty>1?' x'+qty:''));
+  });
+  if(!items.length){notify('Thêm ít nhất 1 sản phẩm!',false);return;}
+  const disc    = Math.min(100,Math.max(0,parseFloat(document.getElementById('od-edit-discount')?.value)||0));
+  // Recalc total
+  let subtotal=0;
+  document.querySelectorAll('.od-item-row').forEach(row=>{
+    const qty=parseInt(row.querySelector('.od-i-qty')?.value)||1;
+    const price=parseFloat(row.querySelector('.od-i-price')?.value)||0;
+    subtotal+=qty*price;
+  });
+  const discAmt = Math.round(subtotal*disc/100);
+  const total   = subtotal-discAmt;
+  const newStatus = document.getElementById('od-edit-status').value;
+  // Update order object
+  const updates = {
+    customer,
+    phone:    document.getElementById('od-edit-phone').value||'',
+    address:  document.getElementById('od-edit-address').value||'',
+    items:    items.join(', '),
+    note:     document.getElementById('od-edit-note').value||'',
+    discount: disc,
+    subtotal,
+    total,
+    status:   newStatus,
+  };
+  Object.assign(o, updates);
+  try {
+    await sbUpsert('orders', o);
+    renderOrders();
+    renderPendingOrders();
+    renderDash();
+    // Update modal view
+    showOrderDetail(o.id);
+    notify('✅ Đã cập nhật đơn '+o.id);
+  } catch(e) { notify('Lỗi lưu: '+e.message, false); }
+}
+
+function odCollect() {
+  if(OD_current) {
+    closeM('modal-order-detail');
+    collectPending(OD_current.id);
+  }
+}
 
 boot();
 </script>
