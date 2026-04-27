@@ -386,22 +386,15 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
         </div>
       </div>
       <div class="form-row">
-        <div class="fg"><label>VAT đơn hàng (thêm)</label>
-          <select id="c-vat" onchange="updateCartTotal()">
-            <option value="0">Không VAT</option>
-            <option value="8">VAT 8%</option>
-            <option value="10">VAT 10%</option>
-          </select>
-        </div>
-        <div class="fg"><label>Chiết khấu đơn hàng (%)</label>
+        <div class="fg"><label>Chiết khấu tổng bill (%)</label>
           <input id="c-discount" type="number" min="0" max="100" placeholder="0" oninput="updateCartTotal()"/>
         </div>
+        <div class="fg"></div>
       </div>
       <!-- Hiển thị tổng sau VAT/chiết khấu -->
       <div id="cart-summary" style="display:none;background:var(--bg2);border-radius:8px;padding:10px 12px;margin:8px 0;font-size:12px">
-        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Tạm tính:</span><span id="cs-subtotal">0đ</span></div>
-        <div style="display:flex;justify-content:space-between" id="cs-discount-row"><span style="color:var(--red)">Chiết khấu:</span><span id="cs-discount">0đ</span></div>
-        <div style="display:flex;justify-content:space-between" id="cs-vat-row"><span style="color:var(--muted)">VAT:</span><span id="cs-vat">0đ</span></div>
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Tạm tính (đã VAT theo SP):</span><span id="cs-subtotal">0đ</span></div>
+        <div style="display:flex;justify-content:space-between" id="cs-discount-row"><span style="color:var(--red)">Chiết khấu tổng bill:</span><span id="cs-discount">0đ</span></div>
         <div style="display:flex;justify-content:space-between;font-weight:700;color:var(--brand);margin-top:4px;padding-top:4px;border-top:1px solid var(--border)"><span>Tổng thanh toán:</span><span id="cs-total-final">0đ</span></div>
       </div>
       <div class="fg" style="margin-bottom:10px"><label>Ghi chú</label><input id="c-note" placeholder="Ghi chú..."/></div>
@@ -3881,10 +3874,18 @@ function renderCart(){
     const vatAmt=Math.round(afterDisc*itemVat/100);
     const itemTotal=afterDisc+vatAmt;
     const badges=[];
-    if(itemDisc>0) badges.push(`<span style="font-size:10px;background:rgba(231,76,60,.1);color:var(--red);border-radius:3px;padding:1px 5px">-${itemDisc}%</span>`);
-    if(itemVat>0) badges.push(`<span style="font-size:10px;background:rgba(52,152,219,.1);color:#2980b9;border-radius:3px;padding:1px 5px">VAT ${itemVat}%</span>`);
+    if(itemVat>0) badges.push(`<span style="font-size:9px;background:rgba(52,152,219,.1);color:#2980b9;border-radius:3px;padding:1px 4px">VAT ${itemVat}%</span>`);
     return`<div class="cart-item">
-    <div class="cart-name">${c.name} ${badges.join(' ')}</div>
+    <div class="cart-name">
+      ${c.name} ${badges.join(' ')}
+      <div style="display:flex;align-items:center;gap:4px;margin-top:3px">
+        <span style="font-size:10px;color:var(--red)">CK:</span>
+        <input type="number" min="0" max="100" value="${c.discount||0}" 
+          style="width:38px;font-size:11px;padding:1px 4px;border:1px solid var(--border);border-radius:4px;text-align:center;font-family:inherit"
+          onchange="setItemDiscount(${i},this.value)"/>
+        <span style="font-size:10px;color:var(--muted)">%</span>
+      </div>
+    </div>
     <div style="display:flex;align-items:center;gap:5px">
       <button class="qb" onclick="chgQty(${i},-1)">−</button>
       <input type="number" min="1" value="${c.qty}"
@@ -3899,37 +3900,31 @@ function renderCart(){
 }
 
 function updateCartTotal(){
-  // Tính tổng theo từng sản phẩm (có VAT/CK riêng)
+  // Tính tổng theo từng SP (VAT+CK riêng theo SP)
   const itemTotals=cart.map(c=>{
     const base=c.price*c.qty;
     const disc=Math.round(base*(c.discount||0)/100);
-    const vat=Math.round((base-disc)*(c.vat||0)/100);
-    return base-disc+vat;
+    const afterDisc=base-disc;
+    const vat=Math.round(afterDisc*(c.vat||0)/100);
+    return afterDisc+vat;
   });
-  const subtotalWithItems=itemTotals.reduce((a,v)=>a+v,0);
-  // Thêm CK/VAT đơn hàng tổng (nếu có)
+  const subtotal=itemTotals.reduce((a,v)=>a+v,0);
+  // Chiết khấu tổng bill
   const discount=Math.min(100,Math.max(0,+document.getElementById('c-discount')?.value||0));
-  const vatPct=+document.getElementById('c-vat')?.value||0;
-  const discountAmt=Math.round(subtotalWithItems*discount/100);
-  const afterDiscount=subtotalWithItems-discountAmt;
-  const vatAmt=Math.round(afterDiscount*vatPct/100);
-  const finalTotal=afterDiscount+vatAmt;
-  const subtotal=subtotalWithItems;
+  const discountAmt=Math.round(subtotal*discount/100);
+  const finalTotal=subtotal-discountAmt;
 
   document.getElementById('cart-total').textContent=fmt(finalTotal);
 
   const sumEl=document.getElementById('cart-summary');
   if(sumEl){
-    const hasExtra=discount>0||vatPct>0;
+    const hasExtra=discount>0;
     sumEl.style.display=hasExtra&&cart.length?'block':'none';
     if(hasExtra){
       document.getElementById('cs-subtotal').textContent=fmt(subtotal);
       const discRow=document.getElementById('cs-discount-row');
-      const vatRow=document.getElementById('cs-vat-row');
       if(discRow) discRow.style.display=discount>0?'flex':'none';
-      if(vatRow) vatRow.style.display=vatPct>0?'flex':'none';
       document.getElementById('cs-discount').textContent='-'+fmt(discountAmt)+' (-'+discount+'%)';
-      document.getElementById('cs-vat').textContent='+'+fmt(vatAmt)+' ('+vatPct+'%)';
       document.getElementById('cs-total-final').textContent=fmt(finalTotal);
     }
   }
@@ -3937,6 +3932,12 @@ function updateCartTotal(){
 
 
 function chgQty(i,d){cart[i].qty+=d;if(cart[i].qty<=0)cart.splice(i,1);renderCart();}
+function setItemDiscount(i,v){
+  if(!cart[i])return;
+  cart[i].discount=Math.min(100,Math.max(0,parseInt(v)||0));
+  renderCart();
+}
+
 function setQty(i,v){if(v===''||v===null||v===undefined)return;const n=parseInt(v)||1;if(n<=0){cart.splice(i,1);}else if(cart[i]){cart[i].qty=n;}renderCart();}
 
 // ── CHECKOUT + VIETQR ──
@@ -3945,10 +3946,8 @@ async function checkout(){
   const name=document.getElementById('c-name').value.trim()||'Khách lẻ';
   const subtotal=cart.reduce((a,c)=>a+c.price*c.qty,0);
   const discount=Math.min(100,Math.max(0,+document.getElementById('c-discount')?.value||0));
-  const vatPct=+document.getElementById('c-vat')?.value||0;
   const discountAmt=Math.round(subtotal*discount/100);
-  const vatAmt=Math.round((subtotal-discountAmt)*vatPct/100);
-  const total=subtotal-discountAmt+vatAmt;
+  const total=subtotal-discountAmt;
   const id='HĐ'+Date.now().toString().slice(-6);
   const items=cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')).join(', ');
   const address=document.getElementById('c-address')?.value?.trim()||'';
@@ -3973,12 +3972,11 @@ async function checkout(){
     ${address?`<div><span>Địa chỉ</span><span>${address}</span></div>`:''}
     <div><span>Thanh toán</span><span>${payment}</span></div>
     <div><span>Giao hàng</span><span>${shipping}</span></div>
-    ${discount>0?`<div><span>Chiết khấu</span><span style="color:var(--red)">-${fmt(discountAmt)} (-${discount}%)</span></div>`:''}
-    ${vatPct>0?`<div><span>VAT ${vatPct}%</span><span>+${fmt(vatAmt)}</span></div>`:''}
+    ${discount>0?`<div><span>Chiết khấu bill</span><span style="color:var(--red)">-${fmt(discountAmt)} (-${discount}%)</span></div>`:''}
     <div><span>Tổng thanh toán</span><span style="color:var(--gold2);font-size:16px">${fmt(total)}</span></div>`;
   // Lưu đơn chờ
   const pendingOrder={id,customer:name,email:'',items,total,time:nowDT(),note,status:'Chờ thanh toán',
-    address,payment,shipping,discount,vat:vatPct,subtotal,created_at:Date.now()};
+    address,payment,shipping,discount,subtotal,created_at:Date.now()};
   await sbUpsert('orders',pendingOrder);
   D.orders.push(pendingOrder);
   showM('modal-qr');
@@ -4197,10 +4195,8 @@ async function saveDraft(){
   const name=document.getElementById('c-name').value.trim()||'Khách lẻ';
   const subtotal=cart.reduce((a,c)=>a+c.price*c.qty,0);
   const discount=Math.min(100,Math.max(0,+document.getElementById('c-discount')?.value||0));
-  const vatPct=+document.getElementById('c-vat')?.value||0;
   const discountAmt=Math.round(subtotal*discount/100);
-  const vatAmt=Math.round((subtotal-discountAmt)*vatPct/100);
-  const total=subtotal-discountAmt+vatAmt;
+  const total=subtotal-discountAmt;
   const id='HĐ'+Date.now().toString().slice(-6);
   const items=cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')).join(', ');
   const address=document.getElementById('c-address')?.value?.trim()||'';
@@ -4208,7 +4204,7 @@ async function saveDraft(){
   const shipping=document.getElementById('c-shipping')?.value||'Khách tới lấy';
   const note=document.getElementById('c-note')?.value?.trim()||'';
   const order={id,customer:name,email:'',items,total,time:nowDT(),note,status:'Chờ thanh toán',
-    address,payment,shipping,discount,vat:vatPct,subtotal,created_at:Date.now()};
+    address,payment,shipping,discount,subtotal,created_at:Date.now()};
   try{
     await sbUpsert('orders',order);
     D.orders.push(order);
