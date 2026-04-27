@@ -1622,6 +1622,8 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
           <span id="od-edit-total" style="font-weight:800;color:var(--orange);font-size:16px"></span>
         </div>
       </div>
+      <!-- Quick action: chuyển bước tiếp (nhân viên tự bấm) -->
+      <div id="od-quick-actions" style="display:none;background:rgba(26,188,156,.06);border:1px solid rgba(26,188,156,.25);border-radius:8px;padding:10px 12px;margin-bottom:12px"></div>
       <div class="btn-group">
         <button class="btn btn-green btn-sm" onclick="odSaveEdit()">💾 Lưu thay đổi</button>
         <button class="btn btn-ghost btn-sm" onclick="odCancelEdit()">Huỷ</button>
@@ -9879,20 +9881,31 @@ function odStatusChange() {
     else payGuide.style.display='none';
   }
 
-  // Tự động gợi ý bước tiếp theo cho nút Lưu
-  const saveBtn = document.querySelector('#od-edit .btn-group .btn-green');
-  if(saveBtn) {
-    const nextLabels = {
-      'Chờ xác nhận':  '✅ Lưu & Xác nhận',
-      'Đã xác nhận':   '🧺 Lưu & Chuẩn bị',
-      'Đang chuẩn bị': '📦 Lưu & Book ship',
-      'Đã book ship':  '🚚 Lưu & Giao hàng',
-      'Đang giao':     '🏠 Lưu — Đang giao',
-      'Đã giao':       payment==='COD'?'💳 Lưu & Chờ thu tiền':'💰 Lưu — Đã giao',
-      'Chờ thu tiền':  '💰 Lưu & Xác nhận thu',
-    };
-    saveBtn.textContent = nextLabels[status] || '💾 Lưu thay đổi';
+  // Hiện quick-action buttons để nhân viên tự chọn chuyển bước
+  const quickActions = document.getElementById('od-quick-actions');
+  if(quickActions) {
+    const flow = ['Chờ xác nhận','Đã xác nhận','Đang chuẩn bị','Đã book ship','Đang giao','Đã giao',
+      payment==='COD'?'Chờ thu tiền':'Đã thanh toán'];
+    const curIdx = flow.indexOf(status);
+    const nextStatus = curIdx >= 0 && curIdx < flow.length-1 ? flow[curIdx+1] : null;
+    const icons = {'Đã xác nhận':'✅','Đang chuẩn bị':'🧺','Đã book ship':'📦',
+      'Đang giao':'🚚','Đã giao':'🏠','Chờ thu tiền':'💳','Đã thanh toán':'💰'};
+    if(nextStatus) {
+      quickActions.style.display='';
+      quickActions.innerHTML=`
+        <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:5px;text-transform:uppercase;letter-spacing:.4px">Chuyển sang bước tiếp</div>
+        <button class="btn btn-sm" style="background:var(--teal);color:#fff;border-color:var(--teal)"
+          onclick="odAdvanceStatus('${nextStatus}')">
+          ${icons[nextStatus]||'→'} ${nextStatus}
+        </button>`;
+    } else {
+      quickActions.style.display='none';
+    }
   }
+
+  // Nút lưu luôn là "Lưu thay đổi" — không auto-advance
+  const saveBtn = document.querySelector('#od-edit .btn-group .btn-green');
+  if(saveBtn) saveBtn.textContent = '💾 Lưu thay đổi';
 }
 
 // ── Patch showOrderDetail để render progress + tracking ────────
@@ -10024,6 +10037,12 @@ async function runMigration() {
       resultEl.style.background = 'rgba(192,57,43,.1)'; resultEl.style.color = '#c0392b';
     }
   }
+}
+
+function odAdvanceStatus(newStatus) {
+  const sel = document.getElementById('od-edit-status');
+  if(sel) { sel.value = newStatus; odStatusChange(); }
+  odSaveEdit();
 }
 
 boot();
