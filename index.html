@@ -389,7 +389,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <button class="btn btn-excel btn-sm" onclick="xlExport('inventory')">📊 Excel</button>
   </div>
   <!-- Tổng giá trị kho -->
-  <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+  <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:8px">
     <div class="stat" style="--accent:var(--teal)">
       <div class="stat-num" id="inv-total-value">—</div>
       <div class="stat-label">Tổng giá trị kho (₫)</div>
@@ -403,10 +403,20 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <div class="stat-label">Sắp hết hàng</div>
     </div>
   </div>
+  <div class="stats" style="grid-template-columns:repeat(2,1fr);margin-bottom:14px">
+    <div class="stat" style="--accent:var(--green)">
+      <div class="stat-num" id="inv-total-in">—</div>
+      <div class="stat-label">Tổng nhập kho (số lượng)</div>
+    </div>
+    <div class="stat" style="--accent:var(--orange)">
+      <div class="stat-num" id="inv-total-out">—</div>
+      <div class="stat-label">Tổng xuất kho (số lượng)</div>
+    </div>
+  </div>
   <div class="card">
     <div class="card-head"><span class="card-title">Tình trạng tồn kho</span></div>
     <table><thead><tr>
-      <th>Mã HH</th><th>Nguyên liệu</th><th>Nhà CC</th><th>Đơn vị</th>
+      <th>Mã HH</th><th>Nguyên liệu</th><th>Đơn vị</th>
       <th>Tồn kho</th><th>Tối thiểu</th><th>Giá nhập</th><th>Giá trị HH</th><th>Mức tồn</th><th></th>
     </tr></thead>
     <tbody id="inv-list"></tbody></table>
@@ -3332,6 +3342,20 @@ function renderInventory(){
   const liEl=document.getElementById('inv-low-items');
   if(liEl) liEl.textContent=lowItems;
 
+  // Tổng nhập / tổng xuất từ stockLog
+  const totalIn=D.stockLog.filter(l=>l.type==='Nhập').reduce((a,l)=>{
+    const q=parseFloat((l.qty||'0').toString().replace(/[^0-9.]/g,''))||0;
+    return a+q;
+  },0);
+  const totalOut=D.stockLog.filter(l=>l.type!=='Nhập').reduce((a,l)=>{
+    const q=parseFloat((l.qty||'0').toString().replace(/[^0-9.]/g,''))||0;
+    return a+q;
+  },0);
+  const inEl=document.getElementById('inv-total-in');
+  if(inEl) inEl.textContent=Math.round(totalIn*100)/100;
+  const outEl=document.getElementById('inv-total-out');
+  if(outEl) outEl.textContent=Math.round(totalOut*100)/100;
+
   el.innerHTML=D.inventory.map(item=>{
     const max=Math.max(item.qty,item.min*3,1);
     const pct=Math.round(item.qty/max*100);
@@ -3340,8 +3364,10 @@ function renderInventory(){
     const sku=item.sku||'—';
     return`<tr>
       <td><span style="font-size:11px;font-weight:600;color:var(--brand);background:rgba(255,140,0,.1);padding:2px 6px;border-radius:4px">${sku}</span></td>
-      <td><strong>${item.name}</strong></td>
-      <td style="font-size:12px;color:var(--muted)">${item.supplier||'—'}</td>
+      <td>
+        <strong>${item.name}</strong>
+        ${item.supplier?`<br><span style="font-size:10px;color:var(--muted)">🏭 ${item.supplier}</span>`:''}
+      </td>
       <td style="color:var(--muted)">${item.unit}</td>
       <td><strong style="color:${col}">${item.qty}</strong></td>
       <td style="color:var(--muted)">${item.min}</td>
@@ -3359,7 +3385,7 @@ function renderInventory(){
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteMat('${item.id}')">🗑</button>
       </td>
     </tr>`;
-  }).join('')||'<tr><td colspan="10" style="text-align:center;padding:18px;color:var(--muted)">Chưa có nguyên liệu</td></tr>';
+  }).join('')||'<tr><td colspan="9" style="text-align:center;padding:18px;color:var(--muted)">Chưa có nguyên liệu</td></tr>';
 }
 
 async function addMaterial(){
@@ -3610,6 +3636,9 @@ async function gsSyncAll(){
     }
     // Sync Thu Chi
     await gsSend({sheet:'ThuChi',rows:gsThuChi(),time:nowDT()});
+    await new Promise(r=>setTimeout(r,500));
+    // Sync tổng nhập xuất
+    await gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
     notify('✅ Đã sync toàn bộ lên Google Sheet!');
   }catch(e){notify('Lỗi sync: '+e.message,false);}
 }
