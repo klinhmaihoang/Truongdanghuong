@@ -577,10 +577,11 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 <!-- TÍNH COST MÓN NƯỚC — BOM MODEL -->
 <div class="page" id="page-costcalc">
 
-  <!-- Sub-tabs: Món nước / Nguyên liệu -->
+  <!-- Sub-tabs: Món nước / Nguyên liệu / Bán thành phẩm -->
   <div class="tabs" style="margin-bottom:14px">
     <div class="tab active" id="cc-tab-drinks" onclick="ccSwitchTab('drinks',this)">🧋 Danh sách món</div>
     <div class="tab" id="cc-tab-mats" onclick="ccSwitchTab('mats',this)">🧂 Nguyên liệu (DMHH)</div>
+    <div class="tab" id="cc-tab-semi" onclick="ccSwitchTab('semi',this)">🧪 Bán thành phẩm</div>
   </div>
 
   <!-- ══ PANEL: DANH SÁCH MÓN ══ -->
@@ -704,6 +705,47 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 
   </div><!-- /cc-panel-mats -->
 
+  <!-- ══ PANEL: BÁN THÀNH PHẨM ══ -->
+  <div id="cc-panel-semi" style="display:none">
+
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;align-items:center">
+      <input id="semi-search" placeholder="🔍 Tìm tên bán thành phẩm..." oninput="renderSemiList()"
+        style="flex:1;min-width:200px;padding:8px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit"/>
+      <button class="btn btn-sm" onclick="openAddSemi()">+ Tạo công thức mới</button>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats" style="grid-template-columns:repeat(3,1fr);margin-bottom:14px">
+      <div class="stat"><div class="stat-num" id="semi-stat-total">0</div><div class="stat-label">Tổng công thức</div></div>
+      <div class="stat" style="--accent:var(--blue)"><div class="stat-num" id="semi-stat-nl">0</div><div class="stat-label">Đã vào DMHH</div></div>
+      <div class="stat" style="--accent:var(--teal)"><div class="stat-num" id="semi-stat-tp">0</div><div class="stat-label">Thành phẩm nội bộ</div></div>
+    </div>
+
+    <!-- Giải thích -->
+    <div class="guide" style="margin-bottom:14px">
+      🔁 <strong>Bán thành phẩm</strong> là nguyên liệu được làm từ nhiều nguyên liệu thô khác (VD: nền trà sữa, nước đường, kem muối...).<br/>
+      Sau khi tạo xong, chọn <strong>loại đầu ra</strong>:
+      <strong style="color:var(--blue)">📦 Nguyên liệu</strong> → tự động thêm vào DMHH với giá cost/đv để dùng trong công thức món.
+      <strong style="color:var(--teal)">📋 Thành phẩm</strong> → chỉ lưu để tham khảo, không vào DMHH.
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden">
+      <table>
+        <thead><tr>
+          <th style="width:28%">Tên bán thành phẩm</th>
+          <th style="width:8%;text-align:center">Đơn vị</th>
+          <th style="width:10%;text-align:right">Lượng nấu</th>
+          <th style="width:14%;text-align:right">Tổng cost</th>
+          <th style="width:14%;text-align:right">Cost/đv</th>
+          <th style="width:14%;text-align:center">Loại đầu ra</th>
+          <th style="width:12%"></th>
+        </tr></thead>
+        <tbody id="semi-list"></tbody>
+      </table>
+    </div>
+
+  </div><!-- /cc-panel-semi -->
+
 </div><!-- /page-costcalc -->
 
 <!-- Modal Thêm / Sửa Nguyên Liệu -->
@@ -750,6 +792,181 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
   </div>
 </div>
+
+<!-- ══ Modal Tạo / Sửa Bán Thành Phẩm ══ -->
+<div class="overlay" id="modal-semi-edit">
+  <div class="modal wide" style="max-width:560px;max-height:92vh;overflow-y:auto">
+    <div class="modal-title" id="semi-modal-title">🧪 Tạo công thức bán thành phẩm</div>
+    <input type="hidden" id="semi-edit-id"/>
+
+    <div class="form-row">
+      <div class="fg">
+        <label>Tên bán thành phẩm *</label>
+        <input id="semi-edit-ten" placeholder="VD: Nền trà sữa, Nước đường, Kem muối..."/>
+      </div>
+      <div class="fg">
+        <label>Đơn vị đầu ra *</label>
+        <input id="semi-edit-don-vi" placeholder="ml / gram / cái..." value="ml"/>
+      </div>
+    </div>
+
+    <div class="form-row">
+      <div class="fg">
+        <label>Lượng thu được sau nấu *</label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input id="semi-edit-yield" type="number" min="1" step="1" placeholder="1000" oninput="semiLiveCalc()"
+            style="flex:1"/>
+          <span id="semi-edit-yield-unit" style="font-size:13px;color:var(--muted);font-weight:600;white-space:nowrap">ml</span>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">VD: nấu ra 1000ml nước đường</div>
+      </div>
+      <div class="fg">
+        <label>Ghi chú / hướng dẫn</label>
+        <input id="semi-edit-note" placeholder="VD: Đun sôi 10 phút, để nguội..."/>
+      </div>
+    </div>
+
+    <!-- Nguyên liệu đầu vào -->
+    <div style="font-size:13px;font-weight:700;color:var(--brown);margin:12px 0 8px">
+      🧂 Nguyên liệu đầu vào
+    </div>
+    <div id="semi-ing-rows" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+    <button class="btn btn-ghost btn-sm" onclick="semiAddIngRow()" style="width:100%;margin-bottom:14px">+ Thêm nguyên liệu</button>
+
+    <!-- Kết quả tính toán live -->
+    <div id="semi-live-result" style="background:var(--brand-light);border-radius:10px;padding:14px;margin-bottom:14px;display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:center;margin-bottom:10px">
+        <div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Tổng cost nguyên liệu</div>
+          <div style="font-size:20px;font-weight:800;color:var(--brand)" id="semi-total-cost">0₫</div>
+        </div>
+        <div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost / <span id="semi-unit-label">đv</span></div>
+          <div style="font-size:20px;font-weight:800;color:var(--brown)" id="semi-cost-per-unit">0₫</div>
+        </div>
+      </div>
+      <!-- Breakdown từng NL -->
+      <div id="semi-breakdown" style="font-size:12px;color:var(--muted);border-top:1px solid var(--border);padding-top:8px"></div>
+    </div>
+
+    <!-- Chọn loại đầu ra — QUAN TRỌNG NHẤT -->
+    <div style="border:2px solid var(--border);border-radius:10px;padding:14px;margin-bottom:14px">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">
+        📤 Loại đầu ra — Sau khi làm xong, dùng làm gì?
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+
+        <!-- Option 1: Nguyên liệu -->
+        <label id="semi-opt-nl" style="border:2px solid var(--border);border-radius:8px;padding:12px;cursor:pointer;transition:.15s;display:block"
+          onclick="semiSelectType('nguyen_lieu')">
+          <input type="radio" name="semi-type" value="nguyen_lieu" id="semi-radio-nl" style="display:none"/>
+          <div style="font-size:18px;margin-bottom:4px">📦</div>
+          <div style="font-weight:700;font-size:13px;color:var(--blue)">Nguyên liệu (DMHH)</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5">
+            Tự động thêm vào danh mục nguyên liệu với giá = cost/đv vừa tính.<br/>
+            Dùng được ngay trong công thức tính cost món nước.
+          </div>
+        </label>
+
+        <!-- Option 2: Thành phẩm -->
+        <label id="semi-opt-tp" style="border:2px solid var(--border);border-radius:8px;padding:12px;cursor:pointer;transition:.15s;display:block"
+          onclick="semiSelectType('thanh_pham')">
+          <input type="radio" name="semi-type" value="thanh_pham" id="semi-radio-tp" style="display:none"/>
+          <div style="font-size:18px;margin-bottom:4px">📋</div>
+          <div style="font-weight:700;font-size:13px;color:var(--teal)">Thành phẩm (nội bộ)</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5">
+            Chỉ lưu công thức để tham khảo & dạy học.<br/>
+            Không sync vào danh mục nguyên liệu.
+          </div>
+        </label>
+
+      </div>
+
+      <!-- Trường mã NL (chỉ hiện khi chọn Nguyên liệu) -->
+      <div id="semi-nl-fields" style="display:none;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border)">
+        <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px">Thông tin trong DMHH:</div>
+        <div class="form-row" style="margin-bottom:0">
+          <div class="fg">
+            <label>Mã nguyên liệu *</label>
+            <input id="semi-nl-ma" placeholder="VD: A50" style="font-family:monospace;font-weight:700"/>
+          </div>
+          <div class="fg">
+            <label>Nhà cung cấp (nếu có)</label>
+            <input id="semi-nl-ncc" placeholder="Tự sản xuất"/>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-green btn-sm" onclick="saveSemi()">💾 Lưu công thức</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-semi-edit')">Hủy</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ Modal Chi tiết Bán Thành Phẩm ══ -->
+<div class="overlay" id="modal-semi-detail">
+  <div class="modal wide" style="max-width:520px;max-height:90vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:10px">
+      <div>
+        <div class="modal-title" id="sd-title" style="font-size:16px"></div>
+        <div style="font-size:12px;color:var(--muted)" id="sd-sub"></div>
+      </div>
+      <span id="sd-type-badge" style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;flex-shrink:0"></span>
+    </div>
+
+    <!-- Cost summary -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;background:var(--brand-light);border-radius:10px;padding:12px;text-align:center">
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Lượng nấu</div>
+        <div style="font-size:18px;font-weight:800;color:var(--brown)" id="sd-yield"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Tổng cost</div>
+        <div style="font-size:18px;font-weight:800;color:var(--brand)" id="sd-total"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost/<span id="sd-unit"></span></div>
+        <div style="font-size:18px;font-weight:800;color:var(--brown)" id="sd-per-unit"></div>
+      </div>
+    </div>
+
+    <!-- Ingredients table -->
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:7px">Nguyên liệu đầu vào</div>
+    <table style="margin-bottom:12px">
+      <thead><tr>
+        <th>Nguyên liệu</th>
+        <th style="text-align:right">Lượng</th>
+        <th style="text-align:right">Đơn giá</th>
+        <th style="text-align:right">Thành tiền</th>
+        <th style="text-align:right">%</th>
+      </tr></thead>
+      <tbody id="sd-ing-rows"></tbody>
+      <tfoot><tr>
+        <td colspan="3" style="font-weight:700;text-align:right;padding:7px 10px;border-top:2px solid var(--border)">Tổng</td>
+        <td style="font-weight:800;color:var(--brand);text-align:right;padding:7px 10px;border-top:2px solid var(--border)" id="sd-total-foot"></td>
+        <td style="padding:7px 10px;border-top:2px solid var(--border);text-align:right;color:var(--muted)">100%</td>
+      </tr></tfoot>
+    </table>
+
+    <!-- Ghi chú -->
+    <div id="sd-note-box" style="display:none;background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:12px;font-size:12px;color:var(--muted)"></div>
+
+    <!-- Nếu là NL: hiện mã DMHH -->
+    <div id="sd-nl-info" style="display:none;background:rgba(41,128,185,.06);border:1.5px solid rgba(41,128,185,.2);border-radius:8px;padding:10px 12px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:#2980b9;margin-bottom:4px">📦 Đã thêm vào DMHH</div>
+      <div style="font-size:13px;font-weight:700;color:var(--brown)">Mã: <span id="sd-nl-ma" style="font-family:monospace"></span> — Giá: <span id="sd-nl-gia"></span>/<span id="sd-nl-dv"></span></div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-sm" onclick="semiEditFromDetail()">✏️ Sửa</button>
+      <button class="btn btn-red btn-sm" onclick="semiDeleteFromDetail()">🗑 Xóa</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-semi-detail')">Đóng</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modal chi tiết + chỉnh sửa BOM -->
 <div class="overlay" id="modal-bom-detail">
   <div class="modal wide" style="max-width:580px;max-height:92vh;overflow-y:auto">
@@ -6074,6 +6291,405 @@ async function initCostCalc() {  // Build initial matMap từ BOM
 
 // Khởi động sau khi boot xong
 setTimeout(()=>initCostCalc(), 2500);
+
+// ═══════════════════════════════════════════════════════════════
+// MODULE: BÁN THÀNH PHẨM (SUB-RECIPE)
+// ═══════════════════════════════════════════════════════════════
+
+let CC_semis = []; // [{id, ten, don_vi, yield, note, type, nl_ma, nl_ncc, ingredients, cost_total, cost_per_unit}]
+let SEMI_currentId = null;
+
+// ── PATCH ccSwitchTab để hỗ trợ tab 'semi' ──────────────────
+const _origCcSwitchTab = ccSwitchTab;
+function ccSwitchTab(tab, el) {
+  document.getElementById('cc-panel-drinks').style.display = tab==='drinks' ? '' : 'none';
+  document.getElementById('cc-panel-mats').style.display   = tab==='mats'   ? '' : 'none';
+  document.getElementById('cc-panel-semi').style.display   = tab==='semi'   ? '' : 'none';
+  document.querySelectorAll('#page-costcalc .tabs .tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+  if (tab === 'mats')  renderMatList();
+  if (tab === 'semi')  renderSemiList();
+}
+
+// ── LOAD từ Supabase ─────────────────────────────────────────
+async function loadSemiRecipes() {
+  try {
+    const rows = await sbGet('semi_recipes', '?order=created_at.asc');
+    CC_semis = (rows || []).map(r => ({
+      id: r.id, ten: r.ten, don_vi: r.don_vi||'ml',
+      yield: r.yield_amount||0, note: r.note||'',
+      type: r.type||'thanh_pham', // 'nguyen_lieu' | 'thanh_pham'
+      nl_ma: r.nl_ma||'', nl_ncc: r.nl_ncc||'',
+      ingredients: r.ingredients||[],
+      cost_total: r.cost_total||0,
+      cost_per_unit: r.cost_per_unit||0
+    }));
+  } catch(e) { CC_semis = []; }
+}
+
+// ── RENDER DANH SÁCH ─────────────────────────────────────────
+function renderSemiList() {
+  const q = (document.getElementById('semi-search')?.value||'').toLowerCase();
+  const filtered = CC_semis.filter(s => !q || s.ten.toLowerCase().includes(q));
+
+  const elId = id => document.getElementById(id);
+  const nlCount = CC_semis.filter(s=>s.type==='nguyen_lieu').length;
+  const tpCount = CC_semis.filter(s=>s.type==='thanh_pham').length;
+  if (elId('semi-stat-total')) elId('semi-stat-total').textContent = CC_semis.length;
+  if (elId('semi-stat-nl'))    elId('semi-stat-nl').textContent    = nlCount;
+  if (elId('semi-stat-tp'))    elId('semi-stat-tp').textContent    = tpCount;
+
+  const tbody = document.getElementById('semi-list');
+  if (!tbody) return;
+  if (!filtered.length) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:24px;color:var(--muted)">
+      Chưa có công thức bán thành phẩm nào.<br/>
+      <span style="font-size:12px">Bấm "+ Tạo công thức mới" để bắt đầu.</span>
+    </td></tr>`;
+    return;
+  }
+  tbody.innerHTML = filtered.map(s => {
+    const isNL = s.type === 'nguyen_lieu';
+    return `<tr style="cursor:pointer" onclick="showSemiDetail('${s.id}')">
+      <td>
+        <div style="font-weight:700">${s.ten}</div>
+        ${s.note?`<div style="font-size:11px;color:var(--muted)">${s.note}</div>`:''}
+      </td>
+      <td style="text-align:center"><span class="tag" style="background:var(--dim);color:var(--brown);font-size:10px">${s.don_vi}</span></td>
+      <td style="text-align:right;color:var(--muted)">${s.yield} ${s.don_vi}</td>
+      <td style="text-align:right;font-weight:700;color:var(--brand)">${Math.round(s.cost_total).toLocaleString('vi-VN')}₫</td>
+      <td style="text-align:right;font-weight:800;color:var(--brown)">${Math.round(s.cost_per_unit*100)/100}₫/${s.don_vi}</td>
+      <td style="text-align:center">
+        <span style="font-size:11px;padding:3px 9px;border-radius:20px;font-weight:700;
+          background:${isNL?'rgba(41,128,185,.12)':'rgba(45,212,160,.12)'};
+          color:${isNL?'#2980b9':'#0d9488'}">
+          ${isNL?'📦 Nguyên liệu':'📋 Thành phẩm'}
+        </span>
+        ${isNL&&s.nl_ma?`<div style="font-size:10px;color:var(--muted);font-family:monospace;margin-top:2px">→ ${s.nl_ma}</div>`:''}
+      </td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-ghost btn-sm" style="padding:3px 8px" onclick="event.stopPropagation();openEditSemi('${s.id}')">✏️</button>
+          <button class="btn btn-ghost btn-sm" style="padding:3px 8px;color:var(--red)" onclick="event.stopPropagation();deleteSemi('${s.id}')">🗑</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+// ── MỞ MODAL TẠO MỚI ─────────────────────────────────────────
+function openAddSemi() {
+  document.getElementById('semi-modal-title').textContent = '🧪 Tạo công thức bán thành phẩm';
+  document.getElementById('semi-edit-id').value = '';
+  document.getElementById('semi-edit-ten').value = '';
+  document.getElementById('semi-edit-don-vi').value = 'ml';
+  document.getElementById('semi-edit-yield').value = '';
+  document.getElementById('semi-edit-yield-unit').textContent = 'ml';
+  document.getElementById('semi-edit-note').value = '';
+  document.getElementById('semi-ing-rows').innerHTML = '';
+  document.getElementById('semi-live-result').style.display = 'none';
+  // Auto gen mã
+  const lastNums = CC_mats.map(m=>parseInt((m.ma||'').replace(/\D/g,''))||0);
+  const next = lastNums.length ? Math.max(...lastNums)+1 : 50;
+  document.getElementById('semi-nl-ma').value = 'A'+next;
+  document.getElementById('semi-nl-ncc').value = 'Tự sản xuất';
+  // Reset type selection
+  semiSelectType('nguyen_lieu'); // mặc định chọn Nguyên liệu
+  showM('modal-semi-edit');
+  // Thêm 1 dòng NL trống sẵn
+  semiAddIngRow();
+}
+
+// ── MỞ MODAL SỬA ─────────────────────────────────────────────
+function openEditSemi(id) {
+  const s = CC_semis.find(x=>x.id===id);
+  if (!s) return;
+  document.getElementById('semi-modal-title').textContent = '✏️ Sửa công thức bán thành phẩm';
+  document.getElementById('semi-edit-id').value = s.id;
+  document.getElementById('semi-edit-ten').value = s.ten||'';
+  document.getElementById('semi-edit-don-vi').value = s.don_vi||'ml';
+  document.getElementById('semi-edit-yield-unit').textContent = s.don_vi||'ml';
+  document.getElementById('semi-edit-yield').value = s.yield||'';
+  document.getElementById('semi-edit-note').value = s.note||'';
+  document.getElementById('semi-ing-rows').innerHTML = '';
+  (s.ingredients||[]).forEach(i => semiAddIngRow(i.ma_nl, i.so_luong));
+  semiSelectType(s.type||'thanh_pham');
+  if (s.nl_ma) document.getElementById('semi-nl-ma').value = s.nl_ma;
+  if (s.nl_ncc) document.getElementById('semi-nl-ncc').value = s.nl_ncc;
+  semiLiveCalc();
+  showM('modal-semi-edit');
+}
+
+// ── CHỌN LOẠI ĐẦU RA ─────────────────────────────────────────
+function semiSelectType(type) {
+  const isNL = type === 'nguyen_lieu';
+  const optNL = document.getElementById('semi-opt-nl');
+  const optTP = document.getElementById('semi-opt-tp');
+  const nlFields = document.getElementById('semi-nl-fields');
+  if (optNL) {
+    optNL.style.borderColor = isNL ? '#2980b9' : 'var(--border)';
+    optNL.style.background  = isNL ? 'rgba(41,128,185,.07)' : '';
+  }
+  if (optTP) {
+    optTP.style.borderColor = !isNL ? 'var(--teal)' : 'var(--border)';
+    optTP.style.background  = !isNL ? 'rgba(45,212,160,.07)' : '';
+  }
+  if (nlFields) nlFields.style.display = isNL ? '' : 'none';
+  const radioNL = document.getElementById('semi-radio-nl');
+  const radioTP = document.getElementById('semi-radio-tp');
+  if (radioNL) radioNL.checked = isNL;
+  if (radioTP) radioTP.checked = !isNL;
+}
+
+// ── THÊM DÒNG NL VÀO FORM ────────────────────────────────────
+function semiAddIngRow(matId='', qty='') {
+  const container = document.getElementById('semi-ing-rows');
+  const allMats = {};
+  CC_mats.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
+  D.inventory.forEach(m=>{ if(!allMats[m.id]) allMats[m.id]={id:m.id,name:m.name,unit:m.unit,cost:m.cost||0}; });
+  const matOpts = Object.values(allMats).map(m =>
+    `<option value="${m.id}" data-cost="${m.cost}" data-unit="${m.unit||''}" ${m.id===matId?'selected':''}>
+      ${m.name} — ${Math.round(m.cost*10)/10}₫/${m.unit||'đv'}
+    </option>`
+  ).join('');
+  const row = document.createElement('div');
+  row.className = 'semi-ing-row';
+  row.style.cssText = 'display:grid;grid-template-columns:1fr 110px 60px auto;gap:8px;align-items:center;background:var(--bg);border-radius:8px;padding:8px 10px;border:1px solid var(--border)';
+  row.innerHTML = `
+    <select class="semi-mat-sel" onchange="semiMatChange(this);semiLiveCalc()"
+      style="border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-size:12px;font-family:inherit;background:#fff;outline:none">
+      <option value="">-- Chọn nguyên liệu --</option>${matOpts}
+    </select>
+    <input class="semi-qty" type="number" step="0.001" min="0" placeholder="0" value="${qty}" oninput="semiLiveCalc()"
+      style="border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-size:13px;font-family:inherit;width:100%;outline:none;text-align:right"/>
+    <span class="semi-unit" style="font-size:12px;color:var(--muted);font-weight:600"></span>
+    <button onclick="this.closest('.semi-ing-row').remove();semiLiveCalc()"
+      style="background:var(--red);color:#fff;border:none;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;flex-shrink:0">✕</button>`;
+  container.appendChild(row);
+  if (matId) {
+    const sel = row.querySelector('.semi-mat-sel');
+    sel.value = matId;
+    semiMatChange(sel);
+  }
+  semiLiveCalc();
+}
+function semiMatChange(sel) {
+  const row = sel.closest('.semi-ing-row');
+  const opt = sel.options[sel.selectedIndex];
+  if (row && opt) row.querySelector('.semi-unit').textContent = opt.dataset.unit||'';
+}
+
+// ── TÍNH COST LIVE ───────────────────────────────────────────
+function semiLiveCalc() {
+  // Sync unit label
+  const dv = document.getElementById('semi-edit-don-vi')?.value||'ml';
+  const yieldUnit = document.getElementById('semi-edit-yield-unit');
+  if (yieldUnit) yieldUnit.textContent = dv;
+
+  let total = 0;
+  const breakdown = [];
+  document.querySelectorAll('.semi-ing-row').forEach(row => {
+    const sel = row.querySelector('.semi-mat-sel');
+    const qty = parseFloat(row.querySelector('.semi-qty')?.value)||0;
+    if (!sel||!sel.value||qty<=0) return;
+    const opt = sel.options[sel.selectedIndex];
+    const cost = parseFloat(opt?.dataset.cost||0);
+    const line = cost * qty;
+    total += line;
+    if (line > 0) breakdown.push({
+      name: opt.text.split('—')[0].trim(),
+      qty, unit: opt?.dataset.unit||'', cost, line
+    });
+  });
+
+  const yieldAmt = parseFloat(document.getElementById('semi-edit-yield')?.value)||0;
+  const perUnit  = yieldAmt > 0 ? total/yieldAmt : 0;
+
+  const resultDiv = document.getElementById('semi-live-result');
+  if (!resultDiv) return;
+  resultDiv.style.display = total>0 ? '' : 'none';
+  document.getElementById('semi-total-cost').textContent = Math.round(total).toLocaleString('vi-VN')+'₫';
+  document.getElementById('semi-cost-per-unit').textContent = perUnit>0 ? (Math.round(perUnit*100)/100)+'₫' : '—';
+  document.getElementById('semi-unit-label').textContent = dv;
+
+  // Breakdown
+  const bdEl = document.getElementById('semi-breakdown');
+  if (bdEl && breakdown.length) {
+    bdEl.innerHTML = breakdown
+      .sort((a,b)=>b.line-a.line)
+      .map(b=>{
+        const pct = total>0?Math.round(b.line/total*100):0;
+        const barW = Math.max(pct,2);
+        return `<div style="display:flex;align-items:center;gap:8px;padding:2px 0">
+          <div style="flex:1;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${b.name}</div>
+          <div style="width:80px;background:var(--dim);border-radius:3px;height:5px;flex-shrink:0">
+            <div style="width:${barW}%;height:5px;border-radius:3px;background:var(--brand)"></div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);min-width:32px;text-align:right">${pct}%</div>
+          <div style="font-size:11px;font-weight:600;min-width:55px;text-align:right">${Math.round(b.line).toLocaleString('vi-VN')}₫</div>
+        </div>`;
+      }).join('');
+  }
+}
+
+// ── LƯU BÁN THÀNH PHẨM ──────────────────────────────────────
+async function saveSemi() {
+  const ten    = (document.getElementById('semi-edit-ten').value||'').trim();
+  const donVi  = (document.getElementById('semi-edit-don-vi').value||'ml').trim();
+  const yld    = parseFloat(document.getElementById('semi-edit-yield').value)||0;
+  const note   = (document.getElementById('semi-edit-note').value||'').trim();
+  const type   = document.getElementById('semi-radio-nl')?.checked ? 'nguyen_lieu' : 'thanh_pham';
+  const nlMa   = (document.getElementById('semi-nl-ma')?.value||'').trim().toUpperCase();
+  const nlNcc  = (document.getElementById('semi-nl-ncc')?.value||'').trim();
+  const editId = document.getElementById('semi-edit-id').value;
+
+  if (!ten)    { notify('Nhập tên bán thành phẩm!', false); return; }
+  if (!donVi)  { notify('Nhập đơn vị!', false); return; }
+  if (yld<=0)  { notify('Nhập lượng thu được!', false); return; }
+  if (type==='nguyen_lieu' && !nlMa) { notify('Nhập mã nguyên liệu!', false); return; }
+
+  // Thu thập nguyên liệu
+  const ingredients = [];
+  let totalCost = 0;
+  document.querySelectorAll('.semi-ing-row').forEach(row => {
+    const sel = row.querySelector('.semi-mat-sel');
+    const qty = parseFloat(row.querySelector('.semi-qty')?.value)||0;
+    if (!sel||!sel.value||qty<=0) return;
+    const opt = sel.options[sel.selectedIndex];
+    const matName = opt.text.split('—')[0].trim();
+    const cost = parseFloat(opt?.dataset.cost||0);
+    const unit = opt?.dataset.unit||'';
+    const line = cost*qty;
+    totalCost += line;
+    ingredients.push({ma_nl:sel.value, ten_nl:matName, don_vi:unit, so_luong:qty, don_gia:cost, thanh_tien:Math.round(line*100)/100});
+  });
+  if (!ingredients.length) { notify('Thêm ít nhất 1 nguyên liệu!', false); return; }
+
+  const costPerUnit = yld>0 ? Math.round(totalCost/yld*1000)/1000 : 0;
+
+  const record = {
+    id: editId||('sr'+Date.now()),
+    ten, don_vi:donVi, yield_amount:yld, note, type,
+    nl_ma: type==='nguyen_lieu'?nlMa:'',
+    nl_ncc: type==='nguyen_lieu'?nlNcc:'',
+    ingredients,
+    cost_total: Math.round(totalCost*100)/100,
+    cost_per_unit: costPerUnit
+  };
+
+  try { await sbUpsert('semi_recipes', record); }
+  catch(e) { notify('⚠️ Lưu offline (lỗi Supabase)', false); }
+
+  // Cập nhật local
+  const idx = CC_semis.findIndex(x=>x.id===record.id);
+  const semiObj = {...record};
+  if (idx>=0) CC_semis[idx]=semiObj; else CC_semis.push(semiObj);
+
+  // Nếu là Nguyên liệu → tự động sync vào DMHH
+  if (type === 'nguyen_lieu') {
+    const matObj = {
+      ma: nlMa, ten, don_vi: donVi, gia: costPerUnit,
+      ncc: nlNcc||'Tự sản xuất', note: `Sub-recipe: ${ten}`,
+      _custom: true
+    };
+    try { await sbUpsert('dmhh', {...matObj, created_at:new Date().toISOString()}); }
+    catch(e) {}
+    const mIdx = CC_mats.findIndex(m=>m.ma===nlMa);
+    if (mIdx>=0) CC_mats[mIdx]={...CC_mats[mIdx],...matObj};
+    else CC_mats.push(matObj);
+    CC_matMap[nlMa] = matObj;
+    notify(`✅ Đã lưu & thêm vào DMHH: ${nlMa} — ${costPerUnit}₫/${donVi}`);
+  } else {
+    notify(`✅ Đã lưu công thức: ${ten}`);
+  }
+
+  closeM('modal-semi-edit');
+  renderSemiList();
+}
+
+// ── CHI TIẾT ─────────────────────────────────────────────────
+function showSemiDetail(id) {
+  const s = CC_semis.find(x=>x.id===id);
+  if (!s) return;
+  SEMI_currentId = id;
+  const isNL = s.type==='nguyen_lieu';
+
+  document.getElementById('sd-title').textContent = s.ten;
+  document.getElementById('sd-sub').textContent = `${(s.ingredients||[]).length} nguyên liệu · Nấu ${s.yield} ${s.don_vi}`;
+
+  const badge = document.getElementById('sd-type-badge');
+  badge.textContent = isNL ? '📦 Nguyên liệu' : '📋 Thành phẩm';
+  badge.style.background = isNL ? 'rgba(41,128,185,.1)' : 'rgba(45,212,160,.1)';
+  badge.style.color = isNL ? '#2980b9' : '#0d9488';
+  badge.style.border = `1.5px solid ${isNL?'#2980b9':'#0d9488'}`;
+
+  document.getElementById('sd-yield').textContent = `${s.yield} ${s.don_vi}`;
+  document.getElementById('sd-total').textContent = Math.round(s.cost_total).toLocaleString('vi-VN')+'₫';
+  document.getElementById('sd-per-unit').textContent = `${Math.round(s.cost_per_unit*100)/100}₫`;
+  document.getElementById('sd-unit').textContent = s.don_vi;
+  document.getElementById('sd-total-foot').textContent = Math.round(s.cost_total).toLocaleString('vi-VN')+'₫';
+
+  const ings = s.ingredients||[];
+  document.getElementById('sd-ing-rows').innerHTML = ings.map(i => {
+    const pct = s.cost_total>0 ? Math.round(i.thanh_tien/s.cost_total*100) : 0;
+    const isTop = pct>=25;
+    return `<tr style="${isTop?'background:rgba(255,140,0,.04)':''}">
+      <td style="font-weight:${isTop?700:400}">${i.ten_nl}${isTop?` <span style="font-size:9px;background:var(--dim);color:var(--brand);padding:1px 5px;border-radius:4px">chính</span>`:''}</td>
+      <td style="text-align:right;color:var(--muted)">${i.so_luong} ${i.don_vi}</td>
+      <td style="text-align:right;color:var(--muted);font-size:12px">${Math.round(i.don_gia*10)/10}₫</td>
+      <td style="text-align:right;font-weight:600">${Math.round(i.thanh_tien).toLocaleString('vi-VN')}₫</td>
+      <td style="text-align:right;color:${isTop?'var(--brand)':'var(--muted)'};font-weight:${isTop?700:400}">${pct}%</td>
+    </tr>`;
+  }).join('');
+
+  const noteBox = document.getElementById('sd-note-box');
+  if (s.note) { noteBox.textContent = '📝 '+s.note; noteBox.style.display=''; }
+  else noteBox.style.display='none';
+
+  const nlInfo = document.getElementById('sd-nl-info');
+  if (isNL && s.nl_ma) {
+    nlInfo.style.display='';
+    document.getElementById('sd-nl-ma').textContent = s.nl_ma;
+    document.getElementById('sd-nl-gia').textContent = `${Math.round(s.cost_per_unit*100)/100}₫`;
+    document.getElementById('sd-nl-dv').textContent = s.don_vi;
+  } else nlInfo.style.display='none';
+
+  showM('modal-semi-detail');
+}
+
+function semiEditFromDetail() {
+  closeM('modal-semi-detail');
+  openEditSemi(SEMI_currentId);
+}
+
+async function semiDeleteFromDetail() {
+  const s = CC_semis.find(x=>x.id===SEMI_currentId);
+  if (!s) return;
+  let msg = `Xóa công thức "${s.ten}"?`;
+  if (s.type==='nguyen_lieu'&&s.nl_ma) msg += `\n\n⚠️ Nguyên liệu ${s.nl_ma} trong DMHH sẽ KHÔNG bị xóa theo.`;
+  if (!confirm(msg)) return;
+  try { await sbDel('semi_recipes','?id=eq.'+SEMI_currentId); } catch(e){}
+  CC_semis = CC_semis.filter(x=>x.id!==SEMI_currentId);
+  closeM('modal-semi-detail');
+  renderSemiList();
+  notify('Đã xóa: '+s.ten);
+}
+
+async function deleteSemi(id) {
+  const s = CC_semis.find(x=>x.id===id);
+  if (!s||!confirm(`Xóa "${s.ten}"?`)) return;
+  try { await sbDel('semi_recipes','?id=eq.'+id); } catch(e){}
+  CC_semis = CC_semis.filter(x=>x.id!==id);
+  renderSemiList();
+  notify('Đã xóa: '+s.ten);
+}
+
+// Patch initCostCalc để load semi recipes
+const _origInit2 = initCostCalc;
+async function initCostCalc() {
+  await _origInit2();
+  await loadSemiRecipes();
+}
 
 boot();
 </script>
