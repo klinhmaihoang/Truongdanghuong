@@ -3844,6 +3844,7 @@ function filterProducts(){
       <div class="prod-icon">${p.icon||'📦'}</div>
       <div class="prod-name">${p.name}${vatBadge}${discBadge}</div>
       <div class="prod-price">${fmt(p.price)}</div>
+      ${p.vat?`<div style="font-size:10px;color:#2980b9">Giá gồm VAT: ${fmt(Math.round(p.price*(1+p.vat/100)))}</div>`:''}
       ${mat?`<div style="font-size:10px;color:var(--muted)">${mat.qty} ${mat.unit} còn</div>`:''}
     </div>`;
   }).join('')||'<div style="padding:14px;color:var(--muted);font-size:12px">Không tìm thấy sản phẩm</div>';
