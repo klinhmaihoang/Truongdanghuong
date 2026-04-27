@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -9449,6 +9448,19 @@ function showOrderDetail(id) {
     discEl.style.display='';
   } else discEl.style.display='none';
   showM('modal-order-detail');
+  // Progress bar + tracking (inlined từ patch)
+  odRenderProgressBar(o.status||'Đã lên đơn');
+  const trackView = document.getElementById('od-tracking-view');
+  if(trackView) {
+    if(o.tracking_url) {
+      trackView.style.display='';
+      const prov = odDetectProvider ? odDetectProvider(o.tracking_url) : null;
+      const pvEl = document.getElementById('od-tracking-provider-view');
+      const urlEl = document.getElementById('od-tracking-url-display');
+      if(pvEl) pvEl.textContent = prov?`${prov.icon} ${prov.name}`:'';
+      if(urlEl) urlEl.textContent = o.tracking_url;
+    } else { trackView.style.display='none'; }
+  }
 }
 
 function odEnterEdit() {
@@ -9462,7 +9474,12 @@ function odEnterEdit() {
   document.getElementById('od-edit-address').value  = o.address||'';
   document.getElementById('od-edit-discount').value = o.discount||'';
   document.getElementById('od-edit-note').value     = o.note||'';
-  document.getElementById('od-edit-status').value   = o.status||'Chờ thanh toán';
+  document.getElementById('od-edit-status').value   = o.status||'Đã lên đơn';
+  // Load tracking (inlined)
+  const trkInp = document.getElementById('od-edit-tracking');
+  if(trkInp) { trkInp.value = o.tracking_url||''; odTrackingPreview && odTrackingPreview(); }
+  odStatusChange && odStatusChange();
+  odRenderProgressBar(o.status||'Đã lên đơn');
   // Build item rows from items string
   const itemsContainer = document.getElementById('od-edit-items');
   itemsContainer.innerHTML = '';
@@ -9579,6 +9596,15 @@ async function odSaveEdit() {
     renderOrders();
     renderPendingOrders();
     renderDash();
+    // Lưu tracking_url (inlined)
+    const trkVal = document.getElementById('od-edit-tracking')?.value?.trim()||'';
+    o.tracking_url = trkVal;
+    // TG notify khi giao hàng
+    const newSt = document.getElementById('od-edit-status')?.value;
+    if(newSt==='Đang giao'||newSt==='Đã giao') {
+      const pv = trkVal&&odDetectProvider?odDetectProvider(trkVal):null;
+      tgMsg(`${newSt==='Đang giao'?'🚚':'🏠'} *${newSt}!*\n\n📋 Đơn: \`${o.id}\`\n👤 ${o.customer}\n💰 ${fmt(o.total||0)}`+(trkVal?`\n\n🔗 Tracking${pv?' ('+pv.name+')':''}:\n${trkVal}`:'')+`\n\n_Trương Dáng Hương Academy_`);
+    }
     // Update modal view
     showOrderDetail(o.id);
     notify('✅ Đã cập nhật đơn '+o.id);
@@ -9703,62 +9729,7 @@ function odStatusChange() {
 }
 
 // ── Patch showOrderDetail để render progress + tracking ────────
-const _origShowOrderDetail = showOrderDetail;
-function showOrderDetail(id) {
-  _origShowOrderDetail(id);
-  const o = OD_current;
-  if(!o) return;
-  // Progress bar
-  odRenderProgressBar(o.status||'Đã lên đơn');
-  // Tracking view
-  const trackView = document.getElementById('od-tracking-view');
-  if(trackView) {
-    if(o.tracking_url) {
-      trackView.style.display='';
-      const prov = odDetectProvider(o.tracking_url);
-      document.getElementById('od-tracking-provider-view').textContent = prov?`${prov.icon} ${prov.name}`:'';
-      document.getElementById('od-tracking-url-display').textContent = o.tracking_url;
-    } else {
-      trackView.style.display='none';
-    }
-  }
-}
-
-// ── Patch odEnterEdit để load tracking + status change ─────────
-const _origOdEnterEdit = odEnterEdit;
-function odEnterEdit() {
-  _origOdEnterEdit();
-  const o = OD_current;
-  if(!o) return;
-  document.getElementById('od-edit-tracking').value = o.tracking_url||'';
-  odTrackingPreview();
-  odStatusChange(); // Show/hide tracking section based on status
-  // Update progress bar in edit too
-  odRenderProgressBar(o.status||'Đã lên đơn');
-}
-
-// ── Patch odSaveEdit để lưu tracking_url & cập nhật status flow ─
-const _origOdSaveEdit = odSaveEdit;
-async function odSaveEdit() {
-  // Inject tracking_url vào order trước khi save
-  const trackingUrl = document.getElementById('od-edit-tracking')?.value?.trim()||'';
-  if(OD_current) OD_current.tracking_url = trackingUrl;
-  await _origOdSaveEdit();
-  // Re-render progress bar
-  if(OD_current) odRenderProgressBar(OD_current.status||'Đã lên đơn');
-  // Gửi TG khi chuyển sang Đang giao / Đã giao
-  const newStatus = document.getElementById('od-edit-status')?.value;
-  if(OD_current && (newStatus==='Đang giao'||newStatus==='Đã giao')) {
-    const prov = trackingUrl?odDetectProvider(trackingUrl):null;
-    tgMsg(`${newStatus==='Đang giao'?'🚚':'🏠'} *${newStatus}!*\n\n` +
-      `📋 Đơn: \`${OD_current.id}\`\n👤 ${OD_current.customer}\n💰 ${fmt(OD_current.total||0)}\n` +
-      (trackingUrl?`\n🔗 Tracking${prov?' ('+prov.name+')':''}:\n${trackingUrl}\n`:'')+
-      `\n_Trương Dáng Hương Academy_`);
-  }
-}
-
-// ── Cập nhật sbUpsert cho orders để lưu tracking_url ──────────
-// (tracking_url được lưu cùng order object nên sbUpsert tự xử lý)
+// Patches removed — logic inlined into original functions
 
 // ── Quick status buttons trong pending orders ──────────────────
 function odQuickStatus(id, newStatus) {
