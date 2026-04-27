@@ -635,50 +635,103 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 </div>
 
 <!-- Modal chi tiết BOM -->
+<!-- Modal chi tiết + chỉnh sửa BOM -->
 <div class="overlay" id="modal-bom-detail">
-  <div class="modal wide" style="max-width:560px">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-      <div>
-        <div class="modal-title" id="bom-detail-title" style="margin-bottom:2px"></div>
-        <div style="font-size:12px;color:var(--muted)" id="bom-detail-sub"></div>
+  <div class="modal wide" style="max-width:580px;max-height:92vh;overflow-y:auto">
+
+    <!-- Header: tên + badge + nút action -->
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;gap:10px">
+      <div style="flex:1;min-width:0">
+        <!-- VIEW mode -->
+        <div id="bom-hd-view">
+          <div class="modal-title" id="bom-detail-title" style="margin-bottom:2px;font-size:16px"></div>
+          <div style="font-size:12px;color:var(--muted)" id="bom-detail-sub"></div>
+        </div>
+        <!-- EDIT mode -->
+        <div id="bom-hd-edit" style="display:none">
+          <input id="bom-edit-name" style="width:100%;border:1.5px solid var(--brand);border-radius:8px;padding:7px 10px;font-size:15px;font-weight:700;font-family:inherit;outline:none;color:var(--brown)" placeholder="Tên món"/>
+          <div style="display:flex;gap:8px;margin-top:6px">
+            <select id="bom-edit-nhom" style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:6px 9px;font-size:12px;font-family:inherit;background:#fff;outline:none">
+              <option>Cà phê</option><option>Trà trái cây</option><option>Kombucha</option><option>Soda</option><option>Matcha</option><option>Khác</option>
+            </select>
+            <select id="bom-edit-size" style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:6px 9px;font-size:12px;font-family:inherit;background:#fff;outline:none">
+              <option>240ml</option><option>650ml</option><option>Khác</option>
+            </select>
+          </div>
+        </div>
       </div>
-      <span id="bom-detail-badge" style="font-size:13px;font-weight:700;padding:4px 12px;border-radius:20px"></span>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex-shrink:0">
+        <span id="bom-detail-badge" style="font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px"></span>
+        <div style="display:flex;gap:5px">
+          <!-- VIEW: nút Sửa + Xóa -->
+          <div id="bom-action-view" style="display:flex;gap:5px">
+            <button class="btn btn-sm" style="padding:4px 12px;font-size:12px" onclick="bomEnterEdit()">✏️ Sửa</button>
+            <button class="btn btn-red btn-sm" style="padding:4px 12px;font-size:12px" onclick="bomDeleteProduct()">🗑 Xóa</button>
+          </div>
+          <!-- EDIT: nút Lưu + Huỷ -->
+          <div id="bom-action-edit" style="display:none;gap:5px">
+            <button class="btn btn-green btn-sm" style="padding:4px 12px;font-size:12px" onclick="bomSaveEdit()">💾 Lưu</button>
+            <button class="btn btn-ghost btn-sm" style="padding:4px 12px;font-size:12px" onclick="bomCancelEdit()">Huỷ</button>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Cost summary bar -->
-    <div id="bom-detail-summary" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:12px 0;background:var(--brand-light);border-radius:10px;padding:12px;text-align:center">
-      <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Giá bán</div><div style="font-size:22px;font-weight:800;color:var(--brown)" id="bom-gb"></div></div>
-      <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost NL</div><div style="font-size:22px;font-weight:800;color:var(--brand)" id="bom-cost"></div><div style="font-size:13px;font-weight:700" id="bom-pct"></div></div>
-      <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Lợi nhuận</div><div style="font-size:22px;font-weight:800;color:var(--green)" id="bom-ln"></div></div>
+    <!-- Cost summary -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px;background:var(--brand-light);border-radius:10px;padding:12px;text-align:center">
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Giá bán</div>
+        <!-- VIEW -->
+        <div id="bom-gb" style="font-size:20px;font-weight:800;color:var(--brown)"></div>
+        <!-- EDIT -->
+        <input id="bom-edit-price" type="number" placeholder="0" oninput="bomLiveCalc()"
+          style="display:none;width:100%;border:1.5px solid var(--brand);border-radius:7px;padding:5px 8px;font-size:15px;font-weight:700;font-family:inherit;text-align:center;outline:none;background:#fff;color:var(--brown)"/>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost NL</div>
+        <div id="bom-cost" style="font-size:20px;font-weight:800;color:var(--brand)"></div>
+        <div id="bom-pct" style="font-size:13px;font-weight:700"></div>
+      </div>
+      <div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Lợi nhuận</div>
+        <div id="bom-ln" style="font-size:20px;font-weight:800;color:var(--green)"></div>
+      </div>
     </div>
 
     <!-- BOM table -->
-    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Công thức nguyên liệu</div>
-    <table style="margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Công thức nguyên liệu</div>
+      <!-- Nút thêm NL (chỉ hiện khi edit) -->
+      <button id="bom-add-ing-btn" onclick="bomAddIngRow()" style="display:none"
+        class="btn btn-ghost btn-sm" style="font-size:11px">+ Thêm NL</button>
+    </div>
+
+    <table style="margin-bottom:4px">
       <thead><tr>
-        <th style="width:45%">Nguyên liệu</th>
-        <th style="text-align:right;width:18%">Định lượng</th>
-        <th style="text-align:right;width:18%">Đơn giá</th>
-        <th style="text-align:right;width:19%">Thành tiền</th>
+        <th style="width:38%">Nguyên liệu</th>
+        <th style="text-align:right;width:16%">Định lượng</th>
+        <th style="text-align:right;width:16%">Đơn vị</th>
+        <th style="text-align:right;width:16%">Đơn giá</th>
+        <th style="text-align:right;width:14%">Thành tiền</th>
       </tr></thead>
       <tbody id="bom-ing-rows"></tbody>
       <tfoot><tr>
-        <td colspan="3" style="font-weight:700;text-align:right;padding:8px 10px;border-top:2px solid var(--border)">Tổng cost</td>
+        <td colspan="4" style="font-weight:700;text-align:right;padding:8px 10px;border-top:2px solid var(--border)">Tổng cost</td>
         <td style="font-weight:800;color:var(--brand);text-align:right;padding:8px 10px;border-top:2px solid var(--border)" id="bom-total-cost"></td>
       </tr></tfoot>
     </table>
 
-    <!-- Giá bán chỉnh sửa -->
-    <div style="background:var(--bg);border-radius:8px;padding:10px 12px;margin-bottom:14px">
+    <!-- Thử nghiệm giá (chỉ hiện view mode) -->
+    <div id="bom-trial-box" style="background:var(--bg);border-radius:8px;padding:10px 12px;margin:10px 0">
       <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:6px">Thử nghiệm giá bán</div>
       <div style="display:flex;gap:8px;align-items:center">
         <input id="bom-trial-price" type="number" placeholder="Nhập giá bán thử..." oninput="updateTrialCalc()"
           style="flex:1;border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-size:13px;font-family:inherit;outline:none"/>
-        <div style="font-size:13px;font-weight:700;min-width:80px;text-align:right" id="bom-trial-result"></div>
+        <div style="font-size:13px;font-weight:700;min-width:90px;text-align:right;line-height:1.4" id="bom-trial-result"></div>
       </div>
     </div>
 
-    <div class="btn-group">
+    <div class="btn-group" style="margin-top:4px">
       <button class="btn btn-ghost btn-sm" onclick="printSingleDrink()">🖨️ In phiếu</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-bom-detail')">Đóng</button>
     </div>
@@ -4910,56 +4963,304 @@ function ccToggleView() {
   renderCostCalc();
 }
 
-// ── CHI TIẾT BOM ─────────────────────────────────────────────
+// ── CHI TIẾT BOM + CHỈNH SỬA ─────────────────────────────────
+let CC_editMode = false;
+
 function showBomDetail(id) {
   const p = CC_products.find(x => x.id===id);
   if (!p) return;
   CC_currentId = id;
+  CC_editMode = false;
+  _bomRenderView(p);
+  showM('modal-bom-detail');
+}
+
+function _bomRenderView(p) {
   const cost = getCost(p);
   const gb = p.gia_ban||0;
   const pct = gb>0 ? Math.round(cost/gb*100) : null;
   const ln = gb>0 ? gb-cost : null;
   const b = costBadge(pct);
 
+  // Header
   document.getElementById('bom-detail-title').textContent = p.ten;
-  document.getElementById('bom-detail-sub').textContent = p.nhom + (p.size?' · '+p.size:'');
-
+  document.getElementById('bom-detail-sub').textContent = (p.nhom||'') + (p.size?' · '+p.size:'');
   const badge = document.getElementById('bom-detail-badge');
-  badge.textContent = pct!==null ? pct+'% '+b.icon : '—';
-  badge.style.color = b.color;
-  badge.style.background = b.bg;
-  badge.style.border = '1.5px solid '+b.color;
+  badge.textContent = pct!==null ? pct+'% '+b.icon : 'Chưa có giá';
+  badge.style.cssText = `font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;color:${b.color};background:${b.bg};border:1.5px solid ${b.color}`;
 
+  // Summary
   document.getElementById('bom-gb').textContent = gb>0?fmtVND(gb):'—';
+  document.getElementById('bom-gb').style.display = '';
+  document.getElementById('bom-edit-price').style.display = 'none';
   document.getElementById('bom-cost').textContent = fmtVND(cost);
   document.getElementById('bom-pct').textContent = pct!==null?pct+'%':'—';
   document.getElementById('bom-pct').style.color = b.color;
   document.getElementById('bom-ln').textContent = ln!==null?fmtVND(ln):'—';
   document.getElementById('bom-total-cost').textContent = fmtVND(cost);
 
-  // BOM rows
-  const ings = p.ingredients||[];
-  document.getElementById('bom-ing-rows').innerHTML = ings.map(i => {
-    const mat = CC_matMap[i.ma_nl];
-    // Tính lại với giá kho hiện tại nếu có
-    const invMat = D.inventory.find(m=>m.id===i.ma_nl||m.name===i.ten_nl);
-    const unitPrice = invMat?(invMat.cost||0):(i.don_gia||0);
-    const total = unitPrice*(i.so_luong||0);
-    const isTop = total > cost*0.3; // highlight NL tốn nhất
-    return `<tr style="${isTop?'background:rgba(255,140,0,.05)':''}">
-      <td style="font-weight:${isTop?700:400}">${i.ten_nl} ${isTop?'<span style="font-size:10px;color:var(--brand);background:var(--dim);padding:1px 5px;border-radius:4px">NL chính</span>':''}</td>
-      <td style="text-align:right;color:var(--muted)">${i.so_luong} <small>${i.don_vi}</small></td>
-      <td style="text-align:right;color:var(--muted)">${Math.round(unitPrice*10)/10}₫/${i.don_vi}</td>
-      <td style="text-align:right;font-weight:600;color:${isTop?'var(--brand)':'inherit'}">${fmtVND(total)}</td>
-    </tr>`;
-  }).join('');
+  // Mode toggles
+  document.getElementById('bom-hd-view').style.display = '';
+  document.getElementById('bom-hd-edit').style.display = 'none';
+  document.getElementById('bom-action-view').style.display = 'flex';
+  document.getElementById('bom-action-edit').style.display = 'none';
+  document.getElementById('bom-add-ing-btn').style.display = 'none';
+  document.getElementById('bom-trial-box').style.display = 'block';
 
-  // Reset trial price
+  // Ingredient rows (VIEW)
+  _bomRenderIngRows(p, false);
+
+  // Trial price
   document.getElementById('bom-trial-price').value = gb||'';
-  document.getElementById('bom-trial-result').textContent = '';
   updateTrialCalc();
+}
 
-  showM('modal-bom-detail');
+function _bomRenderIngRows(p, editMode) {
+  const cost = getCost(p);
+  const ings = p.ingredients||[];
+
+  if (!editMode) {
+    // VIEW: read-only rows
+    document.getElementById('bom-ing-rows').innerHTML = ings.map((i,idx) => {
+      const invMat = D.inventory.find(m=>m.id===i.ma_nl||m.name===i.ten_nl);
+      const unitPrice = invMat?(invMat.cost||0):(i.don_gia||0);
+      const total = unitPrice*(i.so_luong||0);
+      const isTop = cost>0 && total > cost*0.3;
+      return `<tr style="${isTop?'background:rgba(255,140,0,.05)':''}">
+        <td style="font-weight:${isTop?700:400}">
+          ${i.ten_nl}
+          ${isTop?'<span style="font-size:9px;color:var(--brand);background:var(--dim);padding:1px 5px;border-radius:4px;margin-left:4px">NL chính</span>':''}
+        </td>
+        <td style="text-align:right;color:var(--muted)">${i.so_luong}</td>
+        <td style="text-align:right;color:var(--muted)">${i.don_vi}</td>
+        <td style="text-align:right;color:var(--muted);font-size:12px">${Math.round(unitPrice*10)/10}₫</td>
+        <td style="text-align:right;font-weight:600;color:${isTop?'var(--brand)':'inherit'}">${fmtVND(total)}</td>
+      </tr>`;
+    }).join('');
+  } else {
+    // EDIT: editable rows
+    const allMats = {};
+    BOM_DATA.materials.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
+    D.inventory.forEach(m=>{ if(!allMats[m.id]) allMats[m.id]={id:m.id,name:m.name,unit:m.unit,cost:m.cost||0}; });
+    const matOpts = (cur='')=>Object.values(allMats).map(m=>
+      `<option value="${m.id}" data-cost="${m.cost}" data-unit="${m.unit}" ${m.id===cur||m.name===cur?'selected':''}>${m.name}</option>`
+    ).join('');
+
+    document.getElementById('bom-ing-rows').innerHTML = ings.map((i,idx) => {
+      return `<tr class="bom-edit-row" data-idx="${idx}">
+        <td style="padding:4px 6px">
+          <select class="bom-ing-mat" onchange="bomIngMatChange(this);bomLiveCalc()"
+            style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:5px 7px;font-size:12px;font-family:inherit;background:#fff;outline:none">
+            <option value="">-- Chọn NL --</option>${matOpts(i.ma_nl||i.ten_nl)}
+          </select>
+        </td>
+        <td style="padding:4px 4px">
+          <input class="bom-ing-qty" type="number" step="0.001" min="0" value="${i.so_luong||0}" oninput="bomLiveCalc()"
+            style="width:70px;border:1.5px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;font-family:inherit;outline:none;text-align:right"/>
+        </td>
+        <td style="padding:4px 4px">
+          <span class="bom-ing-unit" style="font-size:12px;color:var(--muted);font-weight:600">${i.don_vi||''}</span>
+        </td>
+        <td style="padding:4px 4px">
+          <input class="bom-ing-price" type="number" step="0.01" min="0" value="${Math.round((i.don_gia||0)*100)/100}" oninput="bomLiveCalc()"
+            style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;font-family:inherit;outline:none;text-align:right"/>
+        </td>
+        <td style="padding:4px 4px;text-align:right">
+          <button onclick="this.closest('tr').remove();bomLiveCalc()"
+            style="background:var(--red);color:#fff;border:none;border-radius:5px;width:24px;height:24px;cursor:pointer;font-size:12px;line-height:1">✕</button>
+        </td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+function bomIngMatChange(sel) {
+  const row = sel.closest('tr');
+  const opt = sel.options[sel.selectedIndex];
+  // Update unit label
+  const unitEl = row.querySelector('.bom-ing-unit');
+  if (unitEl) unitEl.textContent = opt ? (opt.dataset.unit||'') : '';
+  // Update price from DMHH
+  const priceEl = row.querySelector('.bom-ing-price');
+  if (priceEl && opt && opt.dataset.cost) priceEl.value = Math.round(parseFloat(opt.dataset.cost)*100)/100;
+}
+
+function bomLiveCalc() {
+  let total = 0;
+  document.querySelectorAll('.bom-edit-row').forEach(row => {
+    const qty  = parseFloat(row.querySelector('.bom-ing-qty')?.value)||0;
+    const price= parseFloat(row.querySelector('.bom-ing-price')?.value)||0;
+    total += qty * price;
+  });
+  const gb = parseFloat(document.getElementById('bom-edit-price')?.value)||0;
+  document.getElementById('bom-cost').textContent = fmtVND(total);
+  document.getElementById('bom-total-cost').textContent = fmtVND(total);
+  if (gb>0) {
+    const pct = Math.round(total/gb*100);
+    const b = costBadge(pct);
+    document.getElementById('bom-pct').textContent = pct+'%';
+    document.getElementById('bom-pct').style.color = b.color;
+    document.getElementById('bom-ln').textContent = fmtVND(gb-total);
+    const badge = document.getElementById('bom-detail-badge');
+    badge.textContent = pct+'% '+b.icon;
+    badge.style.cssText = `font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;color:${b.color};background:${b.bg};border:1.5px solid ${b.color}`;
+  } else {
+    document.getElementById('bom-pct').textContent = '—';
+    document.getElementById('bom-ln').textContent = '—';
+  }
+}
+
+function bomAddIngRow() {
+  // Thêm 1 dòng rỗng vào tbody
+  const tbody = document.getElementById('bom-ing-rows');
+  const allMats = {};
+  BOM_DATA.materials.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
+  D.inventory.forEach(m=>{ if(!allMats[m.id]) allMats[m.id]={id:m.id,name:m.name,unit:m.unit,cost:m.cost||0}; });
+  const matOpts = Object.values(allMats).map(m=>
+    `<option value="${m.id}" data-cost="${m.cost}" data-unit="${m.unit}">${m.name}</option>`
+  ).join('');
+  const tr = document.createElement('tr');
+  tr.className = 'bom-edit-row';
+  tr.innerHTML = `
+    <td style="padding:4px 6px">
+      <select class="bom-ing-mat" onchange="bomIngMatChange(this);bomLiveCalc()"
+        style="width:100%;border:1.5px solid var(--brand);border-radius:6px;padding:5px 7px;font-size:12px;font-family:inherit;background:#fff;outline:none">
+        <option value="">-- Chọn NL --</option>${matOpts}
+      </select>
+    </td>
+    <td style="padding:4px 4px">
+      <input class="bom-ing-qty" type="number" step="0.001" min="0" value="0" oninput="bomLiveCalc()"
+        style="width:70px;border:1.5px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;font-family:inherit;outline:none;text-align:right"/>
+    </td>
+    <td style="padding:4px 4px"><span class="bom-ing-unit" style="font-size:12px;color:var(--muted);font-weight:600"></span></td>
+    <td style="padding:4px 4px">
+      <input class="bom-ing-price" type="number" step="0.01" min="0" value="0" oninput="bomLiveCalc()"
+        style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;font-family:inherit;outline:none;text-align:right"/>
+    </td>
+    <td style="padding:4px 4px;text-align:right">
+      <button onclick="this.closest('tr').remove();bomLiveCalc()"
+        style="background:var(--red);color:#fff;border:none;border-radius:5px;width:24px;height:24px;cursor:pointer;font-size:12px;line-height:1">✕</button>
+    </td>`;
+  tbody.appendChild(tr);
+}
+
+// ── VÀO CHẾ ĐỘ SỬA ──────────────────────────────────────────
+function bomEnterEdit() {
+  const p = CC_products.find(x=>x.id===CC_currentId);
+  if (!p) return;
+  CC_editMode = true;
+
+  // Hiện input tên
+  document.getElementById('bom-hd-view').style.display = 'none';
+  document.getElementById('bom-hd-edit').style.display = 'block';
+  document.getElementById('bom-edit-name').value = p.ten||'';
+  document.getElementById('bom-edit-nhom').value = p.nhom||'Khác';
+  document.getElementById('bom-edit-size').value = p.size||'240ml';
+
+  // Hiện input giá bán
+  document.getElementById('bom-gb').style.display = 'none';
+  const priceInput = document.getElementById('bom-edit-price');
+  priceInput.style.display = '';
+  priceInput.value = p.gia_ban||'';
+
+  // Hiện nút edit action
+  document.getElementById('bom-action-view').style.display = 'none';
+  document.getElementById('bom-action-edit').style.display = 'flex';
+  document.getElementById('bom-add-ing-btn').style.display = '';
+  document.getElementById('bom-trial-box').style.display = 'none';
+
+  // Render editable rows
+  _bomRenderIngRows(p, true);
+}
+
+function bomCancelEdit() {
+  const p = CC_products.find(x=>x.id===CC_currentId);
+  if (!p) return;
+  CC_editMode = false;
+  _bomRenderView(p);
+}
+
+// ── LƯU CHỈNH SỬA ───────────────────────────────────────────
+async function bomSaveEdit() {
+  const p = CC_products.find(x=>x.id===CC_currentId);
+  if (!p) return;
+
+  const newName = (document.getElementById('bom-edit-name').value||'').trim();
+  if (!newName) { notify('Nhập tên món!', false); return; }
+
+  // Thu thập nguyên liệu từ các row đang edit
+  const newIngs = [];
+  document.querySelectorAll('.bom-edit-row').forEach(row => {
+    const sel   = row.querySelector('.bom-ing-mat');
+    const qty   = parseFloat(row.querySelector('.bom-ing-qty')?.value)||0;
+    const price = parseFloat(row.querySelector('.bom-ing-price')?.value)||0;
+    const unit  = row.querySelector('.bom-ing-unit')?.textContent||'';
+    if (!sel||!sel.value||qty<=0) return;
+    const opt = sel.options[sel.selectedIndex];
+    const matName = opt ? opt.text : '';
+    newIngs.push({
+      ma_nl: sel.value,
+      ten_nl: matName,
+      don_vi: unit || (opt?opt.dataset.unit:''),
+      so_luong: qty,
+      don_gia: price,
+      thanh_tien: Math.round(qty*price*100)/100
+    });
+  });
+
+  const newPrice  = parseFloat(document.getElementById('bom-edit-price')?.value)||0;
+  const newNhom   = document.getElementById('bom-edit-nhom')?.value||p.nhom||'Khác';
+  const newSize   = document.getElementById('bom-edit-size')?.value||p.size||'—';
+  const newCost   = newIngs.reduce((s,i)=>s+i.thanh_tien,0);
+
+  // Cập nhật local
+  p.ten        = newName;
+  p.nhom       = newNhom;
+  p.size       = newSize;
+  p.gia_ban    = newPrice;
+  p.ingredients = newIngs;
+  p.cost       = newCost;
+  p._edited    = true; // mark as edited
+
+  // Nếu là món custom (Supabase) → lưu lên Supabase
+  if (p._custom || p._edited) {
+    try {
+      await sbUpsert('drink_recipes', {
+        id: p.id, name: newName, nhom: newNhom, size: newSize,
+        sale_price: newPrice,
+        ingredients: newIngs.map(i=>({
+          mat_id: i.ma_nl, mat_name: i.ten_nl, mat_unit: i.don_vi,
+          qty: i.so_luong, cost_snapshot: i.don_gia
+        }))
+      });
+      notify('✅ Đã lưu: '+newName);
+    } catch(e) {
+      // Lưu local thôi nếu là BOM gốc chưa có trên Supabase
+      notify('✅ Đã cập nhật (chỉ trên máy này)');
+    }
+  }
+
+  CC_editMode = false;
+  _bomRenderView(p);
+  renderCostCalcGroups();
+  renderCostCalc();
+}
+
+// ── XÓA MÓN ─────────────────────────────────────────────────
+async function bomDeleteProduct() {
+  const p = CC_products.find(x=>x.id===CC_currentId);
+  if (!p) return;
+  if (!confirm(`Xóa món "${p.ten}" khỏi danh sách?`)) return;
+  // Nếu là custom → xóa Supabase
+  if (p._custom) {
+    try { await sbDel('drink_recipes','?id=eq.'+p.id); } catch(e) {}
+  }
+  // Xóa khỏi local
+  CC_products = CC_products.filter(x=>x.id!==CC_currentId);
+  closeM('modal-bom-detail');
+  renderCostCalcGroups();
+  renderCostCalc();
+  notify('Đã xóa: '+p.ten);
 }
 
 // ── THỬ NGHIỆM GIÁ BÁN ──────────────────────────────────────
