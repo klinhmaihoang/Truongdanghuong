@@ -174,7 +174,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   /* Unpaid table on dashboard */
   #dash-unpaid-rows td:nth-child(3),#dash-unpaid-rows td:nth-child(4){display:none}
   /* Stats orders */
-  #page-orders .stats{grid-template-columns:repeat(3,1fr)}
+  #orders-component .stats{grid-template-columns:repeat(3,1fr)}
 }
 @media(min-width:701px){
   .bottom-nav{display:none}
@@ -200,7 +200,6 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <button onclick="go('pos',this)">Bán hàng</button>
     <button onclick="go('products',this)">Hàng hóa</button>
     <button onclick="go('inventory',this)">Kho</button>
-    <button onclick="go('orders',this)">Đơn hàng</button>
     <button onclick="go('customers',this)">👥 Khách hàng</button>
     <button onclick="go('reports',this)" style="color:var(--teal)">📊 Báo cáo</button>
       <button onclick="go('finance',this)" style="color:var(--green)">💵 Thu chi</button>
@@ -225,9 +224,6 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   </button>
   <button class="bottom-nav-btn" onclick="go('inventory',this);syncBottomNav(this)">
     <span class="bn-icon">📦</span>Kho
-  </button>
-  <button class="bottom-nav-btn" onclick="go('orders',this);syncBottomNav(this)">
-    <span class="bn-icon">📋</span>Đơn hàng
   </button>
   <button class="bottom-nav-btn" onclick="go('customers',this);syncBottomNav(this)">
     <span class="bn-icon">👥</span>Khách hàng
@@ -277,7 +273,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="card" style="margin-bottom:0">
       <div class="card-head">
         <span class="card-title">🛍️ Đơn bán lẻ gần đây</span>
-        <button class="btn btn-ghost btn-sm" onclick="go('orders',document.querySelectorAll('.nav button')[5])">Xem tất cả →</button>
+        <button class="btn btn-ghost btn-sm" onclick="go('pos',null);posTab('orders',document.getElementById('pos-tab-orders'))">Xem tất cả →</button>
       </div>
       <table><thead><tr><th>Khách</th><th>Sản phẩm</th><th>Tiền</th><th>TT</th></tr></thead>
       <tbody id="dash-orders"></tbody></table>
@@ -351,6 +347,15 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 
 <!-- BÁN HÀNG -->
 <div class="page" id="page-pos">
+
+  <!-- Sub-tabs: Bán hàng / Đơn hàng -->
+  <div class="tabs" style="margin-bottom:14px">
+    <div class="tab active" id="pos-tab-sell" onclick="posTab('sell',this)">🛒 Bán hàng</div>
+    <div class="tab" id="pos-tab-orders" onclick="posTab('orders',this)">📋 Đơn hàng <span id="pending-badge-pos" style="background:var(--red);color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;margin-left:3px"></span></div>
+  </div>
+
+  <!-- Panel Bán hàng -->
+  <div id="panel-pos-sell">
   <div class="pos-wrap">
     <div>
       <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Chọn sản phẩm</div>
@@ -411,6 +416,12 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
   </div>
 </div>
+  </div><!-- /panel-pos-sell -->
+
+  <!-- Panel Đơn hàng (nhúng vào trang Bán hàng) -->
+  <div id="panel-pos-orders" style="display:none"></div>
+
+</div><!-- END page-pos-stub -->
 
 <!-- HÀNG HÓA -->
 <div class="page" id="page-products">
@@ -496,7 +507,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 </div>
 
 <!-- ĐƠN HÀNG -->
-<div class="page" id="page-orders">
+<div id="orders-component" style="display:none">
   <div class="tabs">
     <div class="tab active" onclick="ordTab(this,'retail')">🛍️ Bán lẻ</div>
     <div class="tab" onclick="ordTab(this,'pending')">⏳ Chờ thu tiền <span id="pending-badge" style="background:var(--red);color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;margin-left:3px">0</span></div>
@@ -4079,7 +4090,7 @@ function filterOrders(){
 }
 
 function ordTab(el,type){
-  document.querySelectorAll('#page-orders .tab').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('#orders-component .tab').forEach(x=>x.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('panel-retail-orders').style.display   = type==='retail'   ?'block':'none';
   document.getElementById('panel-pending-orders').style.display  = type==='pending'  ?'block':'none';
@@ -5251,7 +5262,7 @@ function renderFinance(){
     </td>
     <td style="font-size:12px;color:var(--muted)">${t.note||'—'}</td>
     <td>${t._auto
-      ?`<a href="#" onclick="go('orders',document.querySelector('.nav button'));return false" style="font-size:11px;color:var(--teal)">Xem đơn</a>`
+      ?`<a href="#" onclick="go('pos',null);posTab('orders',document.getElementById('pos-tab-orders'));return false" style="font-size:11px;color:var(--teal)">Xem đơn</a>`
       :`<button class="btn btn-ghost btn-sm" style="color:var(--red);font-size:11px" onclick="deleteTransaction('${t.id}')">✕</button>`
     }</td>
   </tr>`).join(''):'<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--muted)">Chưa có giao dịch nào</td></tr>';
@@ -5355,11 +5366,11 @@ function printRetailPDF(order){
   <title>Hóa đơn ${order.id}</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:Arial,sans-serif;font-size:13px;color:#222;width:148mm;margin:0 auto;padding:10mm}
+    body{font-family:Arial,sans-serif;font-size:11px;color:#222;width:80mm;margin:0 auto;padding:5mm 3mm}
     .header{background:#FF8C00;color:#fff;text-align:center;padding:10px;border-radius:6px;margin-bottom:14px}
-    .header h1{font-size:16px;font-weight:bold;margin-bottom:2px}
+    .header h1{font-size:13px;font-weight:bold;margin-bottom:2px}
     .header p{font-size:10px;opacity:.9}
-    .title{text-align:center;font-size:15px;font-weight:bold;color:#FF8C00;margin-bottom:12px;letter-spacing:1px}
+    .title{text-align:center;font-size:12px;font-weight:bold;color:#FF8C00;margin-bottom:8px;letter-spacing:.5px}
     .divider{border:none;border-top:1px solid #ddd;margin:8px 0}
     .row{display:flex;justify-content:space-between;padding:4px 0;font-size:12px}
     .row .label{color:#888}
@@ -5369,12 +5380,12 @@ function printRetailPDF(order){
     .item{font-size:11px;padding:2px 0;color:#333}
     .total-box{background:#fff3e0;border:1.5px solid #FF8C00;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin:12px 0}
     .total-box .label{font-size:13px;font-weight:bold;color:#cc5500}
-    .total-box .amount{font-size:16px;font-weight:bold;color:#cc5500}
+    .total-box .amount{font-size:14px;font-weight:bold;color:#cc5500}
     .qr{text-align:center;margin:14px 0}
-    .qr img{width:100px;height:100px}
+    .qr img{width:70px;height:70px}
     .qr p{font-size:9px;color:#888;margin-top:4px}
     .footer{text-align:center;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:12px}
-    @media print{body{width:100%}}
+    @page{size:80mm auto;margin:0}@media print{body{width:80mm;padding:3mm 3mm}}
   </style></head><body>
   <div class="header">
     <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
@@ -5459,7 +5470,7 @@ function printAllFeeReceipt(s, hpOrders){
   <title>Phiếu thu học phí - ${s.name}</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:Arial,sans-serif;font-size:13px;color:#222;width:148mm;margin:0 auto;padding:10mm}
+    body{font-family:Arial,sans-serif;font-size:11px;color:#222;width:80mm;margin:0 auto;padding:5mm 3mm}
     .header{background:#FF8C00;color:#fff;text-align:center;padding:12px;border-radius:6px;margin-bottom:16px}
     .header h1{font-size:16px;font-weight:bold;margin-bottom:3px}
     .header p{font-size:10px;opacity:.9}
@@ -5483,7 +5494,7 @@ function printAllFeeReceipt(s, hpOrders){
     .sign-col{width:45%;text-align:center;font-size:11px;color:#555}
     .sign-line{border-top:1px dashed #ccc;margin-top:32px;padding-top:4px;font-size:10px;color:#888}
     .footer{text-align:center;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:14px}
-    @media print{body{width:100%}}
+    @page{size:80mm auto;margin:0}@media print{body{width:80mm;padding:3mm 3mm}}
   </style></head><body>
   <div class="header">
     <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
@@ -5538,11 +5549,11 @@ function printFeePDF(order){
   <title>Phiếu thu ${order.id}</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:Arial,sans-serif;font-size:13px;color:#222;width:148mm;margin:0 auto;padding:10mm}
+    body{font-family:Arial,sans-serif;font-size:11px;color:#222;width:80mm;margin:0 auto;padding:5mm 3mm}
     .header{background:#FF8C00;color:#fff;text-align:center;padding:10px;border-radius:6px;margin-bottom:14px}
-    .header h1{font-size:16px;font-weight:bold;margin-bottom:2px}
+    .header h1{font-size:13px;font-weight:bold;margin-bottom:2px}
     .header p{font-size:10px;opacity:.9}
-    .title{text-align:center;font-size:15px;font-weight:bold;color:#FF8C00;margin-bottom:12px;letter-spacing:1px}
+    .title{text-align:center;font-size:12px;font-weight:bold;color:#FF8C00;margin-bottom:8px;letter-spacing:.5px}
     .info-box{background:#f0faf0;border-radius:8px;padding:12px;margin-bottom:12px}
     .row{display:flex;justify-content:space-between;padding:4px 0;font-size:12px}
     .row .label{color:#666}
@@ -5558,7 +5569,7 @@ function printFeePDF(order){
     .sign-col{width:45%;font-size:11px;color:#555}
     .sign-col .name{margin-top:32px;border-top:1px dashed #ccc;padding-top:4px;font-size:10px;color:#888}
     .footer{text-align:center;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:16px}
-    @media print{body{width:100%}}
+    @page{size:80mm auto;margin:0}@media print{body{width:80mm;padding:3mm 3mm}}
   </style></head><body>
   <div class="header">
     <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
@@ -5597,7 +5608,7 @@ function printFeePDF(order){
 }
 
 function openPrintWindow(html, filename){
-  const w=window.open('','_blank','width=600,height=800');
+  const w=window.open('','_blank','width=420,height=700');
   if(!w){notify('Trình duyệt chặn popup! Cho phép popup để in phiếu.',false);return;}
   w.document.write(html);
   w.document.close();
@@ -6308,7 +6319,7 @@ function printSingleDrink() {
   }).join('');
   const d=new Date(), ds=d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear();
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${p.ten}</title>
-  <style>body{font-family:Arial,sans-serif;font-size:13px;color:#222;width:148mm;margin:0 auto;padding:10mm}
+  <style>body{font-family:Arial,sans-serif;font-size:11px;color:#222;width:80mm;margin:0 auto;padding:5mm 3mm}
   .header{background:#FF8C00;color:#fff;text-align:center;padding:10px;border-radius:8px;margin-bottom:14px}
   .header h1{font-size:15px;margin:0 0 2px;font-weight:700}.header p{font-size:10px;opacity:.85;margin:0}
   .name{font-size:20px;font-weight:800;color:#FF8C00;text-align:center;margin:10px 0 2px}
@@ -6320,7 +6331,7 @@ function printSingleDrink() {
   .box .lbl{font-size:10px;color:#888;text-transform:uppercase;font-weight:600}
   .box .val{font-size:18px;font-weight:800}
   .footer{text-align:center;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:8px}
-  @media print{body{width:100%}}</style></head><body>
+  @page{size:80mm auto;margin:0}@media print{body{width:80mm;padding:3mm 3mm}}</style></head><body>
   <div class="header"><h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1><p>Chuyên Gia F&B — BOM Cost Sheet — ${ds}</p></div>
   <div class="name">${p.ten}</div>
   <div class="sub">${p.nhom} · ${p.size||''}</div>
@@ -7222,6 +7233,52 @@ async function deleteSemi(id) {
   renderSemiList();
   notify('Đã xóa: '+s.ten);
 }
+
+
+// ═══════════════════════════════════════════════════════════════
+// POS SUB-TABS: Bán hàng ↔ Đơn hàng
+// ═══════════════════════════════════════════════════════════════
+function posTab(tab, el) {
+  const sellPanel   = document.getElementById('panel-pos-sell');
+  const ordersPanel = document.getElementById('panel-pos-orders');
+  if (!sellPanel || !ordersPanel) return;
+
+  document.querySelectorAll('#page-pos > .tabs .tab').forEach(t => t.classList.remove('active'));
+  if (el) el.classList.add('active');
+
+  if (tab === 'sell') {
+    sellPanel.style.display   = '';
+    ordersPanel.style.display = 'none';
+  } else {
+    sellPanel.style.display   = 'none';
+    ordersPanel.style.display = '';
+    // Nhúng orders-component vào đây nếu chưa có
+    const comp = document.getElementById('orders-component');
+    if (comp && !ordersPanel.contains(comp)) {
+      comp.style.display = '';
+      ordersPanel.appendChild(comp);
+    }
+    renderOrders();
+  }
+}
+
+// Sync pending badge từ orders sang pos tab
+const _origRenderOrders = renderOrders;
+function renderOrders() {
+  _origRenderOrders();
+  // Sync badge vào tab pos-orders
+  const srcBadge  = document.getElementById('pending-badge');
+  const destBadge = document.getElementById('pending-badge-pos');
+  if (srcBadge && destBadge) destBadge.textContent = srcBadge.textContent;
+}
+
+// Nếu URL hash có #orders, tự mở tab đơn hàng
+window.addEventListener('load', () => {
+  if (location.hash === '#orders') {
+    const btn = document.getElementById('pos-tab-orders');
+    if (btn) { go('pos', btn); posTab('orders', btn); }
+  }
+});
 
 boot();
 </script>
