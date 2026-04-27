@@ -347,7 +347,9 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 <div class="page" id="page-pos">
   <div class="pos-wrap">
     <div>
-      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px">Chọn sản phẩm</div>
+      <div style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:8px">Chọn sản phẩm</div>
+      <input id="product-search" placeholder="🔍 Tìm tên hàng..." oninput="filterProducts()"
+        style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;margin-bottom:10px;outline:none"/>
       <div class="prod-grid" id="prod-grid"></div>
     </div>
     <div class="cart-box">
@@ -360,6 +362,47 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <div class="form-row" style="margin-top:12px">
         <div class="fg"><label>Tên khách *</label><input id="c-name" placeholder="Tên khách hàng"/></div>
         <div class="fg"><label>Số điện thoại</label><input id="c-phone" placeholder="090xxxxxxx" type="tel"/></div>
+      </div>
+      <div class="fg" style="margin-bottom:8px"><label>Địa chỉ giao hàng</label><input id="c-address" placeholder="Số nhà, đường, phường/xã..."/></div>
+      <div class="form-row">
+        <div class="fg"><label>Hình thức thanh toán</label>
+          <select id="c-payment">
+            <option value="Tiền mặt">💵 Tiền mặt</option>
+            <option value="Chuyển khoản">🏦 Chuyển khoản</option>
+            <option value="QR VietQR">📱 QR VietQR</option>
+            <option value="COD">📦 COD</option>
+          </select>
+        </div>
+        <div class="fg"><label>Phương thức giao hàng</label>
+          <select id="c-shipping">
+            <option value="Khách tới lấy">🏪 Khách tới lấy</option>
+            <option value="Book ship">🛵 Book ship</option>
+            <option value="Chành xe">🚛 Chành xe</option>
+            <option value="Giao hàng nhanh">⚡ Giao hàng nhanh</option>
+            <option value="Giao hàng tiết kiệm">💰 Giao hàng tiết kiệm</option>
+            <option value="J&T Express">📮 J&T Express</option>
+            <option value="Viettel Post">📬 Viettel Post</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>VAT</label>
+          <select id="c-vat">
+            <option value="0">Không VAT</option>
+            <option value="8">VAT 8%</option>
+            <option value="10">VAT 10%</option>
+          </select>
+        </div>
+        <div class="fg"><label>Chiết khấu (%)</label>
+          <input id="c-discount" type="number" min="0" max="100" placeholder="0" oninput="updateCartTotal()"/>
+        </div>
+      </div>
+      <!-- Hiển thị tổng sau VAT/chiết khấu -->
+      <div id="cart-summary" style="display:none;background:var(--bg2);border-radius:8px;padding:10px 12px;margin:8px 0;font-size:12px">
+        <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Tạm tính:</span><span id="cs-subtotal">0đ</span></div>
+        <div style="display:flex;justify-content:space-between" id="cs-discount-row"><span style="color:var(--red)">Chiết khấu:</span><span id="cs-discount">0đ</span></div>
+        <div style="display:flex;justify-content:space-between" id="cs-vat-row"><span style="color:var(--muted)">VAT:</span><span id="cs-vat">0đ</span></div>
+        <div style="display:flex;justify-content:space-between;font-weight:700;color:var(--brand);margin-top:4px;padding-top:4px;border-top:1px solid var(--border)"><span>Tổng thanh toán:</span><span id="cs-total-final">0đ</span></div>
       </div>
       <div class="fg" style="margin-bottom:10px"><label>Ghi chú</label><input id="c-note" placeholder="Ghi chú..."/></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
@@ -1482,8 +1525,19 @@ function doPost(e) {
     else if (sheet === 'DonHang') {
       const sh = ss.getSheetByName('DonHang') || ss.insertSheet('DonHang');
       if (sh.getLastRow() === 0)
-        sh.getRange(1,1,1,7).setValues([['Mã ĐH','Khách','Sản phẩm','Tổng tiền','Trạng thái','Thời gian','Ghi chú']]).setFontWeight('bold');
-      sh.appendRow([data.id||'',data.customer||'',data.items||'',data.total||0,data.status||'',data.time||'',data.note||'']);
+        sh.getRange(1,1,1,13).setValues([['Mã ĐH','Khách','Sản phẩm','Tạm tính','CK(%)','VAT(%)','Tổng TT','Thanh toán','Giao hàng','Địa chỉ','Trạng thái','Thời gian','Ghi chú']]).setFontWeight('bold');
+      // Dedup by ID
+      const existIds=sh.getLastRow()>1?sh.getRange(2,1,sh.getLastRow()-1,1).getValues().map(r=>r[0]):[];
+      if(existIds.indexOf(data.id)===-1){
+        sh.appendRow([data.id||'',data.customer||'',data.items||'',
+          data.subtotal||data.total||0,data.discount||0,data.vat||0,data.total||0,
+          data.payment||'',data.shipping||'',data.address||'',
+          data.status||'',data.time||'',data.note||'']);
+      } else {
+        // Update status only
+        const allR=sh.getDataRange().getValues();
+        for(var ki=1;ki<allR.length;ki++){if(allR[ki][0]===data.id){sh.getRange(ki+1,11).setValue(data.status||'');break;}}
+      }
     }
 
     else if (sheet === 'LichSuKho') {
@@ -3764,6 +3818,28 @@ async function addProduct(){
 }
 
 // ── CART ──
+function filterProducts(){
+  const q=(document.getElementById('product-search')?.value||'').toLowerCase().trim();
+  const grid=document.getElementById('prod-grid');
+  if(!grid)return;
+  if(!q){renderProductList();return;}
+  const filtered=D.products.filter(p=>
+    p.name.toLowerCase().includes(q)||
+    (p.icon||'').toLowerCase().includes(q)
+  );
+  const low=D.inventory.filter(i=>i.qty<=i.min).map(i=>i.id);
+  grid.innerHTML=filtered.map(p=>{
+    const mat=D.inventory.find(i=>i.id===p.mat_id);
+    const isLow=mat&&low.includes(mat.id);
+    return`<div class="prod-card" onclick="addToCart('${p.id}')" style="${isLow?'border-color:rgba(192,57,43,.4)':''}">
+      <div class="prod-icon">${p.icon||'📦'}</div>
+      <div class="prod-name">${p.name}</div>
+      <div class="prod-price">${fmt(p.price)}</div>
+      ${mat?`<div style="font-size:10px;color:var(--muted)">${mat.qty} ${mat.unit} còn</div>`:''}
+    </div>`;
+  }).join('')||'<div style="padding:14px;color:var(--muted);font-size:12px">Không tìm thấy sản phẩm</div>';
+}
+
 function addToCart(pid){
   const ex=cart.find(c=>c.pid===pid);
   if(ex)ex.qty++;
@@ -3772,22 +3848,56 @@ function addToCart(pid){
 }
 function renderCart(){
   const el=document.getElementById('cart-items');
-  if(!cart.length){el.innerHTML='<div style="color:var(--muted);text-align:center;padding:18px;font-size:12px">Chưa có sản phẩm</div>';document.getElementById('cart-total').textContent='0 ₫';return;}
+  if(!cart.length){
+    el.innerHTML='<div style="color:var(--muted);text-align:center;padding:18px;font-size:12px">Chưa có sản phẩm</div>';
+    document.getElementById('cart-total').textContent='0 ₫';
+    const sumEl=document.getElementById('cart-summary');
+    if(sumEl) sumEl.style.display='none';
+    return;
+  }
   el.innerHTML=cart.map((c,i)=>`<div class="cart-item">
     <div class="cart-name">${c.name}</div>
     <div style="display:flex;align-items:center;gap:5px">
       <button class="qb" onclick="chgQty(${i},-1)">−</button>
       <input type="number" min="1" value="${c.qty}"
         style="width:44px;text-align:center;font-size:13px;font-weight:700;padding:3px 4px;border:1.5px solid var(--border);border-radius:6px;font-family:inherit;background:var(--bg2)"
-        onchange="setQty(${i},this.value)"
-        onblur="if(this.value==='')this.value=cart[${i}]?.qty||1"
-        onclick="this.select()"/>
+        onchange="setQty(${i},this.value)" onblur="if(this.value==='')this.value=cart[${i}]?.qty||1" onclick="this.select()"/>
       <button class="qb" onclick="chgQty(${i},1)">+</button>
     </div>
     <div class="cart-sub">${fmt(c.price*c.qty)}</div>
   </div>`).join('');
-  document.getElementById('cart-total').textContent=fmt(cart.reduce((a,c)=>a+c.price*c.qty,0));
+  updateCartTotal();
 }
+
+function updateCartTotal(){
+  const subtotal=cart.reduce((a,c)=>a+c.price*c.qty,0);
+  const discount=Math.min(100,Math.max(0,+document.getElementById('c-discount')?.value||0));
+  const vatPct=+document.getElementById('c-vat')?.value||0;
+  const discountAmt=Math.round(subtotal*discount/100);
+  const afterDiscount=subtotal-discountAmt;
+  const vatAmt=Math.round(afterDiscount*vatPct/100);
+  const finalTotal=afterDiscount+vatAmt;
+
+  document.getElementById('cart-total').textContent=fmt(finalTotal);
+
+  const sumEl=document.getElementById('cart-summary');
+  if(sumEl){
+    const hasExtra=discount>0||vatPct>0;
+    sumEl.style.display=hasExtra&&cart.length?'block':'none';
+    if(hasExtra){
+      document.getElementById('cs-subtotal').textContent=fmt(subtotal);
+      const discRow=document.getElementById('cs-discount-row');
+      const vatRow=document.getElementById('cs-vat-row');
+      if(discRow) discRow.style.display=discount>0?'flex':'none';
+      if(vatRow) vatRow.style.display=vatPct>0?'flex':'none';
+      document.getElementById('cs-discount').textContent='-'+fmt(discountAmt)+' (-'+discount+'%)';
+      document.getElementById('cs-vat').textContent='+'+fmt(vatAmt)+' ('+vatPct+'%)';
+      document.getElementById('cs-total-final').textContent=fmt(finalTotal);
+    }
+  }
+}
+
+
 function chgQty(i,d){cart[i].qty+=d;if(cart[i].qty<=0)cart.splice(i,1);renderCart();}
 function setQty(i,v){if(v===''||v===null||v===undefined)return;const n=parseInt(v)||1;if(n<=0){cart.splice(i,1);}else if(cart[i]){cart[i].qty=n;}renderCart();}
 
@@ -3795,41 +3905,45 @@ function setQty(i,v){if(v===''||v===null||v===undefined)return;const n=parseInt(
 async function checkout(){
   if(!cart.length){notify('Giỏ hàng trống!',false);return;}
   const name=document.getElementById('c-name').value.trim()||'Khách lẻ';
-  const total=cart.reduce((a,c)=>a+c.price*c.qty,0);
-  const id='HĐ'+String(D.orders.length+1).padStart(3,'0');
+  const subtotal=cart.reduce((a,c)=>a+c.price*c.qty,0);
+  const discount=Math.min(100,Math.max(0,+document.getElementById('c-discount')?.value||0));
+  const vatPct=+document.getElementById('c-vat')?.value||0;
+  const discountAmt=Math.round(subtotal*discount/100);
+  const vatAmt=Math.round((subtotal-discountAmt)*vatPct/100);
+  const total=subtotal-discountAmt+vatAmt;
+  const id='HĐ'+Date.now().toString().slice(-6);
   const items=cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')).join(', ');
-  invoice={id,name,phone:document.getElementById('c-phone')?.value?.trim()||'',email:document.getElementById('c-email')?.value?.trim()||'',
-    note:document.getElementById('c-note').value.trim(),total,items,time:nowDT()};
+  const address=document.getElementById('c-address')?.value?.trim()||'';
+  const payment=document.getElementById('c-payment')?.value||'Tiền mặt';
+  const shipping=document.getElementById('c-shipping')?.value||'Khách tới lấy';
+  const noteRaw=document.getElementById('c-note')?.value?.trim()||'';
+  const extraNote=[address?'ĐC: '+address:'',payment,shipping,discount>0?'CK '+discount+'%':'',vatPct>0?'VAT '+vatPct+'%':''].filter(Boolean).join(' | ');
+  const note=noteRaw?extraNote+' | '+noteRaw:extraNote;
+  invoice={id,name,phone:document.getElementById('c-phone')?.value?.trim()||'',
+    email:'',note,total,items,time:nowDT(),
+    address,payment,shipping,discount,discountAmt,vatPct,vatAmt,subtotal};
   const bankId=cfg.bankId||'VCB';
-  const accNo=cfg.bankAcc||'9704220000000000';
+  const accNo=cfg.bankAcc||'';
   const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
-  const phone=document.getElementById('c-phone')?.value?.trim()||'';
-  const qrNote=name+(phone?' '+phone:'');
-  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${total}&addInfo=${encodeURIComponent(qrNote)}&accountName=${encodeURIComponent(accName)}`;
+  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${total}&addInfo=${encodeURIComponent(id+' '+name)}&accountName=${encodeURIComponent(accName)}`;
   document.getElementById('qr-img').src=qrUrl;
   document.getElementById('qr-amount').textContent=fmt(total);
   document.getElementById('qr-bank-label').textContent=`${bankId} · ${accNo} · ${accName}`;
   document.getElementById('qr-info').innerHTML=`
     <div><span>Mã đơn</span><span style="color:var(--gold2)">${id}</span></div>
     <div><span>Khách hàng</span><span>${name}</span></div>
-    <div><span>Nội dung CK</span><span style="color:var(--teal)">${id} ${name}</span></div>
-    <div><span>Số tiền</span><span style="color:var(--gold2)">${fmt(total)}</span></div>
-    ${invoice.note?`<div><span>Ghi chú</span><span>${invoice.note}</span></div>`:''}`;
+    ${address?`<div><span>Địa chỉ</span><span>${address}</span></div>`:''}
+    <div><span>Thanh toán</span><span>${payment}</span></div>
+    <div><span>Giao hàng</span><span>${shipping}</span></div>
+    ${discount>0?`<div><span>Chiết khấu</span><span style="color:var(--red)">-${fmt(discountAmt)} (-${discount}%)</span></div>`:''}
+    ${vatPct>0?`<div><span>VAT ${vatPct}%</span><span>+${fmt(vatAmt)}</span></div>`:''}
+    <div><span>Tổng thanh toán</span><span style="color:var(--gold2);font-size:16px">${fmt(total)}</span></div>`;
+  // Lưu đơn chờ
+  const pendingOrder={id,customer:name,email:'',items,total,time:nowDT(),note,status:'Chờ thanh toán',
+    address,payment,shipping,discount,vat:vatPct,subtotal,created_at:Date.now()};
+  await sbUpsert('orders',pendingOrder);
+  D.orders.push(pendingOrder);
   showM('modal-qr');
-  // Lưu đơn "Chờ thanh toán" vào Supabase ngay để hiện trong tab Đơn hàng
-  const pendingOrder={id,customer:name,email:document.getElementById('c-email')?.value?.trim()||'',
-    items,total,time:nowDT(),note:document.getElementById('c-note').value.trim()||'',
-    status:'Chờ thanh toán',created_at:Date.now()};
-  try{
-    await sbUpsert('orders',pendingOrder);
-    // Reload orders từ Supabase để đảm bảo đồng bộ
-    const freshOrders=await sbGet('orders','?order=created_at.asc');
-    if(freshOrders&&freshOrders.length) D.orders=freshOrders;
-    else D.orders.push(pendingOrder);
-    renderOrders();renderDash();
-  }catch(e){console.warn('Lưu đơn chờ lỗi:',e.message);}
-  if(document.getElementById('at-sale').checked)
-    tgMsg(`🛒 *Đơn hàng mới!*\n\nMã: \`${id}\`\n👤 ${name}\n🛍️ ${items}\n💰 ${fmt(total)}\n⏳ Chờ thanh toán\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
 }
 
 async function markPaid(){
@@ -4043,21 +4157,31 @@ function renderArchivedOrders(){
 async function saveDraft(){
   if(!cart.length){notify('Giỏ hàng trống!',false);return;}
   const name=document.getElementById('c-name').value.trim()||'Khách lẻ';
-  const note=document.getElementById('c-note').value.trim();
-  const total=cart.reduce((a,c)=>a+c.price*c.qty,0);
-  const id='HĐ'+String(D.orders.length+1).padStart(3,'0');
+  const subtotal=cart.reduce((a,c)=>a+c.price*c.qty,0);
+  const discount=Math.min(100,Math.max(0,+document.getElementById('c-discount')?.value||0));
+  const vatPct=+document.getElementById('c-vat')?.value||0;
+  const discountAmt=Math.round(subtotal*discount/100);
+  const vatAmt=Math.round((subtotal-discountAmt)*vatPct/100);
+  const total=subtotal-discountAmt+vatAmt;
+  const id='HĐ'+Date.now().toString().slice(-6);
   const items=cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')).join(', ');
-  const order={id,customer:name,email:document.getElementById('c-email')?.value?.trim()||'',
-    items,total,time:nowDT(),note,status:'Chờ thanh toán',created_at:Date.now()};
+  const address=document.getElementById('c-address')?.value?.trim()||'';
+  const payment=document.getElementById('c-payment')?.value||'Tiền mặt';
+  const shipping=document.getElementById('c-shipping')?.value||'Khách tới lấy';
+  const note=document.getElementById('c-note')?.value?.trim()||'';
+  const order={id,customer:name,email:'',items,total,time:nowDT(),note,status:'Chờ thanh toán',
+    address,payment,shipping,discount,vat:vatPct,subtotal,created_at:Date.now()};
   try{
     await sbUpsert('orders',order);
     D.orders.push(order);
     cart=[];
-    ['c-name','c-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    ['c-name','c-note','c-address'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     const ph=document.getElementById('c-phone');if(ph)ph.value='';
+    const disc=document.getElementById('c-discount');if(disc)disc.value='';
+    const vat=document.getElementById('c-vat');if(vat)vat.value='0';
     renderCart();renderOrders();renderDash();
     notify('💾 Đã lưu đơn tạm: '+id+' — xem trong tab "Chờ thu tiền"');
-    tgMsg('💾 *Đơn tạm mới!*\n\nMã: `'+id+'`\n👤 '+name+'\n🛍️ '+items+'\n💰 '+fmt(total)+'\n⏳ Chờ thu tiền\n🕐 '+nowDT()+'\n\n_Trương Dáng Hương Academy_');
+    tgMsg('💾 *Đơn tạm mới!*\n\nMã: `'+id+'`\n👤 '+name+'\n🛍️ '+items+'\n💰 '+fmt(total)+'\n🚚 '+shipping+'\n⏳ Chờ thu tiền\n🕐 '+nowDT()+'\n\n_Trương Dáng Hương Academy_');
     gsSend({sheet:'DonHang',...order});
   }catch(e){notify('Lỗi lưu: '+e.message,false);}
 }
