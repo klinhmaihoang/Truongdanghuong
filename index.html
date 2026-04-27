@@ -2,6 +2,9 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Trương Dáng Hương Academy</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
@@ -3777,8 +3780,13 @@ function openEditProd(id){
   document.getElementById('ep-icon').value=p.icon||'';
   document.getElementById('ep-price').value=p.price;
   document.getElementById('ep-cost').value=p.cost||'';
-  setTimeout(()=>{document.getElementById('ep-mat').value=p.mat_id||'';document.getElementById('ep-use').value=p.mat_use||0;},30);
   showM('modal-edit-product');
+  setTimeout(()=>{
+    document.getElementById('ep-mat').value=p.mat_id||'';
+    document.getElementById('ep-use').value=p.mat_use||0;
+    const vatEl=document.getElementById('ep-vat');if(vatEl)vatEl.value=String(p.vat||0);
+    const discEl=document.getElementById('ep-discount');if(discEl)discEl.value=p.discount||0;
+  },150);
 }
 
 async function saveProduct(){
