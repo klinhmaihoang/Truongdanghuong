@@ -237,9 +237,6 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <button class="active" onclick="go('dashboard',this)">Tổng quan</button>
     <button onclick="go('students',this)">Học viên</button>
     <button onclick="go('pos',this)">Bán hàng</button>
-    <button onclick="go('products',this)">Hàng hóa</button>
-    <button onclick="go('nvl',this)" style="color:#e67e22">📦 Bán NVL</button>
-    <button onclick="go('schedule',this)" style="color:var(--teal)">📅 Lịch học</button>
     <button onclick="go('inventory',this)">Kho</button>
     <button onclick="go('customers',this)">👥 Khách hàng</button>
     <button onclick="go('reports',this)" style="color:var(--teal)">📊 Báo cáo</button>
@@ -260,15 +257,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   <button class="bottom-nav-btn" onclick="go('pos',this);syncBottomNav(this)">
     <span class="bn-icon">🛒</span>Bán hàng
   </button>
-  <button class="bottom-nav-btn" onclick="go('products',this);syncBottomNav(this)">
-    <span class="bn-icon">📦</span>Hàng hóa
-  </button>
-  <button class="bottom-nav-btn" onclick="go('nvl',this);syncBottomNav(this)">
-    <span class="bn-icon">🧂</span>Bán NVL
-  </button>
-  <button class="bottom-nav-btn" onclick="go('schedule',this);syncBottomNav(this)">
-    <span class="bn-icon">📅</span>Lịch học
-  </button>
+
   <button class="bottom-nav-btn" onclick="go('inventory',this);syncBottomNav(this)">
     <span class="bn-icon">📦</span>Kho
   </button>
@@ -340,6 +329,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 <div class="page" id="page-students">
   <div class="tabs">
     <div class="tab active" onclick="stTab(this,'all')">Tất cả</div>
+    <div class="tab" id="st-tab-schedule" onclick="stTab(this,'schedule')">📅 Lịch học</div>
     <div class="tab" onclick="stTab(this,'online')">Online</div>
     <div class="tab" onclick="stTab(this,'offline')">Offline</div>
     <div class="tab" onclick="stTab(this,'deleted')" style="color:var(--red)">🗑 Đã xóa</div>
@@ -399,6 +389,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   <div class="tabs" style="margin-bottom:14px">
     <div class="tab active" id="pos-tab-sell" onclick="posTab('sell',this)">🛒 Bán hàng</div>
     <div class="tab" id="pos-tab-orders" onclick="posTab('orders',this)">📋 Đơn hàng <span id="pending-badge-pos" style="background:var(--red);color:#fff;border-radius:20px;padding:1px 7px;font-size:10px;margin-left:3px"></span></div>
+    <div class="tab" id="pos-tab-nvl" onclick="posTab('nvl',this)">📦 Bán NVL</div>
   </div>
 
   <!-- Panel Bán hàng -->
@@ -467,23 +458,22 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 
   <!-- Panel Đơn hàng (nhúng vào trang Bán hàng) -->
   <div id="panel-pos-orders" style="display:none"></div>
+  <div id="panel-pos-nvl" style="display:none"></div>
 
 </div><!-- END page-pos-stub -->
 
 <!-- HÀNG HÓA -->
-<div class="page" id="page-products">
-  <div class="card">
-    <div class="card-head">
-      <span class="card-title">Danh sách hàng hóa &amp; giá bán</span>
-      <button class="btn btn-sm" onclick="showM('modal-add-product')">+ Thêm sản phẩm</button>
-    </div>
-    <table><thead><tr><th>Icon</th><th>Tên sản phẩm</th><th>Giá bán (₫)</th><th class="hide-mobile">Giá nhập (₫)</th><th class="hide-mobile">Lợi nhuận</th><th class="hide-mobile">Nguyên liệu</th><th class="hide-mobile">Mức dùng/lần</th><th></th></tr></thead>
-    <tbody id="product-list"></tbody></table>
-  </div>
-</div>
-
-<!-- KHO -->
+<!-- KHO + HÀNG HÓA (gộp) -->
 <div class="page" id="page-inventory">
+
+  <!-- Tabs Kho / Hàng hóa -->
+  <div class="tabs" style="margin-bottom:14px">
+    <div class="tab active" id="inv-tab-stock" onclick="invTab('stock',this)">📦 Kho nguyên liệu</div>
+    <div class="tab" id="inv-tab-products" onclick="invTab('products',this)">🛍 Hàng hóa</div>
+  </div>
+
+  <!-- Panel: Kho nguyên liệu -->
+  <div id="inv-panel-stock">
   <div class="btn-group" style="margin-bottom:14px">
     <button class="btn btn-sm" onclick="showM('modal-add-mat')">+ Thêm nguyên liệu</button>
     <button class="btn btn-green btn-sm" onclick="showM('modal-import')">📥 Nhập kho</button>
@@ -640,7 +630,21 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <tbody id="archived-orders"></tbody></table>
     </div>
   </div>
-</div>
+  </div><!-- /inv-panel-stock -->
+
+  <!-- Panel: Hàng hóa -->
+  <div id="inv-panel-products" style="display:none">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Danh sách hàng hóa &amp; giá bán</span>
+        <button class="btn btn-sm" onclick="showM('modal-add-product')">+ Thêm sản phẩm</button>
+      </div>
+      <table><thead><tr><th>Icon</th><th>Tên sản phẩm</th><th>Giá bán (₫)</th><th class="hide-mobile">Giá nhập (₫)</th><th class="hide-mobile">Lợi nhuận</th><th class="hide-mobile">Nguyên liệu</th><th class="hide-mobile">Mức dùng/lần</th><th></th></tr></thead>
+      <tbody id="product-list"></tbody></table>
+    </div>
+  </div><!-- /inv-panel-products -->
+
+</div><!-- /page-inventory merged -->
 
 <!-- BÁO CÁO -->
 <!-- THU CHI -->
@@ -2930,8 +2934,30 @@ function applyTgUI(){
 // NAVIGATION
 // ══════════════════════════════════════════════════
 function stTab(el,f){
-  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
-  el.classList.add('active');
+  document.querySelectorAll('#page-students .tab').forEach(x=>x.classList.remove('active'));
+  if(el) el.classList.add('active');
+
+  // Ẩn schedule panel nếu chuyển tab khác
+  const schedDiv=document.getElementById('schedule-in-students');
+  if(schedDiv&&f!=='schedule') schedDiv.style.display='none';
+
+  if(f==='schedule'){
+    // Nhúng page-schedule vào students lần đầu
+    if(!schedDiv){
+      const div=document.createElement('div'); div.id='schedule-in-students';
+      const src=document.getElementById('page-schedule');
+      if(src) div.innerHTML=src.innerHTML;
+      const pg=document.getElementById('page-students'); if(pg) pg.appendChild(div);
+    } else { schedDiv.style.display=''; }
+    // Ẩn các panel khác
+    ['panel-students','panel-courses','deleted-students-card'].forEach(id=>{
+      const p=document.getElementById(id); if(p) p.style.display='none';
+    });
+    stFilter=f;
+    renderSchedule();
+    return;
+  }
+
   stFilter=f;
   const panelSt=document.getElementById('panel-students');
   const panelCo=document.getElementById('panel-courses');
@@ -3654,8 +3680,25 @@ function syncBottomNav(btn){
 }
 
 function go(p,btn){
+  // Redirect gộp tab: products→inventory, nvl→pos, schedule→students
+  if(p==='products'){
+    go('inventory',btn);
+    setTimeout(()=>invTab('products',document.getElementById('inv-tab-products')),50);
+    return;
+  }
+  if(p==='nvl'){
+    go('pos',btn);
+    setTimeout(()=>posTabNvl(),50);
+    return;
+  }
+  if(p==='schedule'){
+    go('students',btn);
+    setTimeout(()=>{const el=document.getElementById('st-tab-schedule');if(el&&el.onclick)el.onclick();},50);
+    return;
+  }
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
-  document.getElementById('page-'+p).classList.add('active');
+  const pg=document.getElementById('page-'+p);
+  if(pg) pg.classList.add('active');
   // Sync top nav
   document.querySelectorAll('.nav button').forEach(x=>x.classList.remove('active'));
   if(btn&&btn.classList.contains('nav')===false&&!btn.classList.contains('bottom-nav-btn'))btn.classList.add('active');
@@ -3669,6 +3712,7 @@ function go(p,btn){
   fillMatSelects();
   if(p==='reports')renderReports();
   if(p==='finance')renderFinance();
+  if(p==='telegram') setTimeout(_chpwUpdateInfo, 100);
 }
 
 function renderReports(){
@@ -8382,25 +8426,35 @@ async function deleteSemi(id) {
 function posTab(tab, el) {
   const sellPanel   = document.getElementById('panel-pos-sell');
   const ordersPanel = document.getElementById('panel-pos-orders');
-  if (!sellPanel || !ordersPanel) return;
+  const nvlPanel    = document.getElementById('panel-pos-nvl');
 
   document.querySelectorAll('#page-pos > .tabs .tab').forEach(t => t.classList.remove('active'));
   if (el) el.classList.add('active');
 
+  // Ẩn tất cả panels
+  if(sellPanel)   sellPanel.style.display   = 'none';
+  if(ordersPanel) ordersPanel.style.display = 'none';
+  if(nvlPanel)    nvlPanel.style.display    = 'none';
+
   if (tab === 'sell') {
-    sellPanel.style.display   = '';
-    ordersPanel.style.display = 'none';
+    if(sellPanel) sellPanel.style.display = '';
+  } else if (tab === 'nvl') {
+    if(nvlPanel) {
+      nvlPanel.style.display = '';
+      if(!nvlPanel.hasChildNodes()){
+        const src=document.getElementById('page-nvl');
+        if(src) nvlPanel.innerHTML=src.innerHTML;
+      }
+      setTimeout(()=>renderNvlOrders(),50);
+    }
   } else {
-    sellPanel.style.display   = 'none';
-    ordersPanel.style.display = '';
-    // Nhúng orders-component vào đây nếu chưa có
+    if(ordersPanel) ordersPanel.style.display = '';
     const comp = document.getElementById('orders-component');
     if (comp && !ordersPanel.contains(comp)) {
       comp.style.display = '';
       ordersPanel.appendChild(comp);
     }
     renderOrders();
-    // Sync pending badge vào tab pos-orders
     setTimeout(()=>{
       const src = document.getElementById('pending-badge');
       const dst = document.getElementById('pending-badge-pos');
@@ -8408,6 +8462,8 @@ function posTab(tab, el) {
     }, 50);
   }
 }
+function posTabNvl(){ posTab('nvl',document.getElementById('pos-tab-nvl')); }
+
 
 // Nếu URL hash có #orders, tự mở tab đơn hàng
 window.addEventListener('load', () => {
@@ -8437,12 +8493,12 @@ async function _hashPw(pw) {
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-// Load mật khẩu từ Supabase lúc boot
+// Load mật khẩu từ Supabase lúc boot (graceful — bảng chưa tạo thì dùng default)
 async function _authLoadPasswords() {
   try {
     const rows = await sbGet('app_users', '?select=username,pass_hash');
-    if(rows) rows.forEach(r => { if(r.username) _pwCache[r.username] = r.pass_hash; });
-  } catch(e) { /* offline — dùng mật khẩu mặc định */ }
+    if(rows && Array.isArray(rows)) rows.forEach(r => { if(r.username) _pwCache[r.username] = r.pass_hash; });
+  } catch(e) { /* bảng chưa tạo hoặc offline — dùng mật khẩu mặc định */ }
 }
 
 // Lấy mật khẩu: ưu tiên Supabase, fallback về hardcode
@@ -8571,12 +8627,7 @@ function _chpwUpdateInfo() {
   const el = document.getElementById('chpw-username');
   if(el && AUTH_CURRENT) el.textContent = AUTH_CURRENT.user + (AUTH_CURRENT.role==='admin'?' 👑 Admin':' 👤 Nhân viên');
 }
-// Gọi mỗi khi render page
-const _origGo = go;
-function go(page, el) {
-  _origGo(page, el);
-  if(page==='telegram') setTimeout(_chpwUpdateInfo, 100);
-}
+// go() patch removed — logic inlined below
 
 async function doLogin() {
   const u = (document.getElementById('auth-user')?.value||'').trim();
@@ -8628,6 +8679,8 @@ async function doLogin() {
   // Lưu session (30 phút)
   sessionStorage.setItem('tdh_auth', JSON.stringify({...AUTH_CURRENT, ts: Date.now()}));
   document.getElementById('auth-overlay').style.display = 'none';
+  // Ghi nhớ thiết bị nếu checkbox được chọn
+  if(document.getElementById('auth-remember')?.checked) _rememberDevice();
   // Hiện tên user trên topbar
   _authUpdateTopbar();
   // Áp dụng phân quyền
@@ -8643,6 +8696,7 @@ function toggleAuthPass() {
 function doLogout() {
   AUTH_CURRENT = null;
   sessionStorage.removeItem('tdh_auth');
+  localStorage.removeItem(typeof REMEMBER_KEY!=='undefined'?REMEMBER_KEY:'tdh_remember_device');
   document.getElementById('auth-overlay').style.display = 'flex';
   document.getElementById('auth-user').value = '';
   document.getElementById('auth-pass').value = '';
@@ -9224,6 +9278,60 @@ function odQuickStatus(id, newStatus) {
     if(sel) { sel.value=newStatus; odStatusChange(); }
   }, 200);
 }
+
+
+// ═══════════════════════════════════════════════════════════════
+// KHO + HÀNG HÓA TAB
+// ═══════════════════════════════════════════════════════════════
+function invTab(tab, el) {
+  const stock    = document.getElementById('inv-panel-stock');
+  const products = document.getElementById('inv-panel-products');
+  if(stock)    stock.style.display    = tab==='stock'    ? '' : 'none';
+  if(products) products.style.display = tab==='products' ? '' : 'none';
+  document.querySelectorAll('#page-inventory > .tabs .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  if(tab==='products') renderProductList();
+}
+
+// ═══════════════════════════════════════════════════════════════
+// REMEMBER DEVICE (30 ngày)
+// ═══════════════════════════════════════════════════════════════
+const REMEMBER_KEY  = 'tdh_remember_device';
+const REMEMBER_DAYS = 30;
+
+function _rememberDevice() {
+  if(!AUTH_CURRENT) return;
+  localStorage.setItem(REMEMBER_KEY, JSON.stringify({
+    user:AUTH_CURRENT.user, role:AUTH_CURRENT.role,
+    expires: Date.now() + REMEMBER_DAYS*864e5
+  }));
+}
+function _checkRememberedDevice() {
+  try {
+    const data = JSON.parse(localStorage.getItem(REMEMBER_KEY)||'null');
+    if(!data||Date.now()>data.expires){localStorage.removeItem(REMEMBER_KEY);return false;}
+    if(!AUTH_USERS.find(a=>a.user===data.user)) return false;
+    AUTH_CURRENT={user:data.user,role:data.role};
+    document.getElementById('auth-overlay').style.display='none';
+    setTimeout(()=>{_authUpdateTopbar();_authApplyRole();},300);
+    _rememberDevice();
+    return true;
+  } catch(e){return false;}
+}
+// Checkbox "Ghi nhớ thiết bị" — thêm vào login form
+setTimeout(()=>{
+  const btn=document.getElementById('auth-btn');
+  if(btn&&!document.getElementById('auth-remember-wrap')){
+    const w=document.createElement('div');
+    w.id='auth-remember-wrap';
+    w.style.cssText='display:flex;align-items:center;gap:8px;margin-bottom:14px';
+    w.innerHTML='<input type="checkbox" id="auth-remember" checked style="width:15px;height:15px;accent-color:var(--brand);cursor:pointer"/>'+
+      '<label for="auth-remember" style="font-size:12px;color:var(--muted);cursor:pointer">Ghi nhớ thiết bị này '+REMEMBER_DAYS+' ngày</label>';
+    btn.parentNode.insertBefore(w,btn);
+  }
+},100);
+// Kiểm tra remember ngay khi load
+if(!_checkRememberedDevice()) _authCheckSession();
 
 boot();
 </script>
