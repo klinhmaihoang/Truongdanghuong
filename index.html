@@ -1496,7 +1496,24 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
 
     <!-- Status progress bar -->
-    <div id="od-status-progress" style="margin-bottom:14px;overflow-x:auto;padding-bottom:4px"></div>
+    <div id="od-status-progress" style="margin-bottom:10px;overflow-x:auto;padding-bottom:4px"></div>
+    <!-- Quick status update dropdown -->
+    <div id="od-status-quick" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;background:var(--bg);border-radius:8px;padding:8px 12px;border:1px solid var(--border)">
+      <span style="font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap">Cập nhật:</span>
+      <select id="od-status-select" onchange="odQuickUpdateStatus(this.value)"
+        style="flex:1;border:1.5px solid var(--brand);border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;background:#fff;outline:none;font-weight:600;color:var(--brown)">
+        <option value="">— Chọn trạng thái mới —</option>
+        <option value="Chờ xác nhận">🕐 Chờ xác nhận</option>
+        <option value="Đã xác nhận">✅ Đã xác nhận</option>
+        <option value="Đang chuẩn bị">🧺 Đang chuẩn bị</option>
+        <option value="Đã book ship">📦 Đã book ship</option>
+        <option value="Đang giao">🚚 Đang giao</option>
+        <option value="Đã giao">🏠 Đã giao</option>
+        <option value="Chờ thu tiền">💳 Chờ thu tiền (COD)</option>
+        <option value="Đã thanh toán">💰 Đã thanh toán</option>
+        <option value="Đã hủy">✕ Đã hủy</option>
+      </select>
+    </div>
 
     <!-- VIEW mode -->
     <div id="od-view">
@@ -9547,6 +9564,9 @@ function showOrderDetail(id) {
     discEl.style.display='';
   } else discEl.style.display='none';
   showM('modal-order-detail');
+  // Sync status dropdown — set về empty để nhân viên chủ động chọn
+  const statusSel = document.getElementById('od-status-select');
+  if(statusSel) statusSel.value = '';
   // Progress bar + tracking (inlined từ patch)
   // Map legacy status cho progress bar
   const legacyMap = {'Chờ thanh toán':'Chờ thu tiền','Đã lên đơn':'Chờ xác nhận','Chờ lấy hàng':'Đã book ship'};
@@ -10036,6 +10056,36 @@ async function runMigration() {
       resultEl.textContent = `⚠️ ${ok} thành công, ${fail} lỗi: ${errors.slice(0,2).join('; ')}`;
       resultEl.style.background = 'rgba(192,57,43,.1)'; resultEl.style.color = '#c0392b';
     }
+  }
+}
+
+async function odQuickUpdateStatus(newStatus) {
+  if(!newStatus || !OD_current) return;
+  const o = OD_current;
+  const oldStatus = o.status;
+  if(newStatus === oldStatus) {
+    document.getElementById('od-status-select').value = '';
+    return;
+  }
+  o.status = newStatus;
+  try {
+    await sbPatch('orders', {status: newStatus}, `?id=eq.${o.id}`);
+    renderPendingOrders();
+    renderOrders();
+    renderDash();
+    // Re-render modal với status mới
+    showOrderDetail(o.id);
+    notify(`✅ Đã chuyển: ${oldStatus} → ${newStatus}`);
+    // Gửi TG nếu đang giao hoặc đã giao
+    if(newStatus==='Đang giao'||newStatus==='Đã giao') {
+      const trkUrl = o.tracking_url||'';
+      const pv = trkUrl&&odDetectProvider ? odDetectProvider(trkUrl) : null;
+      tgMsg(`${newStatus==='Đang giao'?'🚚':'🏠'} *${newStatus}!*\n\n📋 Đơn: \`${o.id}\`\n👤 ${o.customer}\n💰 ${fmt(o.total||0)}`+(trkUrl?`\n\n🔗 Tracking${pv?' ('+pv.name+')':''}:\n${trkUrl}`:'')+`\n\n_Trương Dáng Hương Academy_`);
+    }
+  } catch(e) {
+    o.status = oldStatus; // rollback
+    notify('Lỗi cập nhật: ' + e.message, false);
+    document.getElementById('od-status-select').value = '';
   }
 }
 
