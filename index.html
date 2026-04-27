@@ -1165,9 +1165,104 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   <div class="tabs" style="margin-bottom:16px">
     <div class="tab active" onclick="rpTab(this,'sales')">🛒 Bán hàng</div>
     <div class="tab" onclick="rpTab(this,'monthly')">📅 Theo tháng</div>
+    <div class="tab" onclick="rpTab(this,'drinks')">💧 Đồ uống</div>
     <div class="tab" onclick="rpTab(this,'inventory')">📦 Xuất nhập kho</div>
     <div class="tab" onclick="rpTab(this,'students')">🎓 Học viên</div>
   </div>
+
+  <!-- ══ TAB: ĐỒ UỐNG ══ -->
+  <div id="rp-drinks" style="display:none">
+
+    <!-- Bộ lọc thời gian -->
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px">
+      <span style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase">Khoảng thời gian:</span>
+      <div style="display:flex;gap:5px;flex-wrap:wrap" id="drink-rp-range-btns">
+        <button class="btn btn-sm btn-ghost" onclick="drinkRpSetRange('week',this)">7 ngày</button>
+        <button class="btn btn-sm" onclick="drinkRpSetRange('month',this)">30 ngày</button>
+        <button class="btn btn-sm btn-ghost" onclick="drinkRpSetRange('quarter',this)">3 tháng</button>
+        <button class="btn btn-sm btn-ghost" onclick="drinkRpSetRange('year',this)">Cả năm</button>
+        <button class="btn btn-sm btn-ghost" onclick="drinkRpSetRange('all',this)">Tất cả</button>
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-left:auto;flex-wrap:wrap">
+        <input type="date" id="drink-rp-from" onchange="drinkRpRender()" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:inherit;outline:none"/>
+        <span style="font-size:12px;color:var(--muted)">→</span>
+        <input type="date" id="drink-rp-to" onchange="drinkRpRender()" style="padding:5px 8px;border:1.5px solid var(--border);border-radius:7px;font-size:12px;font-family:inherit;outline:none"/>
+      </div>
+    </div>
+
+    <!-- KPIs tổng -->
+    <div class="stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+      <div class="stat" style="--accent:var(--teal)"><div class="stat-num" id="drp-revenue">0</div><div class="stat-label">Doanh thu (₫)</div></div>
+      <div class="stat" style="--accent:var(--green)"><div class="stat-num" id="drp-profit">0</div><div class="stat-label">Lợi nhuận (₫)</div></div>
+      <div class="stat" style="--accent:var(--orange)"><div class="stat-num" id="drp-margin">0%</div><div class="stat-label">Biên lợi nhuận</div></div>
+      <div class="stat" style="--accent:var(--rose)"><div class="stat-num" id="drp-qty">0</div><div class="stat-label">Số ly đã bán</div></div>
+    </div>
+
+    <!-- Hàng 1: Biểu đồ doanh thu theo ngày + Pie doanh thu theo nhóm -->
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head">
+          <span class="card-title">📈 Doanh thu & Lợi nhuận theo ngày</span>
+          <div style="display:flex;gap:10px;font-size:11px">
+            <span style="color:var(--teal)">■ Doanh thu</span>
+            <span style="color:var(--green)">■ Lợi nhuận</span>
+          </div>
+        </div>
+        <div id="drp-daily-chart" style="overflow-x:auto"></div>
+      </div>
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><span class="card-title">🥧 Doanh thu theo nhóm</span></div>
+        <div id="drp-group-pie"></div>
+      </div>
+    </div>
+
+    <!-- Hàng 2: Top món bán chạy (bar) + Lợi nhuận từng món (bar) -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><span class="card-title">🏆 Top món bán chạy (số ly)</span></div>
+        <div id="drp-top-qty-chart"></div>
+      </div>
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><span class="card-title">💰 Lợi nhuận từng món (₫/ly)</span></div>
+        <div id="drp-profit-per-unit-chart"></div>
+      </div>
+    </div>
+
+    <!-- Hàng 3: Bảng chi tiết từng món -->
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">📋 Chi tiết doanh thu & lợi nhuận từng món</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <select id="drp-sort" onchange="drinkRpRender()" style="padding:5px 9px;border-radius:6px;border:1px solid var(--border);font-size:12px;font-family:inherit;background:var(--bg)">
+            <option value="revenue">Sắp xếp: Doanh thu</option>
+            <option value="profit_total">Sắp xếp: Tổng lợi nhuận</option>
+            <option value="qty">Sắp xếp: Số ly bán</option>
+            <option value="margin">Sắp xếp: Biên LN%</option>
+            <option value="profit_unit">Sắp xếp: LN/ly</option>
+          </select>
+        </div>
+      </div>
+      <div style="overflow-x:auto">
+        <table id="drp-detail-table">
+          <thead><tr>
+            <th>#</th>
+            <th>Tên món</th>
+            <th style="text-align:center">Nhóm</th>
+            <th style="text-align:right">Giá bán</th>
+            <th style="text-align:right">Cost/ly</th>
+            <th style="text-align:right">LN/ly</th>
+            <th style="text-align:right">Số ly</th>
+            <th style="text-align:right">Doanh thu</th>
+            <th style="text-align:right">Tổng LN</th>
+            <th style="text-align:center">Biên LN</th>
+            <th style="text-align:center">% DT</th>
+          </tr></thead>
+          <tbody id="drp-detail-rows"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /rp-drinks -->
 
   <!-- THEO THÁNG -->
   <div id="rp-monthly" style="display:none">
@@ -2711,14 +2806,286 @@ function renderMonthly(){
 function rpTab(el,tab){
   document.querySelectorAll('#page-reports .tab').forEach(x=>x.classList.remove('active'));
   el.classList.add('active');
-  ['sales','monthly','inventory','students'].forEach(t=>{
-    const el=document.getElementById('rp-'+t);
-    if(el) el.style.display=t===tab?'block':'none';
+  ['sales','monthly','inventory','students','drinks'].forEach(t=>{
+    const panel=document.getElementById('rp-'+t);
+    if(panel) panel.style.display=t===tab?'block':'none';
   });
   rpCurrent=tab;
   if(tab==='monthly') renderMonthly();
+  else if(tab==='drinks') drinkRpRender();
   else renderReports();
 }
+
+// ═══════════════════════════════════════════════════════════════
+// BÁO CÁO ĐỒ UỐNG — Doanh thu + Lợi nhuận từng món
+// ═══════════════════════════════════════════════════════════════
+
+let DRINK_RP_FROM = null; // Date
+let DRINK_RP_TO   = null; // Date
+
+// ── Khởi tạo range mặc định (30 ngày) ───────────────────────
+function drinkRpInit() {
+  const to   = new Date();
+  const from = new Date(); from.setDate(from.getDate()-29);
+  document.getElementById('drink-rp-from').value = dateStr(from);
+  document.getElementById('drink-rp-to').value   = dateStr(to);
+  DRINK_RP_FROM = from; DRINK_RP_TO = to;
+  // Active nút "30 ngày"
+  const btns = document.querySelectorAll('#drink-rp-range-btns button');
+  btns.forEach(b=>b.className='btn btn-sm btn-ghost');
+  if(btns[1]) btns[1].className='btn btn-sm';
+}
+
+function drinkRpSetRange(range, btn) {
+  const to   = new Date();
+  const from = new Date();
+  if (range==='week')    from.setDate(to.getDate()-6);
+  else if(range==='month')   from.setDate(to.getDate()-29);
+  else if(range==='quarter') from.setMonth(to.getMonth()-3);
+  else if(range==='year')    from.setFullYear(to.getFullYear()-1);
+  else if(range==='all')  { from.setFullYear(2020); }
+  document.getElementById('drink-rp-from').value = dateStr(from);
+  document.getElementById('drink-rp-to').value   = dateStr(to);
+  DRINK_RP_FROM = from; DRINK_RP_TO = to;
+  // Active style
+  document.querySelectorAll('#drink-rp-range-btns button').forEach(b=>b.className='btn btn-sm btn-ghost');
+  if(btn) btn.className='btn btn-sm';
+  drinkRpRender();
+}
+
+function dateStr(d) {
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function parseDMY(s) { // "d/m/yyyy hh:mm" hoặc "d/m/yyyy"
+  if(!s) return null;
+  const p = s.split(' ')[0].split('/');
+  if(p.length<3) return null;
+  return new Date(+p[2],+p[1]-1,+p[0]);
+}
+
+// ── Build dữ liệu bán hàng từ D.orders ──────────────────────
+function drinkRpGetOrders() {
+  const fromEl = document.getElementById('drink-rp-from');
+  const toEl   = document.getElementById('drink-rp-to');
+  const from = fromEl?.value ? new Date(fromEl.value) : null;
+  const to   = toEl?.value   ? new Date(toEl.value+'T23:59:59') : null;
+
+  return D.orders.filter(o => {
+    if(o.status==='Đã hủy') return false;
+    if(o.id?.startsWith('HP')) return false; // học phí
+    const d = parseDMY(o.time||'');
+    if(from && d && d < from) return false;
+    if(to   && d && d > to)   return false;
+    return true;
+  });
+}
+
+// ── Map tên sản phẩm → BOM product (để lấy cost) ─────────────
+function matchBomProduct(name) {
+  if(!name) return null;
+  const n = name.toLowerCase().trim();
+  return CC_products.find(p => {
+    const pn = (p.ten||'').toLowerCase().trim();
+    return pn===n || pn.includes(n) || n.includes(pn.split(' ').slice(0,3).join(' '));
+  }) || null;
+}
+
+// ── RENDER CHÍNH ─────────────────────────────────────────────
+function drinkRpRender() {
+  if(!document.getElementById('rp-drinks')) return;
+  if(document.getElementById('rp-drinks').style.display==='none') return;
+  if(!DRINK_RP_FROM) drinkRpInit();
+
+  const orders = drinkRpGetOrders();
+
+  // Tổng hợp theo tên sản phẩm
+  const byProduct = {}; // {name: {qty, revenue, cost, bom}}
+  orders.forEach(o => {
+    (o.items||'').split(',').forEach(item => {
+      const m = item.trim().match(/^(.+?)(?:\s+x(\d+))?$/);
+      if(!m) return;
+      const name = m[1].trim();
+      const qty  = +(m[2]||1);
+      const prod = D.products.find(x=>x.name===name);
+      const price= prod?prod.price:0;
+      const bom  = matchBomProduct(name);
+      const cost = bom ? getCost(bom) : (prod?.cost||0);
+      if(!byProduct[name]) byProduct[name]={qty:0,revenue:0,costTotal:0,price,cost,bom};
+      byProduct[name].qty      += qty;
+      byProduct[name].revenue  += price*qty;
+      byProduct[name].costTotal+= cost*qty;
+    });
+  });
+
+  // Tổng theo ngày (cho biểu đồ đường)
+  const byDay = {};
+  const from = new Date(document.getElementById('drink-rp-from')?.value||'2020-01-01');
+  const to   = new Date(document.getElementById('drink-rp-to')?.value||dateStr(new Date()));
+  for(let d=new Date(from);d<=to;d.setDate(d.getDate()+1)) {
+    byDay[dateStr(new Date(d))] = {rev:0, profit:0};
+  }
+  orders.forEach(o => {
+    const d = parseDMY(o.time||'');
+    if(!d) return;
+    const key = dateStr(d);
+    if(!byDay[key]) return;
+    (o.items||'').split(',').forEach(item => {
+      const m=item.trim().match(/^(.+?)(?:\s+x(\d+))?$/);
+      if(!m) return;
+      const name=m[1].trim(), qty=+(m[2]||1);
+      const prod=D.products.find(x=>x.name===name);
+      const price=prod?prod.price:0;
+      const bom=matchBomProduct(name);
+      const cost=bom?getCost(bom):(prod?.cost||0);
+      byDay[key].rev    += price*qty;
+      byDay[key].profit += (price-cost)*qty;
+    });
+  });
+
+  // KPIs
+  const totalRev    = Object.values(byProduct).reduce((s,p)=>s+p.revenue,0);
+  const totalProfit = Object.values(byProduct).reduce((s,p)=>s+p.revenue-p.costTotal,0);
+  const totalQty    = Object.values(byProduct).reduce((s,p)=>s+p.qty,0);
+  const margin      = totalRev>0?Math.round(totalProfit/totalRev*100):0;
+
+  setEl('drp-revenue', totalRev>0?(totalRev/1000000).toFixed(1)+'M':'0');
+  setEl('drp-profit',  totalProfit>0?(totalProfit/1000000).toFixed(2)+'M':'0');
+  setEl('drp-margin',  margin+'%');
+  setEl('drp-qty',     totalQty.toLocaleString('vi-VN'));
+
+  // ── Biểu đồ doanh thu + lợi nhuận theo ngày ──────────────
+  const dayKeys  = Object.keys(byDay);
+  const dayRevs  = dayKeys.map(k=>byDay[k].rev);
+  const dayProfs = dayKeys.map(k=>byDay[k].profit);
+  const maxDay   = Math.max(...dayRevs, 1);
+  const nDays    = dayKeys.length;
+  const cw = Math.max(16, Math.min(40, Math.floor(680/nDays)-3));
+  const H = 160;
+  const bars = dayKeys.map((k,i)=>{
+    const rev  = dayRevs[i];
+    const prof = Math.max(0,dayProfs[i]);
+    const hRev  = Math.max(2,Math.round(rev/maxDay*(H-40)));
+    const hProf = Math.max(0,Math.round(prof/maxDay*(H-40)));
+    const x = 8+i*(cw+3);
+    const showLabel = nDays<=30 || i%Math.ceil(nDays/15)===0;
+    const label = showLabel ? k.slice(5) : ''; // mm-dd
+    return `<g>
+      <rect x="${x}" y="${H-8-hRev}" width="${cw}" height="${hRev}" rx="3" fill="var(--teal)" opacity=".7">
+        <title>${k}: ${Math.round(rev/1000)}K₫</title>
+      </rect>
+      <rect x="${x+cw*0.15}" y="${H-8-hProf}" width="${cw*0.7}" height="${hProf}" rx="2" fill="var(--green)">
+        <title>LN ${k}: ${Math.round(prof/1000)}K₫</title>
+      </rect>
+      ${label?`<text x="${x+cw/2}" y="${H}" text-anchor="middle" font-size="9" fill="var(--muted)">${label}</text>`:''}
+    </g>`;
+  }).join('');
+  const svgW = 8+nDays*(cw+3)+8;
+  document.getElementById('drp-daily-chart').innerHTML =
+    `<div style="overflow-x:auto;padding-bottom:4px"><svg viewBox="0 0 ${svgW} ${H+4}" width="${Math.max(svgW,400)}" height="${H+4}">${bars}</svg></div>`;
+
+  // ── Pie doanh thu theo nhóm ───────────────────────────────
+  const byGroup = {};
+  Object.entries(byProduct).forEach(([name,d])=>{
+    const bom = d.bom;
+    const grp = bom?(bom.nhom||'Khác'):'Khác';
+    byGroup[grp]=(byGroup[grp]||0)+d.revenue;
+  });
+  document.getElementById('drp-group-pie').innerHTML = svgPie(
+    Object.entries(byGroup).sort((a,b)=>b[1]-a[1]).map(([name,val])=>({name,val}))
+  );
+
+  // ── Top món bán chạy (bar ngang) ─────────────────────────
+  const topQty = Object.entries(byProduct).sort((a,b)=>b[1].qty-a[1].qty).slice(0,8);
+  document.getElementById('drp-top-qty-chart').innerHTML = drinkHBar(
+    topQty.map(([name,d])=>({name,val:d.qty,label:d.qty+' ly',color:'var(--teal)'}))
+  );
+
+  // ── Lợi nhuận từng món / ly (bar ngang) ──────────────────
+  const topProfUnit = Object.entries(byProduct)
+    .filter(([,d])=>d.price>0)
+    .map(([name,d])=>({name,val:d.price-d.cost, label:Math.round(d.price-d.cost).toLocaleString('vi-VN')+'₫'}))
+    .sort((a,b)=>b.val-a.val).slice(0,8);
+  document.getElementById('drp-profit-per-unit-chart').innerHTML = drinkHBar(
+    topProfUnit.map(d=>({...d,color:d.val>=0?'var(--green)':'var(--red)'}))
+  );
+
+  // ── Bảng chi tiết ────────────────────────────────────────
+  const sort = document.getElementById('drp-sort')?.value||'revenue';
+  const rows = Object.entries(byProduct).map(([name,d])=>({
+    name, qty:d.qty, price:d.price, cost:d.cost,
+    revenue:d.revenue, profit:d.revenue-d.costTotal,
+    profitUnit:d.price-d.cost,
+    margin:d.revenue>0?Math.round((d.revenue-d.costTotal)/d.revenue*100):0,
+    bom:d.bom, nhom:d.bom?d.bom.nhom:'—'
+  })).sort((a,b)=>{
+    if(sort==='qty')          return b.qty-a.qty;
+    if(sort==='profit_total') return b.profit-a.profit;
+    if(sort==='margin')       return b.margin-a.margin;
+    if(sort==='profit_unit')  return b.profitUnit-a.profitUnit;
+    return b.revenue-a.revenue;
+  });
+
+  const totalRevAll = rows.reduce((s,r)=>s+r.revenue,0);
+  document.getElementById('drp-detail-rows').innerHTML = rows.map((r,i)=>{
+    const mColor = r.margin<0?'var(--red)':r.margin<20?'#e67e22':r.margin<35?'var(--muted)':'var(--green)';
+    const pctRev = totalRevAll>0?Math.round(r.revenue/totalRevAll*100):0;
+    const profColor = r.profitUnit>=0?'var(--green)':'var(--red)';
+    return `<tr>
+      <td style="color:${i<3?'var(--gold2)':'var(--muted)'};font-weight:700;text-align:center">${i+1}</td>
+      <td>
+        <div style="font-weight:700;font-size:13px">${r.name}</div>
+        ${r.bom?`<div style="font-size:10px;color:var(--muted)">${r.nhom}</div>`:''}
+      </td>
+      <td style="text-align:center">
+        ${r.bom?`<span class="tag" style="background:var(--dim);color:var(--brown);font-size:10px">${r.nhom}</span>`:'<span style="color:var(--muted);font-size:11px">—</span>'}
+      </td>
+      <td style="text-align:right;font-weight:600">${r.price>0?Math.round(r.price).toLocaleString('vi-VN')+'₫':'—'}</td>
+      <td style="text-align:right;color:var(--brand);font-size:12px">${r.cost>0?Math.round(r.cost).toLocaleString('vi-VN')+'₫':'—'}</td>
+      <td style="text-align:right;font-weight:700;color:${profColor}">${r.profitUnit!==0?Math.round(r.profitUnit).toLocaleString('vi-VN')+'₫':'—'}</td>
+      <td style="text-align:right;font-weight:700;color:var(--teal)">${r.qty.toLocaleString('vi-VN')}</td>
+      <td style="text-align:right;font-weight:700">${Math.round(r.revenue).toLocaleString('vi-VN')}₫</td>
+      <td style="text-align:right;font-weight:700;color:${r.profit>=0?'var(--green)':'var(--red)'}">
+        ${Math.round(r.profit).toLocaleString('vi-VN')}₫
+      </td>
+      <td style="text-align:center">
+        <span style="font-weight:800;color:${mColor}">${r.margin}%</span>
+        <div style="background:var(--dim);border-radius:3px;height:4px;width:50px;margin:2px auto 0">
+          <div style="height:4px;border-radius:3px;background:${mColor};width:${Math.min(100,Math.max(0,r.margin))}%"></div>
+        </div>
+      </td>
+      <td style="text-align:center">
+        <span style="font-size:11px;color:var(--muted)">${pctRev}%</span>
+        <div style="background:var(--dim);border-radius:3px;height:4px;width:40px;margin:2px auto 0">
+          <div style="height:4px;border-radius:3px;background:var(--brand);width:${pctRev}%"></div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('') || `<tr><td colspan="11" style="text-align:center;padding:24px;color:var(--muted)">Không có đơn hàng trong khoảng thời gian này</td></tr>`;
+}
+
+// ── Bar ngang helper ──────────────────────────────────────────
+function drinkHBar(items) {
+  if(!items.length) return '<div style="color:var(--muted);text-align:center;padding:20px;font-size:12px">Chưa có dữ liệu</div>';
+  const max = Math.max(...items.map(d=>Math.abs(d.val)),1);
+  return items.map((d,i)=>{
+    const pct = Math.max(4, Math.round(Math.abs(d.val)/max*100));
+    const rankColor = i===0?'#e6a817':i===1?'#9e9e9e':i===2?'#b87333':'transparent';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border)">
+      <div style="width:18px;height:18px;border-radius:50%;background:${rankColor};display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:${i<3?'#fff':'var(--muted)'};flex-shrink:0">${i+1}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px">${d.name}</div>
+        <div style="background:var(--dim);border-radius:4px;height:8px">
+          <div style="height:8px;border-radius:4px;background:${d.color||'var(--teal)'};width:${pct}%;transition:.4s"></div>
+        </div>
+      </div>
+      <div style="font-size:12px;font-weight:700;color:${d.color||'var(--teal)'};min-width:60px;text-align:right;flex-shrink:0">${d.label}</div>
+    </div>`;
+  }).join('');
+}
+
+// Gọi init khi vào tab drinks lần đầu
+let _drinkRpInited = false;
+const _origRpTab = typeof rpTab==='function'?rpTab:null;
 
 function syncBottomNav(btn){
   document.querySelectorAll('.bottom-nav-btn').forEach(x=>x.classList.remove('active'));
