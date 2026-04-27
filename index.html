@@ -3745,6 +3745,7 @@ function renderProducts(){
       <div class="prod-icon">${p.icon||'📦'}</div>
       <div class="prod-name">${p.name}</div>
       <div class="prod-price">${fmt(p.price)}</div>
+      ${p.vat?`<div style="font-size:10px;color:#2980b9;font-weight:500">Gồm VAT ${p.vat}%: ${fmt(Math.round(p.price*(1+(p.vat||0)/100)))}</div>`:''}
       <div class="prod-stock" style="color:${low?'var(--red)':stock===0?'var(--red)':'inherit'}">${stock!==null?stock+' phần':'Không giới hạn'}</div>
     </div>`;
   }).join('');
