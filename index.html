@@ -1719,8 +1719,26 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 <div class="overlay" id="modal-tx-detail">
   <div class="modal" style="max-width:520px">
     <div class="modal-title" id="tx-detail-title">Chi tiết phiếu</div>
+    <!-- View mode -->
     <div id="tx-detail-body"></div>
-    <div class="btn-group" style="margin-top:14px">
+    <!-- Edit mode -->
+    <div id="tx-edit-body" style="display:none">
+      <div class="form-row">
+        <div class="fg"><label>Số tiền (₫)</label><input id="tx-edit-amount" type="number"/></div>
+        <div class="fg"><label>Danh mục</label><select id="tx-edit-cat"></select></div>
+      </div>
+      <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="tx-edit-note"/></div>
+      <div class="fg" style="margin-bottom:12px">
+        <label>📎 Thêm ảnh chứng từ</label>
+        <input type="file" id="tx-edit-img" accept="image/*" multiple onchange="previewTxEditImgs()"/>
+        <div id="tx-edit-previews" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+      </div>
+      <div id="tx-edit-existing-imgs" style="margin-bottom:8px"></div>
+    </div>
+    <div class="btn-group" style="margin-top:14px" id="tx-detail-btns">
+      <button class="btn btn-sm" id="tx-edit-btn" onclick="toggleTxEdit()">✏️ Chỉnh sửa</button>
+      <button class="btn btn-green btn-sm" id="tx-save-btn" onclick="saveTxEdit()" style="display:none">💾 Lưu</button>
+      <button class="btn btn-ghost btn-sm" id="tx-cancel-btn" onclick="cancelTxEdit()" style="display:none">Hủy</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-tx-detail')">Đóng</button>
     </div>
   </div>
@@ -11350,15 +11368,21 @@ function showReceiptModal(src) {
 }
 
 
+let _currentTxId = null;
+
 function showTxDetail(id) {
-  // Find in manual transactions or auto txs
   let t = D.transactions.find(x=>x.id===id);
-  if(!t) {
-    // Try auto transactions
-    const allAuto = buildAutoTxs('');
-    t = allAuto.find(x=>x.id===id);
-  }
+  const isAuto = !t;
+  if(!t) { const allAuto = buildAutoTxs(''); t = allAuto.find(x=>x.id===id); }
   if(!t) return;
+  _currentTxId = id;
+
+  // Reset edit mode
+  document.getElementById('tx-detail-body').style.display = '';
+  document.getElementById('tx-edit-body').style.display = 'none';
+  document.getElementById('tx-edit-btn').style.display = isAuto ? 'none' : '';
+  document.getElementById('tx-save-btn').style.display = 'none';
+  document.getElementById('tx-cancel-btn').style.display = 'none';
 
   const isT = t.type==='thu';
   const title = isT ? '💚 Phiếu Thu' : '🔴 Phiếu Chi';
@@ -11415,6 +11439,127 @@ function showTxDetail(id) {
     ${imgHtml}
   `;
   showM('modal-tx-detail');
+}
+
+
+// ══════════════════════════════════════════════════
+// EDIT PHIẾU THU/CHI
+// ══════════════════════════════════════════════════
+function toggleTxEdit() {
+  const t = D.transactions.find(x=>x.id===_currentTxId);
+  if(!t) return;
+
+  document.getElementById('tx-detail-body').style.display = 'none';
+  document.getElementById('tx-edit-body').style.display = '';
+  document.getElementById('tx-edit-btn').style.display = 'none';
+  document.getElementById('tx-save-btn').style.display = '';
+  document.getElementById('tx-cancel-btn').style.display = '';
+
+  // Fill form
+  document.getElementById('tx-edit-amount').value = t.amount||0;
+  document.getElementById('tx-edit-note').value = t.note||'';
+
+  // Fill category options
+  const cats = t.type==='thu'
+    ? ['Học phí','Bán lẻ sản phẩm','Dịch vụ tư vấn','Thu khác']
+    : ['Mua nguyên liệu','Chi phí vận hành','Lương nhân viên','Marketing','Thiết bị dụng cụ','Chi khác'];
+  const sel = document.getElementById('tx-edit-cat');
+  sel.innerHTML = cats.map(c=>`<option ${c===t.category?'selected':''}>${c}</option>`).join('');
+
+  // Show existing images
+  let existingUrls = [];
+  if(t.receipt_url) {
+    try { existingUrls = JSON.parse(t.receipt_url); }
+    catch(e) { if(t.receipt_url) existingUrls = [t.receipt_url]; }
+  }
+  const existEl = document.getElementById('tx-edit-existing-imgs');
+  if(existingUrls.length) {
+    existEl.innerHTML = `
+      <div style="font-size:12px;font-weight:700;color:var(--brown);margin-bottom:8px">Ảnh hiện có (${existingUrls.length})</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${existingUrls.map((url,i)=>`
+          <div style="position:relative">
+            <img src="${url}" onclick="showReceiptModal('${url}')" style="width:80px;height:80px;object-fit:cover;border-radius:8px;cursor:zoom-in;border:1.5px solid var(--border)"/>
+            <button onclick="removeTxExistingImg(${i})" style="position:absolute;top:-6px;right:-6px;background:#e74c3c;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1">✕</button>
+          </div>
+        `).join('')}
+      </div>`;
+  } else {
+    existEl.innerHTML = '';
+  }
+
+  // Clear new image input
+  document.getElementById('tx-edit-img').value = '';
+  document.getElementById('tx-edit-previews').innerHTML = '';
+}
+
+function removeTxExistingImg(idx) {
+  const t = D.transactions.find(x=>x.id===_currentTxId);
+  if(!t) return;
+  let urls = [];
+  try { urls = JSON.parse(t.receipt_url||'[]'); } catch(e) { urls = t.receipt_url ? [t.receipt_url] : []; }
+  urls.splice(idx, 1);
+  t.receipt_url = JSON.stringify(urls);
+  toggleTxEdit(); // Re-render edit form
+}
+
+function previewTxEditImgs() {
+  const files = Array.from(document.getElementById('tx-edit-img')?.files||[]);
+  const prevEl = document.getElementById('tx-edit-previews');
+  prevEl.innerHTML = '';
+  files.forEach((file,idx) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const div = document.createElement('div');
+      div.style.position = 'relative';
+      div.innerHTML = `<img src="${e.target.result}" style="width:70px;height:70px;object-fit:cover;border-radius:8px;border:1.5px solid var(--teal)"/>
+        <div style="position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:9px;color:#fff;background:rgba(0,0,0,.5);border-radius:0 0 7px 7px">Mới ${idx+1}</div>`;
+      prevEl.appendChild(div);
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function saveTxEdit() {
+  const t = D.transactions.find(x=>x.id===_currentTxId);
+  if(!t) return;
+
+  const amount = parseFloat(document.getElementById('tx-edit-amount').value)||0;
+  const cat    = document.getElementById('tx-edit-cat').value;
+  const note   = document.getElementById('tx-edit-note').value.trim();
+  if(!amount||amount<=0) { notify('Nhập số tiền hợp lệ!',false); return; }
+
+  // Upload ảnh mới nếu có
+  const newUrls = await uploadReceipts('tx-edit');
+
+  // Gộp ảnh cũ (sau khi xóa) + ảnh mới
+  let existingUrls = [];
+  try { existingUrls = JSON.parse(t.receipt_url||'[]'); } catch(e) { existingUrls = t.receipt_url ? [t.receipt_url] : []; }
+  const allUrls = [...existingUrls, ...newUrls];
+
+  const updates = {
+    amount, category:cat, note,
+    receipt_url: allUrls.length ? JSON.stringify(allUrls) : ''
+  };
+
+  try {
+    await sbPatch('transactions', updates, `?id=eq.${t.id}`);
+    Object.assign(t, updates);
+    notify('✅ Đã cập nhật phiếu!');
+    // Re-show detail
+    cancelTxEdit();
+    showTxDetail(_currentTxId);
+    renderFinance();
+    setTimeout(()=>gsSend({sheet:'ThuChi',rows:gsThuChi(),time:nowDT()}),500);
+  } catch(e) { notify('Lỗi lưu: '+e.message, false); }
+}
+
+function cancelTxEdit() {
+  document.getElementById('tx-detail-body').style.display = '';
+  document.getElementById('tx-edit-body').style.display = 'none';
+  document.getElementById('tx-edit-btn').style.display = '';
+  document.getElementById('tx-save-btn').style.display = 'none';
+  document.getElementById('tx-cancel-btn').style.display = 'none';
 }
 
 boot();
