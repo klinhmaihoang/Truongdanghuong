@@ -1714,6 +1714,18 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 </div>
 
 <!-- Phiếu thu -->
+
+<!-- Modal chi tiết phiếu thu/chi -->
+<div class="overlay" id="modal-tx-detail">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-title" id="tx-detail-title">Chi tiết phiếu</div>
+    <div id="tx-detail-body"></div>
+    <div class="btn-group" style="margin-top:14px">
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-tx-detail')">Đóng</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="modal-add-thu">
   <div class="modal">
     <div class="modal-title">💚 Thêm phiếu thu</div>
@@ -6858,7 +6870,7 @@ function renderFinance(){
 
   const el=document.getElementById('fin-list');
   if(!el)return;
-  el.innerHTML=txs.length?txs.map(t=>`<tr style="${t._auto?'opacity:.85':''}">
+  el.innerHTML=txs.length?txs.map(t=>`<tr style="${t._auto?'opacity:.85':''};cursor:pointer" onclick="showTxDetail('${t.id}')">
     <td style="font-size:11px;color:var(--muted)">${t.time||''}</td>
     <td>
       <span class="tag ${t.type==='thu'?'t-paid':'t-low'}">${t.type==='thu'?'💚 Thu':'🔴 Chi'}</span>
@@ -6869,18 +6881,18 @@ function renderFinance(){
       ${t.type==='thu'?'+':'-'}${fmt(t.amount||0)}
     </td>
     <td style="font-size:12px;color:var(--muted)">${t.note||'—'}</td>
-    <td style="white-space:nowrap">
+    <td style="white-space:nowrap" onclick="event.stopPropagation()">
       ${t.receipt_url?(()=>{
         try {
           const urls = JSON.parse(t.receipt_url);
-          return urls.map((u,i)=>`<a href="#" onclick="showReceiptModal('${u}');return false" title="Ảnh ${i+1}" style="font-size:15px;margin-right:2px;text-decoration:none">🖼</a>`).join('');
+          return `<span style="font-size:11px;color:var(--teal)">🖼 ${urls.length} ảnh</span>`;
         } catch(e) {
-          return `<a href="#" onclick="showReceiptModal('${t.receipt_url}');return false" style="font-size:15px;text-decoration:none">🖼</a>`;
+          return `<span style="font-size:11px;color:var(--teal)">🖼 1 ảnh</span>`;
         }
       })():''}
       ${t._auto
         ?`<a href="#" onclick="go('pos',null);posTab('orders',document.getElementById('pos-tab-orders'));return false" style="font-size:11px;color:var(--teal)">Xem đơn</a>`
-        :`<button class="btn btn-ghost btn-sm" style="color:var(--red);font-size:11px" onclick="deleteTransaction('${t.id}')">✕</button>`
+        :`<button class="btn btn-ghost btn-sm" style="color:var(--red);font-size:11px" onclick="deleteTransaction('${t.id}');event.stopPropagation()">✕</button>`
       }
     </td>
   </tr>`).join(''):'<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--muted)">Chưa có giao dịch nào</td></tr>';
@@ -11326,6 +11338,74 @@ function showReceiptModal(src) {
   }
   document.getElementById('receipt-view-img').src = src;
   overlay.style.display = 'flex';
+}
+
+
+function showTxDetail(id) {
+  // Find in manual transactions or auto txs
+  let t = D.transactions.find(x=>x.id===id);
+  if(!t) {
+    // Try auto transactions
+    const allAuto = buildAutoTxs('');
+    t = allAuto.find(x=>x.id===id);
+  }
+  if(!t) return;
+
+  const isT = t.type==='thu';
+  const title = isT ? '💚 Phiếu Thu' : '🔴 Phiếu Chi';
+  document.getElementById('tx-detail-title').textContent = title;
+
+  // Parse receipt URLs
+  let receiptUrls = [];
+  if(t.receipt_url) {
+    try { receiptUrls = JSON.parse(t.receipt_url); }
+    catch(e) { if(t.receipt_url) receiptUrls = [t.receipt_url]; }
+  }
+
+  const imgHtml = receiptUrls.length ? `
+    <div style="margin-top:12px">
+      <div style="font-size:12px;font-weight:700;color:var(--brown);margin-bottom:8px">📎 Chứng từ (${receiptUrls.length} ảnh)</div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px">
+        ${receiptUrls.map((url,i)=>`
+          <div style="position:relative">
+            <img src="${url}" onclick="showReceiptModal('${url}')"
+              style="width:120px;height:120px;object-fit:cover;border-radius:10px;border:2px solid var(--border);cursor:zoom-in;transition:.2s"
+              onmouseover="this.style.borderColor='var(--brand)'" onmouseout="this.style.borderColor='var(--border)'"/>
+            <div style="position:absolute;bottom:4px;left:0;right:0;text-align:center;font-size:10px;color:#fff;background:rgba(0,0,0,.4);border-radius:0 0 8px 8px;padding:2px">Ảnh ${i+1}</div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  ` : '<div style="font-size:12px;color:var(--muted);margin-top:8px;padding:10px;background:var(--bg2);border-radius:8px;text-align:center">Chưa có ảnh chứng từ</div>';
+
+  document.getElementById('tx-detail-body').innerHTML = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:4px">
+      <div style="background:var(--bg2);border-radius:10px;padding:12px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Số tiền</div>
+        <div style="font-size:22px;font-weight:800;color:${isT?'var(--green)':'var(--red)'}">${isT?'+':'-'}${fmt(t.amount||0)}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:10px;padding:12px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Danh mục</div>
+        <div style="font-size:14px;font-weight:700">${t.category||'—'}</div>
+      </div>
+    </div>
+    <div style="background:var(--bg2);border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:4px">Ghi chú</div>
+      <div style="font-size:13px">${t.note||'—'}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">
+      <div style="background:var(--bg2);border-radius:10px;padding:10px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Thời gian</div>
+        <div style="font-size:12px;font-weight:600">${t.time||'—'}</div>
+      </div>
+      <div style="background:var(--bg2);border-radius:10px;padding:10px">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Mã phiếu</div>
+        <div style="font-size:11px;font-family:monospace;color:var(--muted)">${t.id||'—'}</div>
+      </div>
+    </div>
+    ${imgHtml}
+  `;
+  showM('modal-tx-detail');
 }
 
 boot();
