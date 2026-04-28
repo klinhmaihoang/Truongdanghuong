@@ -2025,6 +2025,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       </div>
     </div>
     <div class="fg" style="margin-bottom:12px"><label>Tên chủ tài khoản</label><input id="tg-acc-name" placeholder="VD: TRUONG DANG HUONG"/></div>
+    <div class="fg" style="margin-bottom:12px"><label>SĐT cửa hàng (hiển thị trên hóa đơn PDF)</label><input id="tg-acc-phone" placeholder="VD: 0984830303" type="tel"/></div>
     <div class="fg" style="margin-bottom:12px">
       <label>Google Sheet Webhook URL</label>
       <input id="gs-url" placeholder="https://script.google.com/macros/s/..."/>
@@ -3210,7 +3211,7 @@ const sbUpsert = async (t,d)=> {
 // STATE
 // ══════════════════════════════════════════════════
 let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[],transactions:[]};
-let cfg = {tgToken:'',tgChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',gsUrl:'https://script.google.com/macros/s/AKfycbxA0oXtRRa-l_pA-H8HbnmvvUHp9Aw7xNVV_Xfz3ixXT_QDJ4q1E795XIF-4ntDnMrq/exec'};
+let cfg = {tgToken:'',tgChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',accPhone:'0984830303',gsUrl:'https://script.google.com/macros/s/AKfycbxA0oXtRRa-l_pA-H8HbnmvvUHp9Aw7xNVV_Xfz3ixXT_QDJ4q1E795XIF-4ntDnMrq/exec'};
 let cart=[], invoice=null, selectedStudentId=null, stFilter='all', tgLog=[];
 
 const DEFAULTS = {
@@ -3377,6 +3378,7 @@ function applyTgUI(){
   if(cfg.bankAcc) document.getElementById('tg-bank-acc').value=cfg.bankAcc;
   if(cfg.bankId) document.getElementById('tg-bank-id').value=cfg.bankId;
   if(cfg.accName) document.getElementById('tg-acc-name').value=cfg.accName;
+  const phEl=document.getElementById('tg-acc-phone');if(phEl&&cfg.accPhone) phEl.value=cfg.accPhone;
   if(cfg.gsUrl) document.getElementById('gs-url').value=cfg.gsUrl;
   if(cfg.tgToken&&cfg.tgChatId){
     document.getElementById('tg-dot').style.background='var(--teal)';
@@ -5355,6 +5357,10 @@ async function markPaid(){
   ['c-name','c-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   closeM('modal-qr');renderCart();render();
   notify('✓ Thanh toán xong! Kho đã cập nhật');
+  // Tự động tạo/cập nhật khách hàng và tích điểm
+  if(invoice&&invoice.name&&invoice.name!=='Khách lẻ'){
+    addPointsFromOrder(invoice.name, invoice.phone||'', invoice.total||0);
+  }
   if(document.getElementById('at-paid').checked)
     tgMsg(`✅ *Thanh toán thành công!*\n\nMã: \`${invoice.id}\`\n👤 ${invoice.name}\n💰 ${fmt(invoice.total)}\n📦 Kho đã cập nhật tự động\n🕐 ${ts}\n\n_Trương Dáng Hương Academy_`);
   if(lowItems.length&&document.getElementById('at-stock').checked)
@@ -6136,6 +6142,7 @@ async function saveTg(){
     bankAcc:document.getElementById('tg-bank-acc').value.trim(),
     bankId:document.getElementById('tg-bank-id').value,
     accName:document.getElementById('tg-acc-name').value.trim()||'TRUONG DANG HUONG',
+    accPhone:document.getElementById('tg-acc-phone')?.value.trim()||cfg.accPhone||'',
     gsUrl:document.getElementById('gs-url').value.trim()||cfg.gsUrl};
   saveCfgLocal();
   // Lưu lên Supabase để sync cho cả team
@@ -6724,11 +6731,11 @@ function printRetailPDF(order){
   </style></head><body>
   <div class="header">
     <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
-    <p>Chuyên gia F&B | ĐT: ${cfg.bankAcc||''}</p>
+    <p>Chuyên gia F&B | ĐT: ${cfg.accPhone||'0984830303'}</p>
   </div>
   <div class="title">HÓA ĐƠN BÁN HÀNG</div>
   <div class="row"><span class="label">Mã đơn:</span><span class="value">${order.id}</span></div>
-  <div class="row"><span class="label">Khách hàng:</span><span class="value">${order.customer||'Khách lẻ'}</span></div>
+  <div class="row"><span class="label">Khách hàng:</span><span class="value">${order.customer||'Khách lẻ'}${order.phone?' — '+order.phone:''}</span></div>
   <div class="row"><span class="label">Thời gian:</span><span class="value">${order.time||nowDT()}</span></div>
   <hr class="divider"/>
   <div class="items">
@@ -6764,9 +6771,11 @@ function printRetailPDF(order){
   </div>
   ${order.discount>0?`<div class="row" style="font-size:11px"><span class="label">Tạm tính:</span><span class="value">${fmt(order.subtotal||order.total)}</span></div><div class="row" style="font-size:11px;color:#e74c3c"><span class="label">Giảm giá (${order.discount}%):</span><span class="value">-${fmt(Math.round((order.subtotal||order.total)*order.discount/100))}</span></div>`:''}
   ${order.payment?`<div class="row" style="font-size:11px"><span class="label">Thanh toán:</span><span class="value">${order.payment}</span></div>`:''}
-  ${order.ship_fee>0?`<div class="row" style="font-size:11px"><span class="label">Phí ship:</span><span class="value" style="color:var(--teal);font-weight:600">+${fmt(order.ship_fee)}</span></div>`:''}
+  ${order.ship_fee>0?`<div class="row" style="font-size:11px"><span class="label">Phí ship:</span><span class="value" style="color:#1abc9c;font-weight:600">+${fmt(order.ship_fee)}</span></div>`:''}
   ${order.shipping&&order.shipping!=='Khách tới lấy'?`<div class="row" style="font-size:11px"><span class="label">Giao hàng:</span><span class="value">${order.shipping}</span></div>`:''}
+  ${order.phone?`<div class="row" style="font-size:11px"><span class="label">SĐT:</span><span class="value">${order.phone}</span></div>`:''}
   ${order.address?`<div class="row" style="font-size:11px"><span class="label">Địa chỉ:</span><span class="value" style="font-size:10px">${order.address}</span></div>`:''}
+  ${order.tracking_code?`<div class="row" style="font-size:11px;background:#e8f8f5;border-radius:4px;padding:4px 6px;margin:4px 0"><span class="label">📦 Mã vận đơn:</span><span class="value" style="font-weight:700;color:#1abc9c;font-size:12px">${order.tracking_code}</span></div>`:''}
   ${qrUrl?`<div class="qr">
     <div style="font-size:10px;color:#888;margin-bottom:6px">Quét mã QR để chuyển khoản</div>
     <img src="${qrUrl}" onerror="this.style.display='none'" style="width:160px;height:160px"/>
@@ -6868,7 +6877,7 @@ function printAllFeeReceipt(s, hpOrders){
   </style></head><body>
   <div class="header">
     <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
-    <p>Chuyên gia F&B | ĐT: ${cfg.bankAcc||''}</p>
+    <p>Chuyên gia F&B | ĐT: ${cfg.accPhone||'0984830303'}</p>
   </div>
   <div class="title">PHIẾU THU HỌC PHÍ</div>
 
@@ -6943,7 +6952,7 @@ function printFeePDF(order){
   </style></head><body>
   <div class="header">
     <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
-    <p>Chuyên gia F&B | ĐT: ${cfg.bankAcc||''}</p>
+    <p>Chuyên gia F&B | ĐT: ${cfg.accPhone||'0984830303'}</p>
   </div>
   <div class="title">PHIẾU THU HỌC PHÍ</div>
   <div class="info-box">
@@ -10042,14 +10051,16 @@ async function odSaveEdit() {
     status:   newStatus,
   };
   Object.assign(o, updates);
+  // Lưu tracking_url vào updates và local
+  const trkVal = document.getElementById('od-edit-tracking')?.value?.trim()||'';
+  updates.tracking_url = trkVal;
+  o.tracking_url = trkVal;
   try {
-    await sbUpsert('orders', o);
+    // Dùng sbPatch với filter id để chắc chắn chỉ update đúng đơn này
+    await sbPatch('orders', updates, `?id=eq.${o.id}`);
     renderOrders();
     renderPendingOrders();
     renderDash();
-    // Lưu tracking_url (inlined)
-    const trkVal = document.getElementById('od-edit-tracking')?.value?.trim()||'';
-    o.tracking_url = trkVal;
     // TG notify khi giao hàng
     const newSt = document.getElementById('od-edit-status')?.value;
     if(newSt==='Đang giao'||newSt==='Đã giao') {
