@@ -1,4 +1,4 @@
-\<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
@@ -7884,7 +7884,7 @@ function renderMatList() {
       </td>
       <td>
         <div style="display:flex;gap:4px">
-          <button class="btn btn-ghost btn-sm" style="padding:3px 8px" onclick="openEditMat('${m.ma}')">✏️</button>
+          <button class="btn btn-ghost btn-sm" style="padding:3px 8px" onclick="openEditDmhh('${m.ma}')">✏️</button>
           ${m._custom ? `<button class="btn btn-ghost btn-sm" style="padding:3px 8px;color:var(--red)" onclick="deleteMat('${m.ma}')">🗑</button>` : ''}
         </div>
       </td>
@@ -8022,7 +8022,7 @@ function openAddMat() {
 }
 
 // ── MỞ MODAL SỬA ────────────────────────────────────────────
-function openEditMat(ma) {
+function openEditDmhh(ma) {
   const m = CC_mats.find(x => x.ma === ma);
   if (!m) return;
   document.getElementById('mat-modal-title').textContent = '✏️ Sửa nguyên liệu';
