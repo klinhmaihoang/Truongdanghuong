@@ -6686,30 +6686,40 @@ function printRetailPDF(order){
         <td style="text-align:right;padding:3px 0">Đơn giá</td>
         <td style="text-align:right;padding:3px 0">T.tiền</td>
       </tr>
-      ${(order.items||'').split(',').map(i=>{
-        const s = i.trim();
-        // Parse: "Tên sản phẩm x3 (hộp)" hoặc "Tên sản phẩm x3" hoặc "Tên sản phẩm"
-        const mFull = s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)\s*\(([^)]+)\)$/i); // có unit trong ()
-        const mQty  = s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)$/i);               // có số lượng
-        let name, qty, unitStr;
-        if(mFull)      { name=mFull[1].trim(); qty=+mFull[2]; unitStr=mFull[3]; }
-        else if(mQty)  { name=mQty[1].trim();  qty=+mQty[2];  unitStr=''; }
-        else           { name=s; qty=1; unitStr=''; }
-        // Fallback: lấy unit từ D.products nếu có
-        const prod = D.products.find(p=>p.name===name);
-        const price = prod ? prod.price : 0;
-        const unit  = unitStr || prod?.unit || '';
-        const subtotal = price * qty;
-        return `<tr style="border-bottom:1px dashed #f0f0f0">
-          <td style="padding:5px 0;font-size:11px">
-            <div style="font-weight:600">${name}</div>
-            ${unit?`<div style="font-size:9px;color:#999">${unit}</div>`:''}
-          </td>
-          <td style="text-align:center;padding:5px 4px;font-size:11px;color:#555;white-space:nowrap">x${qty}</td>
-          <td style="text-align:right;padding:5px 0;font-size:11px;color:#888;white-space:nowrap">${price>0?fmt(price):''}</td>
-          <td style="text-align:right;padding:5px 0;font-size:11px;font-weight:700;color:#cc5500;white-space:nowrap">${subtotal>0?fmt(subtotal):''}</td>
-        </tr>`;
-      }).join('')}
+      ${(()=>{
+        // Parse tất cả items trước để tính catalog total
+        const itemList = (order.items||'').split(',').map(s=>s.trim()).filter(Boolean);
+        const parsed = itemList.map(s=>{
+          const mFull = s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)\s*\(([^)]+)\)$/i);
+          const mQty  = s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)$/i);
+          let name, qty, unitStr;
+          if(mFull)     { name=mFull[1].trim(); qty=+mFull[2]; unitStr=mFull[3]; }
+          else if(mQty) { name=mQty[1].trim();  qty=+mQty[2];  unitStr=''; }
+          else          { name=s; qty=1; unitStr=''; }
+          const prod = D.products.find(p=>p.name===name);
+          const unit = unitStr || prod?.unit || '';
+          const catalogPrice = prod?.price || 0;
+          return { name, qty, unit, catalogPrice, lineTotal: catalogPrice * qty };
+        });
+        const catalogTotal = parsed.reduce((s,p)=>s+p.lineTotal, 0);
+        const actualTotal  = order.subtotal || order.total || 0;
+        const ratio = (catalogTotal > 0 && Math.abs(catalogTotal - actualTotal) > 100)
+          ? actualTotal / catalogTotal : 1;
+        return parsed.map(({name, qty, unit, catalogPrice, lineTotal})=>{
+          const displayPrice   = ratio !== 1 ? Math.round(lineTotal * ratio / qty) : catalogPrice;
+          const displaySubtotal = displayPrice * qty;
+          const displayQty = Number.isInteger(qty) ? qty : qty.toFixed(2).replace(/\.?0+$/,'');
+          return `<tr style="border-bottom:1px dashed #f0f0f0">
+            <td style="padding:5px 0;font-size:11px">
+              <div style="font-weight:600">${name}</div>
+              ${unit?`<div style="font-size:9px;color:#999">${unit}</div>`:''}
+            </td>
+            <td style="text-align:center;padding:5px 4px;font-size:11px;color:#555;white-space:nowrap">x${displayQty}</td>
+            <td style="text-align:right;padding:5px 0;font-size:11px;color:#888;white-space:nowrap">${displayPrice>0?fmt(displayPrice):''}</td>
+            <td style="text-align:right;padding:5px 0;font-size:11px;font-weight:700;color:#cc5500;white-space:nowrap">${displaySubtotal>0?fmt(displaySubtotal):''}</td>
+          </tr>`;
+        }).join('');
+      })()}
     </table>
   </div>
   <div class="total-box">
@@ -9812,13 +9822,36 @@ function odEnterEdit() {
   if(trkInp) { trkInp.value = o.tracking_url||''; odTrackingPreview && odTrackingPreview(); }
   odStatusChange && odStatusChange();
   odRenderProgressBar(o.status||'Chờ xác nhận');
-  // Build item rows from items string
+  // Build item rows từ items string — tính giá thực từ tổng đơn
   const itemsContainer = document.getElementById('od-edit-items');
   itemsContainer.innerHTML = '';
   const itemList = (o.items||'').split(',').map(s=>s.trim()).filter(Boolean);
-  itemList.forEach(item => {
-    const m = item.match(/^(.+?)(?:\s+x(\d+))?$/);
-    odAddItem(m?.[1]||item, +(m?.[2]||1));
+
+  // Parse tất cả items trước để tính catalog total
+  const parsed = itemList.map(item => {
+    const mFull = item.match(/^(.+?)\s+x(\d+(?:\.\d+)?)\s*\(([^)]+)\)$/i);
+    const mQty  = item.match(/^(.+?)\s+x(\d+(?:\.\d+)?)$/i);
+    let name, qty;
+    if(mFull)     { name=mFull[1].trim(); qty=+mFull[2]; }
+    else if(mQty) { name=mQty[1].trim();  qty=+mQty[2]; }
+    else          { name=item; qty=1; }
+    const prod = D.products.find(p=>p.name===name);
+    const catalogPrice = prod?.price || 0;
+    return { name, qty, catalogPrice, lineTotal: catalogPrice * qty };
+  });
+
+  const catalogTotal = parsed.reduce((s,p)=>s+p.lineTotal, 0);
+  const actualTotal  = o.subtotal || o.total || 0;
+  const ratio = (catalogTotal > 0 && Math.abs(catalogTotal-actualTotal) > 100)
+    ? actualTotal / catalogTotal  // đơn NVL hoặc giá custom
+    : 1;
+
+  parsed.forEach(({name, qty, catalogPrice, lineTotal}) => {
+    // Tính giá thực từng dòng theo tỷ lệ
+    const actualLinePrice = ratio !== 1
+      ? Math.round(lineTotal * ratio / qty)  // đơn giá sau khi điều chỉnh
+      : catalogPrice;
+    odAddItem(name, qty, actualLinePrice || null);
   });
   odCalcLive();
 }
@@ -9829,7 +9862,7 @@ function odCancelEdit() {
   document.getElementById('od-action-buttons').style.display = 'flex';
 }
 
-function odAddItem(name='', qty=1) {
+function odAddItem(name='', qty=1, actualPrice=null) {
   const container = document.getElementById('od-edit-items');
   const prodOpts = D.products.filter(p=>p.price>0).map(p=>
     `<option value="${p.name}" data-price="${p.price}">${p.name} — ${fmt(p.price)}</option>`
@@ -9840,7 +9873,7 @@ function odAddItem(name='', qty=1) {
   row.innerHTML = `
     <input class="od-i-name" list="od-prod-datalist" value="${name}" placeholder="Tên sản phẩm..." oninput="odItemChange(this);odCalcLive()"
       style="border:1.5px solid var(--border);border-radius:6px;padding:6px 9px;font-size:13px;font-family:inherit;outline:none"/>
-    <input class="od-i-qty" type="number" min="1" step="1" value="${qty}" oninput="odCalcLive()"
+    <input class="od-i-qty" type="number" min="0.01" step="any" value="${qty}" oninput="odCalcLive()"
       style="border:1.5px solid var(--border);border-radius:6px;padding:6px 6px;font-size:13px;font-family:inherit;outline:none;text-align:right"/>
     <input class="od-i-price" type="number" min="0" placeholder="Đơn giá"
       style="border:1.5px solid var(--border);border-radius:6px;padding:6px 6px;font-size:13px;font-family:inherit;outline:none;text-align:right"
@@ -9848,10 +9881,14 @@ function odAddItem(name='', qty=1) {
     <button onclick="this.closest('.od-item-row').remove();odCalcLive()"
       style="background:var(--red);color:#fff;border:none;border-radius:6px;width:27px;height:27px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>`;
   container.appendChild(row);
-  // Set price if product known
+  // Ưu tiên: 1) giá thực từ đơn, 2) giá catalog nếu sản phẩm mới
   const priceInp = row.querySelector('.od-i-price');
-  const prod = D.products.find(p=>p.name===name);
-  if(prod) priceInp.value = prod.price;
+  if(actualPrice !== null && actualPrice !== undefined) {
+    priceInp.value = actualPrice; // Giữ nguyên giá thực từ đơn hàng
+  } else {
+    const prod = D.products.find(p=>p.name===name);
+    if(prod) priceInp.value = prod.price;
+  }
   odCalcLive();
 }
 // Datalist cho sản phẩm trong edit đơn
