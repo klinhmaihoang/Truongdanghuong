@@ -9833,21 +9833,13 @@ function odEnterEdit() {
     else          { name=item; qty=1; }
     const prod = D.products.find(p=>p.name===name);
     const catalogPrice = prod?.price || 0;
-    return { name, qty, catalogPrice, lineTotal: catalogPrice * qty };
+    return { name, qty, catalogPrice };
   });
 
-  const catalogTotal = parsed.reduce((s,p)=>s+p.lineTotal, 0);
-  const actualTotal  = o.subtotal || o.total || 0;
-  const ratio = (catalogTotal > 0 && Math.abs(catalogTotal-actualTotal) > 100)
-    ? actualTotal / catalogTotal  // đơn NVL hoặc giá custom
-    : 1;
-
-  parsed.forEach(({name, qty, catalogPrice, lineTotal}) => {
-    // Tính thành tiền thực của dòng (không phải đơn giá)
-    const actualLineSubtotal = ratio !== 1
-      ? Math.round(lineTotal * ratio)   // thành tiền = tổng dòng × tỷ lệ
-      : Math.round(catalogPrice * qty); // thành tiền = đơn giá × qty
-    odAddItem(name, qty, actualLineSubtotal || null);
+  parsed.forEach(({name, qty, catalogPrice}) => {
+    // Thành tiền = đơn giá catalog × số lượng (đơn giản, chính xác)
+    const lineSubtotal = catalogPrice > 0 ? Math.round(catalogPrice * qty) : null;
+    odAddItem(name, qty, lineSubtotal);
   });
   odCalcLive();
 }
