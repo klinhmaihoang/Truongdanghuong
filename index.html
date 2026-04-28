@@ -2144,7 +2144,9 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   ADD COLUMN IF NOT EXISTS shipping TEXT DEFAULT '',
   ADD COLUMN IF NOT EXISTS tracking_url TEXT DEFAULT '',
   ADD COLUMN IF NOT EXISTS discount NUMERIC DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS subtotal NUMERIC DEFAULT 0;
+  ADD COLUMN IF NOT EXISTS subtotal NUMERIC DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS ship_fee NUMERIC DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS tracking_code TEXT DEFAULT '';
 
 ALTER TABLE products
   ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT '';
@@ -3166,7 +3168,7 @@ const sbPatch = async (t,d,f) => {
     // Nếu lỗi column not found và đang patch orders → chỉ patch status + time
     if(e.message?.includes('could not find') && t==='orders') {
       const safe = {};
-      const safeKeys = ['status','time','note','total','items','customer','email'];
+      const safeKeys = ['status','time','note','total','items','customer','email','address','payment','shipping','discount','subtotal','ship_fee','tracking_url'];
       safeKeys.forEach(k=>{ if(k in d) safe[k]=d[k]; });
       if(Object.keys(safe).length) return await sb('PATCH',t,safe,f);
     }
@@ -10333,6 +10335,7 @@ async function runMigration() {
     `ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount NUMERIC DEFAULT 0`,
     `ALTER TABLE orders ADD COLUMN IF NOT EXISTS subtotal NUMERIC DEFAULT 0`,
     `ALTER TABLE orders ADD COLUMN IF NOT EXISTS ship_fee NUMERIC DEFAULT 0`,
+    `ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_code TEXT DEFAULT ''`,
     // products — thêm unit
     `ALTER TABLE products ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT ''`,
     // app_users
