@@ -5426,6 +5426,7 @@ async function markPaid(){
     setTimeout(()=>tgMsg(`⚠️ *CẢNH BÁO KHO!*\n\n${lowItems.map(i=>'• '+i.name+': còn '+i.qty+' '+i.unit).join('\n')}\n\n➡️ Cần nhập thêm nguyên liệu!\n\n_Trương Dáng Hương Academy_`),1000);
   invoice=null;
   gsSend({sheet:'TonKho',rows:D.inventory,time:ts});
+  setTimeout(()=>gsSend({sheet:'BaoCaoLaiLo',rows:gsBaoCaoData(),time:nowDT()}),1500);
 }
 
 
@@ -5975,7 +5976,10 @@ async function importStock(){
 
     gsSend({sheet:'LichSuKho',id:log.id,time:nowDT(),name:mat.name,type:'Nhập',qty:qty,unit:mat.unit,note:logNote,mat_id:id,mat_qty:qty});
     gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
-    if(total>0 && payment!=='none') gsSend({sheet:'ThuChi',rows:gsThuChi(),time:nowDT()});
+    if(total>0 && payment!=='none') {
+      gsSend({sheet:'ThuChi',rows:gsThuChi(),time:nowDT()});
+      setTimeout(()=>gsSend({sheet:'BaoCaoLaiLo',rows:gsBaoCaoData(),time:nowDT()}),1500);
+    }
 
   }catch(e){mat.qty=oldQty;notify('Lưu thất bại: '+e.message,false);}
 }
@@ -6155,8 +6159,9 @@ async function syncThuChiToSheet(){
     const rows=gsThuChi();
     if(!rows.length){notify('Chưa có dữ liệu thu chi!',false);return;}
     await gsSend({sheet:'ThuChi',rows,time:nowDT()});
-    await new Promise(r=>setTimeout(r,1500));
-    notify('✅ Đã sync '+rows.length+' giao dịch lên Google Sheet!');
+    await new Promise(r=>setTimeout(r,800));
+    await gsSend({sheet:'BaoCaoLaiLo',rows:gsBaoCaoData(),time:nowDT()});
+    notify('✅ Đã sync '+rows.length+' giao dịch + Báo cáo lãi lỗ lên Google Sheet!');
   }catch(e){notify('Lỗi sync: '+e.message,false);}
 }
 
@@ -6858,6 +6863,7 @@ async function addTransaction(type){
     notify('✓ Đã lưu phiếu '+(type==='thu'?'thu':'chi')+': '+fmt(amount));
     tgMsg((type==='thu'?'💚 *Phiếu thu*':'🔴 *Phiếu chi*')+'\n\n💰 '+fmt(amount)+'\n📂 '+cat+(note?'\n📝 '+note:'')+'\n🕐 '+nowDT()+'\n\n_Trương Dáng Hương Academy_');
     setTimeout(()=>gsSend({sheet:'ThuChi',rows:gsThuChi(),time:nowDT()}),500);
+    setTimeout(()=>gsSend({sheet:'BaoCaoLaiLo',rows:gsBaoCaoData(),time:nowDT()}),1500);
   }catch(e){notify('Lỗi lưu: '+e.message,false);}
 }
 
