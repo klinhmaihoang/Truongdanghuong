@@ -4049,6 +4049,7 @@ async function addPointsFromOrder(customerName, phone, amount) {
   await sbPatch('customers',upd,`?id=eq.${c.id}`);
   Object.assign(c,upd);
   renderCustomers();
+  gsSend({sheet:'KhachHang',rows:gsCustomers(),time:nowDT()});
 }
 
 async function addCustomer(){
@@ -6077,6 +6078,8 @@ async function gsSyncAll(){
   try{
     await gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
     await new Promise(r=>setTimeout(r,800));
+    await gsSend({sheet:'KhachHang',rows:gsCustomers(),time:nowDT()});
+    await new Promise(r=>setTimeout(r,800));
     await gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
     await new Promise(r=>setTimeout(r,800));
     for(const o of D.orders){
@@ -6145,6 +6148,31 @@ function gsStudents(){
       paid1:s.paid1?'Đã thu':'Chưa thu',paid1_at:s.paid1_at||'',
       paid2:s.paid2?'Đã thu':'Chưa thu',paid2_at:s.paid2_at||'',
       note:s.note||''
+    };
+  });
+}
+
+function gsCustomers(){
+  return D.customers.map(c=>{
+    const lv = custLevel(c.points||0);
+    return {
+      id:        c.id,
+      name:      c.name||'',
+      phone:     c.phone||'',
+      email:     c.email||'',
+      gender:    c.gender||'',
+      birthday:  c.birthday||'',
+      address:   c.address||'',
+      source:    c.source||'',
+      segment:   c.segment||'',
+      tags:      c.tags||'',
+      points:    c.points||0,
+      level:     lv.label,
+      total_spent: c.total_spent||0,
+      visit_count: c.visit_count||0,
+      last_visit:  c.last_visit||'',
+      note:        c.note||'',
+      created_at:  c.created_at ? new Date(c.created_at).toLocaleDateString('vi-VN') : ''
     };
   });
 }
