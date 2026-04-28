@@ -1729,6 +1729,16 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       </div>
     </div>
     <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="thu-note" placeholder="VD: Thu học phí Nguyễn Văn A..."/></div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>📎 Ảnh chứng từ (tùy chọn)</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label style="cursor:pointer;padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px">
+          📷 Chọn ảnh <input type="file" id="thu-img" accept="image/*" style="display:none" onchange="previewReceipt('thu')"/>
+        </label>
+        <span id="thu-img-name" style="font-size:11px;color:var(--muted)"></span>
+      </div>
+      <img id="thu-img-preview" style="display:none;max-width:100%;max-height:150px;margin-top:8px;border-radius:8px;border:1px solid var(--border)"/>
+    </div>
     <div class="btn-group">
       <button class="btn btn-green btn-sm" onclick="addTransaction('thu')">💾 Lưu phiếu thu</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-thu')">Hủy</button>
@@ -1754,6 +1764,16 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       </div>
     </div>
     <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="chi-note" placeholder="VD: Mua rượu, chanh..."/></div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>📎 Ảnh chứng từ (tùy chọn)</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label style="cursor:pointer;padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px">
+          📷 Chọn ảnh <input type="file" id="chi-img" accept="image/*" style="display:none" onchange="previewReceipt('chi')"/>
+        </label>
+        <span id="chi-img-name" style="font-size:11px;color:var(--muted)"></span>
+      </div>
+      <img id="chi-img-preview" style="display:none;max-width:100%;max-height:150px;margin-top:8px;border-radius:8px;border:1px solid var(--border)"/>
+    </div>
     <div class="btn-group">
       <button class="btn btn-red btn-sm" onclick="addTransaction('chi')">💾 Lưu phiếu chi</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-chi')">Hủy</button>
@@ -2831,6 +2851,16 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
         <span id="im-total-amount" style="font-size:18px;font-weight:800;color:var(--brand)">0₫</span>
       </div>
       <div id="im-payment-note" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
+    </div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>📎 Ảnh chứng từ / hoá đơn NCC (tùy chọn)</label>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <label style="cursor:pointer;padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px">
+          📷 Chọn ảnh <input type="file" id="im-img" accept="image/*" style="display:none" onchange="previewReceipt('im')"/>
+        </label>
+        <span id="im-img-name" style="font-size:11px;color:var(--muted)"></span>
+      </div>
+      <img id="im-img-preview" style="display:none;max-width:100%;max-height:150px;margin-top:8px;border-radius:8px;border:1px solid var(--border)"/>
     </div>
     <div class="btn-group">
       <button class="btn btn-green btn-sm" onclick="importStock()">📥 Nhập kho</button>
@@ -5963,8 +5993,16 @@ async function importStock(){
       D.transactions.unshift(tx);
     }
 
+    // Upload ảnh chứng từ nếu có
+    const imReceiptUrl = await uploadReceipt('im');
+    if(imReceiptUrl && total > 0 && payment !== 'none') {
+      // Gắn URL vào transaction vừa tạo
+      const lastTx = D.transactions[0];
+      if(lastTx) { lastTx.receipt_url = imReceiptUrl; await sbPatch('transactions',{receipt_url:imReceiptUrl},`?id=eq.${lastTx.id}`); }
+    }
     closeM('modal-import');
     ['im-qty','im-sup','im-price','im-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    clearReceiptInput('im');
     document.getElementById('im-total-preview').style.display='none';
     render();
 
@@ -6831,10 +6869,13 @@ function renderFinance(){
       ${t.type==='thu'?'+':'-'}${fmt(t.amount||0)}
     </td>
     <td style="font-size:12px;color:var(--muted)">${t.note||'—'}</td>
-    <td>${t._auto
-      ?`<a href="#" onclick="go('pos',null);posTab('orders',document.getElementById('pos-tab-orders'));return false" style="font-size:11px;color:var(--teal)">Xem đơn</a>`
-      :`<button class="btn btn-ghost btn-sm" style="color:var(--red);font-size:11px" onclick="deleteTransaction('${t.id}')">✕</button>`
-    }</td>
+    <td style="white-space:nowrap">
+      ${t.receipt_url?`<a href="${t.receipt_url}" target="_blank" title="Xem chứng từ" style="font-size:16px;margin-right:4px;text-decoration:none">🖼</a>`:''}
+      ${t._auto
+        ?`<a href="#" onclick="go('pos',null);posTab('orders',document.getElementById('pos-tab-orders'));return false" style="font-size:11px;color:var(--teal)">Xem đơn</a>`
+        :`<button class="btn btn-ghost btn-sm" style="color:var(--red);font-size:11px" onclick="deleteTransaction('${t.id}')">✕</button>`
+      }
+    </td>
   </tr>`).join(''):'<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--muted)">Chưa có giao dịch nào</td></tr>';
 }
 
@@ -6844,6 +6885,8 @@ async function addTransaction(type){
   if(!amount||amount<=0){notify('Nhập số tiền hợp lệ!',false);return;}
   const cat=document.getElementById(type+'-cat').value;
   const note=document.getElementById(type+'-note').value.trim();
+  // Upload ảnh chứng từ nếu có
+  const receiptUrl = await uploadReceipt(type);
   const tx={
     id:'TX'+Date.now(),
     type,
@@ -6851,7 +6894,8 @@ async function addTransaction(type){
     amount,
     note,
     time:nowDT(),
-    created_at:Date.now()
+    created_at:Date.now(),
+    receipt_url: receiptUrl||''
   };
   try{
     await sbUpsert('transactions',tx);
@@ -6859,6 +6903,7 @@ async function addTransaction(type){
     closeM('modal-add-'+type);
     document.getElementById(type+'-amount').value='';
     document.getElementById(type+'-note').value='';
+    clearReceiptInput(type);
     renderFinance();
     notify('✓ Đã lưu phiếu '+(type==='thu'?'thu':'chi')+': '+fmt(amount));
     tgMsg((type==='thu'?'💚 *Phiếu thu*':'🔴 *Phiếu chi*')+'\n\n💰 '+fmt(amount)+'\n📂 '+cat+(note?'\n📝 '+note:'')+'\n🕐 '+nowDT()+'\n\n_Trương Dáng Hương Academy_');
@@ -10565,6 +10610,7 @@ async function runMigration() {
     `ALTER TABLE products ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT ''`,
     // app_users
     `CREATE TABLE IF NOT EXISTS app_users (username TEXT PRIMARY KEY, pass_hash TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW())`,
+    `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS receipt_url TEXT DEFAULT ''`,
     `ALTER TABLE app_users ENABLE ROW LEVEL SECURITY`,
     // nvl_orders
     `CREATE TABLE IF NOT EXISTS nvl_orders (id TEXT PRIMARY KEY, customer TEXT, phone TEXT DEFAULT '', address TEXT DEFAULT '', items JSONB DEFAULT '[]', total NUMERIC DEFAULT 0, paid NUMERIC DEFAULT 0, status TEXT DEFAULT 'Chờ xác nhận', delivery_date TEXT, note TEXT, created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())*1000)`,
@@ -11164,6 +11210,83 @@ async function syncBaoCao() {
     await gsSend({sheet:'BaoCaoLaiLo', rows, time:nowDT()});
     notify('✅ Đã sync báo cáo lãi lỗ lên Google Sheets!');
   } catch(e) { notify('Lỗi: '+e.message, false); }
+}
+
+
+// ══════════════════════════════════════════════════
+// UPLOAD ẢNH CHỨNG TỪ — SUPABASE STORAGE
+// ══════════════════════════════════════════════════
+function previewReceipt(prefix) {
+  const file = document.getElementById(prefix+'-img')?.files?.[0];
+  if(!file) return;
+  const nameEl = document.getElementById(prefix+'-img-name');
+  const prevEl = document.getElementById(prefix+'-img-preview');
+  if(nameEl) nameEl.textContent = file.name + ' (' + (file.size/1024).toFixed(0) + 'KB)';
+  if(prevEl) {
+    const reader = new FileReader();
+    reader.onload = e => { prevEl.src = e.target.result; prevEl.style.display = 'block'; };
+    reader.readAsDataURL(file);
+  }
+}
+
+async function uploadReceipt(prefix) {
+  const fileInput = document.getElementById(prefix+'-img');
+  const file = fileInput?.files?.[0];
+  if(!file) return null;
+
+  // Resize nếu ảnh quá lớn (> 2MB)
+  const maxSize = 2 * 1024 * 1024;
+  let uploadFile = file;
+  if(file.size > maxSize) {
+    uploadFile = await resizeImage(file, 1200);
+  }
+
+  const ext = file.name.split('.').pop().toLowerCase();
+  const fileName = `receipts/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+
+  try {
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/receipts/${fileName}`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': uploadFile.type,
+        'x-upsert': 'true'
+      },
+      body: uploadFile
+    });
+    if(!res.ok) { console.warn('Upload receipt failed:', await res.text()); return null; }
+    return `${SUPABASE_URL}/storage/v1/object/public/receipts/${fileName}`;
+  } catch(e) {
+    console.warn('Upload receipt error:', e.message);
+    return null;
+  }
+}
+
+function resizeImage(file, maxWidth) {
+  return new Promise(resolve => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const ratio = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width  = img.width  * ratio;
+      canvas.height = img.height * ratio;
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(blob => resolve(new File([blob], file.name, {type:'image/jpeg'})), 'image/jpeg', 0.85);
+      URL.revokeObjectURL(url);
+    };
+    img.src = url;
+  });
+}
+
+function clearReceiptInput(prefix) {
+  const fi = document.getElementById(prefix+'-img');
+  const nm = document.getElementById(prefix+'-img-name');
+  const pv = document.getElementById(prefix+'-img-preview');
+  if(fi) fi.value = '';
+  if(nm) nm.textContent = '';
+  if(pv) { pv.src=''; pv.style.display='none'; }
 }
 
 boot();
