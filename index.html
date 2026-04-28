@@ -10703,7 +10703,7 @@ const TRACKING_CODE_PROVIDERS = [
   { name:'GHTK',           pattern:/^S\d{8,}/,    url: code=>`https://khachhang.giaohangtietkiem.vn/don-hang/${code}` },
   { name:'J&T',            pattern:/^JT\d+/i,     url: code=>`https://www.jtexpress.vn/index/query/gzquery.html?bills=${code}` },
   { name:'Viettel Post',   pattern:/^VP\d+/i,     url: code=>`https://viettelpost.com.vn/tra-cuu-hanh-trinh-buu-gui/?peopleTracking=${code}` },
-  { name:'Shopee Express', pattern:/^SPX/i,       url: code=>`https://spx.vn/tracking?tracking_id=${code}` },
+  { name:'Shopee Express', pattern:/^SPX/i,       url: code=>`https://spx.vn/#/?bill_id=${code}` },
   { name:'Ninja Van',      pattern:/^NVVN/i,      url: code=>`https://www.ninjavan.co/vi-vn/tracking?id=${code}` },
   { name:'Grab Express',   pattern:/^GXP|^GRB/i,  url: code=>`https://food.grab.com/` },
 ];
