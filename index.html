@@ -425,12 +425,14 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
         <div class="fg"><label>Phương thức giao hàng</label>
           <select id="c-shipping">
             <option value="Khách tới lấy">🏪 Khách tới lấy</option>
-            <option value="Book ship">🛵 Book ship</option>
-            <option value="Chành xe">🚛 Chành xe</option>
-            <option value="Giao hàng nhanh">⚡ Giao hàng nhanh</option>
-            <option value="Giao hàng tiết kiệm">💰 Giao hàng tiết kiệm</option>
-            <option value="J&T Express">📮 J&T Express</option>
+            <option value="Grab Express">🟢 Grab Express</option>
+            <option value="GHN">🔴 GHN</option>
+            <option value="GHTK">🟠 GHTK</option>
+            <option value="Shopee Express">🟠 Shopee Express</option>
+            <option value="J&T Express">🔵 J&T Express</option>
             <option value="Viettel Post">📬 Viettel Post</option>
+            <option value="Chành xe">🚛 Chành xe</option>
+            <option value="Tự giao">🛵 Tự giao</option>
           </select>
         </div>
       </div>
@@ -450,6 +452,10 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
         <div style="display:flex;justify-content:space-between;font-weight:700;color:var(--brand);margin-top:4px;padding-top:4px;border-top:1px solid var(--border)"><span>Tổng thanh toán:</span><span id="cs-total-final">0đ</span></div>
       </div>
       <div class="fg" style="margin-bottom:10px"><label>Ghi chú</label><input id="c-note" placeholder="Ghi chú..."/></div>
+      <div class="fg" style="margin-bottom:10px" id="c-tracking-code-wrap">
+        <label>📦 Mã vận đơn <span style="font-size:10px;color:var(--muted)">(nếu đã book ship)</span></label>
+        <input id="c-tracking-code" placeholder="VD: GHN123456789, SPX0987654..."/>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px">
         <button class="btn btn-ghost" style="padding:10px;font-size:13px" onclick="saveDraft()">💾 Lưu đơn tạm</button>
         <button class="btn" style="padding:10px;font-size:13px" onclick="checkout()">🔄 Tạo QR &amp; Thu tiền</button>
@@ -1533,6 +1539,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
           <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Thanh toán / Giao hàng</div>
           <div style="font-size:12px" id="od-payment-view"></div>
           <div style="font-size:12px;margin-top:3px" id="od-payment-method-view"></div>
+          <div id="od-tracking-code-view" style="display:none;margin-top:5px"></div>
           <div style="font-size:12px;color:var(--muted)" id="od-address-view"></div>
         </div>
       </div>
@@ -1620,15 +1627,28 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
         <div class="fg">
           <label>🚚 Giao hàng</label>
           <select id="od-edit-shipping" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;outline:none;width:100%">
+            <option value="Khách tới lấy">🏪 Khách tới lấy</option>
             <option value="Grab Express">🟢 Grab Express</option>
             <option value="GHN">🔴 GHN</option>
             <option value="GHTK">🟠 GHTK</option>
+            <option value="Shopee Express">🟠 Shopee Express</option>
             <option value="J&T">🔵 J&T Express</option>
             <option value="Viettel Post">🔴 Viettel Post</option>
-            <option value="Khách tới lấy">🏪 Khách tới lấy</option>
+            <option value="Chành xe">🚛 Chành xe</option>
             <option value="Tự giao">🛵 Tự giao</option>
           </select>
         </div>
+      </div>
+      <!-- Mã vận đơn -->
+      <div class="fg" style="margin-bottom:10px">
+        <label>📦 Mã vận đơn (tracking code)</label>
+        <div style="display:flex;gap:7px;align-items:center">
+          <input id="od-edit-tracking-code" placeholder="VD: GHN123456789, SPX0987654..." oninput="odTrackingCodeChange()"
+            style="flex:1;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none"/>
+          <button id="od-tracking-code-btn" onclick="odOpenTrackingCode()" style="display:none"
+            class="btn btn-ghost btn-sm" style="color:var(--teal);border-color:var(--teal);flex-shrink:0">🔗 Tra cứu</button>
+        </div>
+        <div id="od-tracking-code-hint" style="font-size:11px;color:var(--muted);margin-top:3px"></div>
       </div>
       <!-- Hướng dẫn theo payment method -->
       <div id="od-payment-guide" style="display:none;margin-bottom:10px;font-size:12px;border-radius:8px;padding:8px 12px"></div>
@@ -3814,7 +3834,7 @@ function openCustomerDetail(id) {
       return `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
         <div style="flex:1">
           <div style="font-weight:700;font-size:13px">${o.id}</div>
-          <div style="font-size:11px;color:var(--muted)">${o.items}</div>
+          <div style="font-size:11px;color:var(--muted)">${cleanItems(o.items)}</div>
           <div style="font-size:11px;color:var(--muted)">${o.time||''}</div>
         </div>
         <div style="text-align:right;flex-shrink:0">
@@ -4025,7 +4045,7 @@ function openCustomerDetail(id){
     ${c.note?`<div class="guide" style="margin-bottom:12px">📝 ${c.note}</div>`:''}
     <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Lịch sử mua gần đây</div>
     ${history.length?history.map(o=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
-      <span>${o.items}</span><span style="color:var(--brand);font-weight:700">${fmt(o.total)}</span>
+      <span>${cleanItems(o.items)}</span><span style="color:var(--brand);font-weight:700">${fmt(o.total)}</span>
     </div>`).join(''):'<div style="color:var(--muted);font-size:12px">Chưa có lịch sử</div>'}`;
   showM('modal-customer-detail');
 }
@@ -5273,7 +5293,7 @@ async function checkout(){
   const note=noteRaw?extraNote+' | '+noteRaw:extraNote;
   invoice={id,name,phone:document.getElementById('c-phone')?.value?.trim()||'',
     email:'',note,total,items,time:nowDT(),
-    address,payment,shipping,discount,discountAmt,ship_fee:shipFee,vatPct,vatAmt,subtotal};
+    address,payment,shipping,discount,discountAmt,ship_fee:shipFee,tracking_code:document.getElementById('c-tracking-code')?.value?.trim()||'',vatPct,vatAmt,subtotal};
   const bankId=cfg.bankId||'VCB';
   const accNo=cfg.bankAcc||'';
   const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
@@ -5292,7 +5312,7 @@ async function checkout(){
   // Lưu đơn chờ
   const phone_val=document.getElementById('c-phone')?.value?.trim()||'';
   const pendingOrder={id,customer:name,phone:phone_val,email:'',items,total,time:nowDT(),note,status:'Chờ xác nhận',
-    address,payment,shipping,discount,ship_fee:shipFee2||0,subtotal,tracking_url:'',created_at:Date.now()};
+    address,payment,shipping,discount,ship_fee:shipFee2||0,tracking_code:document.getElementById('c-tracking-code')?.value?.trim()||'',subtotal,tracking_url:'',created_at:Date.now()};
   await sbUpsert('orders',pendingOrder);
   D.orders.push(pendingOrder);
   showM('modal-qr');
@@ -5360,7 +5380,7 @@ function filterOrders(){
     elR.innerHTML=retailFiltered.slice().reverse().map(o=>`<tr>
       <td style="font-weight:700;color:var(--brand)">${o.id}</td>
       <td>${o.customer}</td>
-      <td style="font-size:12px;color:var(--muted)">${o.items}</td>
+      <td style="font-size:12px;color:var(--muted)">${cleanItems(o.items)}</td>
       <td style="font-weight:700">${fmt(o.total||0)}</td>
       <td style="font-size:12px;color:var(--muted)">${o.time}</td>
       <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':'t-pending'}">${o.status}</span></td>
@@ -5372,7 +5392,7 @@ function filterOrders(){
     elA.innerHTML=filtered.slice().reverse().map(o=>`<tr>
       <td style="font-weight:700;color:var(--brand)">${o.id}</td>
       <td>${o.customer}</td>
-      <td style="font-size:12px;color:var(--muted)">${o.items}</td>
+      <td style="font-size:12px;color:var(--muted)">${cleanItems(o.items)}</td>
       <td style="font-weight:700">${fmt(o.total||0)}</td>
       <td style="font-size:12px;color:var(--muted)">${o.time}</td>
       <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':o.status==='Chờ thanh toán'?'t-pending':'t-done'}">${o.status}</span></td>
@@ -5426,7 +5446,7 @@ function renderOrders(){
   if(elR) elR.innerHTML=retailOrders.filter(o=>o.status!=='Chờ thanh toán').slice().reverse().map(o=>`<tr>
     <td style="font-weight:700;color:var(--brand)">${o.id}</td>
     <td>${o.customer}</td>
-    <td style="font-size:12px;color:var(--muted)">${o.items}</td>
+    <td style="font-size:12px;color:var(--muted)">${cleanItems(o.items)}</td>
     <td style="font-weight:700">${fmt(o.total||0)}</td>
     <td style="font-size:12px;color:var(--muted)">${o.time}</td>
     <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':'t-pending'}">${o.status}</span></td>
@@ -5441,7 +5461,7 @@ function renderOrders(){
   if(elT) elT.innerHTML=tuitionOrders.slice().reverse().map(o=>`<tr>
     <td style="font-weight:700;color:var(--brand)">${o.id}</td>
     <td>${o.customer}</td>
-    <td style="font-size:12px;color:var(--muted)">${o.items}</td>
+    <td style="font-size:12px;color:var(--muted)">${cleanItems(o.items)}</td>
     <td style="font-weight:700;color:var(--green)">${fmt(o.total||0)}</td>
     <td style="font-size:12px;color:var(--muted)">${o.time}</td>
     <td><span class="tag t-paid">${o.status}</span></td>
@@ -5452,7 +5472,7 @@ function renderOrders(){
   if(elA) elA.innerHTML=D.orders.filter(o=>o.status!=='Đã hủy').slice().reverse().map(o=>`<tr>
     <td style="font-weight:700;color:var(--brand)">${o.id}</td>
     <td>${o.customer}</td>
-    <td style="font-size:12px;color:var(--muted)">${o.items}</td>
+    <td style="font-size:12px;color:var(--muted)">${cleanItems(o.items)}</td>
     <td style="font-weight:700">${fmt(o.total||0)}</td>
     <td style="font-size:12px;color:var(--muted)">${o.time}</td>
     <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':o.status==='Chờ thanh toán'?'t-pending':'t-done'}">${o.status}</span></td>
@@ -5482,7 +5502,7 @@ function renderPendingOrders(){
     return`<tr style="${isLong?'background:rgba(230,126,34,.05)':''}">
       <td style="font-weight:700;color:var(--orange)">${o.id}</td>
       <td><strong>${o.customer}</strong></td>
-      <td style="font-size:12px;color:var(--muted)">${o.items}</td>
+      <td style="font-size:12px;color:var(--muted)">${cleanItems(o.items)}</td>
       <td style="font-weight:700;color:var(--orange)">${fmt(o.total||0)}</td>
       <td style="font-size:11px;color:${isLong?'var(--red)':'var(--muted)'}">
         ${waitLabel}
@@ -5540,7 +5560,7 @@ async function saveDraft(){
   const note=document.getElementById('c-note')?.value?.trim()||'';
   const order_phone=document.getElementById('c-phone')?.value?.trim()||'';
   const order={id,customer:name,phone:order_phone,email:'',items,total,time:nowDT(),note,status:'Chờ xác nhận',
-    address,payment,shipping,discount,ship_fee:shipFee2||0,subtotal,tracking_url:'',created_at:Date.now()};
+    address,payment,shipping,discount,ship_fee:shipFee2||0,tracking_code:document.getElementById('c-tracking-code')?.value?.trim()||'',subtotal,tracking_url:'',created_at:Date.now()};
   try{
     await sbUpsert('orders',order);
     D.orders.push(order);
@@ -9760,6 +9780,18 @@ function showOrderDetail(id) {
       payMethodEl.innerHTML = '<span style="color:#2980b9;font-weight:700;font-size:12px">🏦 Chuyển khoản trước</span>';
     } else { payMethodEl.textContent=''; }
   }
+  // Tracking code
+  const tcEl = document.getElementById('od-tracking-code-view');
+  if(tcEl) {
+    if(o.tracking_code) {
+      const prov = odGetTrackingProvider ? odGetTrackingProvider(o.tracking_code) : null;
+      const url  = prov?.url ? prov.url(o.tracking_code) : null;
+      tcEl.style.display = '';
+      tcEl.innerHTML = `<span style="font-size:12px;font-weight:600">📦 ${o.tracking_code}</span>
+        ${prov&&prov.name!=='Khác'?`<span style="font-size:10px;color:var(--muted);margin-left:5px">(${prov.name})</span>`:''}
+        ${url?`<button onclick="window.open('${url}','_blank')" class="btn btn-ghost btn-sm" style="font-size:10px;padding:2px 8px;margin-left:6px;color:var(--teal)">🔍 Tra cứu</button>`:''}`;
+    } else { tcEl.style.display='none'; }
+  }
   const addrEl = document.getElementById('od-address-view');
   addrEl.textContent = o.address||'';
   addrEl.style.display = o.address?'':'none';
@@ -9833,6 +9865,8 @@ function odEnterEdit() {
   document.getElementById('od-edit-discount').value = o.discount||'';
   const shipFeeEl = document.getElementById('od-edit-ship-fee');
   if(shipFeeEl) shipFeeEl.value = o.ship_fee||'';
+  const trackCodeEl = document.getElementById('od-edit-tracking-code');
+  if(trackCodeEl) { trackCodeEl.value = o.tracking_code||''; odTrackingCodeChange(); }
   document.getElementById('od-edit-note').value     = o.note||'';
   // Map legacy status → new status options
   const legacyStatusMap = {'Chờ thanh toán':'Chờ thu tiền','Đã lên đơn':'Chờ xác nhận','Chờ lấy hàng':'Đã book ship'};
@@ -10000,6 +10034,7 @@ async function odSaveEdit() {
     shipping: document.getElementById('od-edit-shipping')?.value||o.shipping||'',
     discount: disc,
     ship_fee: shipFee,
+    tracking_code: document.getElementById('od-edit-tracking-code')?.value?.trim()||'',
     subtotal,
     total,
     status:   newStatus,
@@ -10646,6 +10681,45 @@ function parseItemStr(s) {
     : (prod?.price||0) * qty;
   const unitPrice = qty>0 && lineTotal>0 ? Math.round(lineTotal/qty) : (prod?.price||0);
   return { name, qty, unit, prod, lineTotal, unitPrice, savedSubtotal };
+}
+
+// ── TRACKING CODE (mã vận đơn) ────────────────────────────────
+const TRACKING_CODE_PROVIDERS = [
+  { name:'GHN',            pattern:/^GHN/i,       url: code=>`https://donhang.ghn.vn/?id=${code}` },
+  { name:'GHTK',           pattern:/^S\d{8,}/,    url: code=>`https://khachhang.giaohangtietkiem.vn/don-hang/${code}` },
+  { name:'J&T',            pattern:/^JT\d+/i,     url: code=>`https://www.jtexpress.vn/index/query/gzquery.html?bills=${code}` },
+  { name:'Viettel Post',   pattern:/^VP\d+/i,     url: code=>`https://viettelpost.com.vn/tra-cuu-hanh-trinh-buu-gui/?peopleTracking=${code}` },
+  { name:'Shopee Express', pattern:/^SPX/i,       url: code=>`https://spx.vn/tracking?tracking_id=${code}` },
+  { name:'Ninja Van',      pattern:/^NVVN/i,      url: code=>`https://www.ninjavan.co/vi-vn/tracking?id=${code}` },
+  { name:'Grab Express',   pattern:/^GXP|^GRB/i,  url: code=>`https://food.grab.com/` },
+];
+
+function odGetTrackingProvider(code) {
+  if(!code) return null;
+  return TRACKING_CODE_PROVIDERS.find(p=>p.pattern.test(code)) || {name:'Khác', url:()=>null};
+}
+
+function odTrackingCodeChange() {
+  const code = (document.getElementById('od-edit-tracking-code')?.value||'').trim();
+  const hint = document.getElementById('od-tracking-code-hint');
+  const btn  = document.getElementById('od-tracking-code-btn');
+  if(!code) { if(hint) hint.textContent=''; if(btn) btn.style.display='none'; return; }
+  const prov = odGetTrackingProvider(code);
+  if(hint) hint.textContent = prov && prov.name!=='Khác' ? `✅ Nhận dạng: ${prov.name}` : '📦 Mã vận đơn đã nhập';
+  if(btn)  btn.style.display = prov?.url(code) ? '' : 'none';
+}
+
+function odOpenTrackingCode() {
+  const code = (document.getElementById('od-edit-tracking-code')?.value||'').trim();
+  const prov = odGetTrackingProvider(code);
+  const url  = prov?.url(code);
+  if(url) window.open(url, '_blank');
+}
+
+function cleanItems(items) {
+  return (items||'').split(',').map(s=>
+    s.trim().replace(/\s*@\d+\s*$/,'')
+  ).join(', ');
 }
 
 boot();
