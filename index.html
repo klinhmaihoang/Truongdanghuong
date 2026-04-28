@@ -671,7 +671,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
         <span class="card-title">Danh sách hàng hóa &amp; giá bán</span>
         <button class="btn btn-sm" onclick="showM('modal-add-product')">+ Thêm sản phẩm</button>
       </div>
-      <table><thead><tr><th>Icon</th><th>Tên sản phẩm</th><th>Giá bán (₫)</th><th class="hide-mobile">Giá nhập (₫)</th><th class="hide-mobile">Lợi nhuận</th><th class="hide-mobile">Nguyên liệu</th><th class="hide-mobile">Mức dùng/lần</th><th></th></tr></thead>
+      <table><thead><tr><th>Icon</th><th>Tên sản phẩm</th><th>Giá bán (₫)</th><th class="hide-mobile">Giá nhập (₫)</th><th class="hide-mobile">Lợi nhuận</th><th class="hide-mobile">Nguyên liệu</th><th class="hide-mobile">Đơn vị tính</th><th></th></tr></thead>
       <tbody id="product-list"></tbody></table>
     </div>
   </div><!-- /inv-panel-products -->
@@ -3151,7 +3151,7 @@ async function boot(){
 
     D.students = students||[];
     D.inventory = inventory&&inventory.length ? inventory : DEFAULTS.inventory;
-    D.products  = products&&products.length  ? products  : DEFAULTS.products;
+    D.products  = (products&&products.length ? products : DEFAULTS.products).map(p=>({unit:'', ...p}));
     D.orders    = orders||[];
     D.stockLog  = stockLog||[];
     D.recipes   = recipes||[];
@@ -4936,18 +4936,38 @@ function renderProductList(){
     const profitColor=profit===null?'var(--muted)':profit>0?'var(--teal)':'var(--red)';
     return`<tr>
       <td style="font-size:22px">${p.icon||'📦'}</td>
-      <td><strong>${p.name}</strong>${p.unit?`<span style="font-size:10px;color:var(--muted);margin-left:5px">/${p.unit}</span>`:''}</td>
+      <td><strong>${p.name}</strong></td>
       <td style="color:var(--gold2);font-weight:700">${fmt(p.price)}</td>
       <td class="hide-mobile" style="font-weight:600">${cost>0?fmt(cost):'<span style="color:var(--muted)">—</span>'}</td>
       <td class="hide-mobile" style="font-weight:700;color:${profitColor}">${profit===null?'—':fmt(profit)}</td>
       <td class="hide-mobile" style="font-size:12px;color:var(--muted)">${mat?mat.name:'—'}</td>
-      <td class="hide-mobile" style="font-size:12px;color:var(--muted)">${mat&&p.mat_use?p.mat_use+' '+mat.unit+'/lần':'—'}</td>
+      <td class="hide-mobile">
+        <select onchange="saveProductUnit('${p.id}',this.value)"
+          style="border:1.5px solid ${p.unit?'var(--teal)':'var(--border)'};border-radius:6px;padding:3px 6px;font-size:11px;font-family:inherit;background:#fff;outline:none;color:${p.unit?'var(--teal)':'var(--muted)'}">
+          <option value="">— ĐVT —</option>
+          ${['hộp','gói','kg','g','lít','ml','chai','túi','lon','thùng','cái','ly','phần'].map(u=>`<option value="${u}" ${p.unit===u?'selected':''}>${u}</option>`).join('')}
+        </select>
+      </td>
       <td class="btn-group" style="gap:5px">
         <button class="btn btn-ghost btn-sm" onclick="openEditProd('${p.id}')">✏️ Sửa</button>
         <button class="btn btn-ghost btn-sm" onclick="openRecipe('${p.id}')">🧪 Công thức</button>
       </td>
     </tr>`;
   }).join('');
+}
+
+async function saveProductUnit(id, unit) {
+  const p = D.products.find(x=>x.id===id); if(!p) return;
+  p.unit = unit;
+  try {
+    await sbPatch('products', {unit}, `?id=eq.${id}`);
+    notify(unit ? `✅ Đã lưu đơn vị "${unit}" cho ${p.name}` : `Đã xóa đơn vị cho ${p.name}`);
+    renderProductList();
+  } catch(e) {
+    // Nếu lỗi column not found → thử upsert toàn bộ
+    try { await sbUpsert('products', p); notify(`✅ Đã lưu đơn vị "${unit}" cho ${p.name}`); }
+    catch(e2) { notify('Lỗi lưu: cần chạy SQL migration trong Cài đặt', false); }
+  }
 }
 
 function openEditProd(id){
