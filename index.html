@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="vi">
 <head>
@@ -710,11 +709,25 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <button class="btn btn-excel btn-sm" onclick="xlExport('finance')">📊 Excel</button>
   </div>
   <div class="card">
-    <div class="card-head">
+    <div class="card-head" style="flex-wrap:wrap;gap:8px">
       <span class="card-title" id="fin-table-title">Tất cả giao dịch</span>
-      <select id="fin-month-sel" onchange="renderFinance()" style="padding:5px 8px;border-radius:6px;border:1px solid var(--border);font-size:12px;font-family:inherit;background:var(--bg2)">
-        <option value="">Tất cả tháng</option>
-      </select>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <!-- Quick filter buttons -->
+        <div style="display:flex;gap:4px">
+          <button id="fin-quick-today" class="btn btn-ghost btn-sm" onclick="finQuickFilter('today',this)" style="font-size:11px;padding:4px 8px">Hôm nay</button>
+          <button id="fin-quick-week" class="btn btn-ghost btn-sm" onclick="finQuickFilter('week',this)" style="font-size:11px;padding:4px 8px">7 ngày</button>
+          <button id="fin-quick-month" class="btn btn-ghost btn-sm" onclick="finQuickFilter('month',this)" style="font-size:11px;padding:4px 8px">Tháng này</button>
+          <button id="fin-quick-all" class="btn btn-sm" onclick="finQuickFilter('all',this)" style="font-size:11px;padding:4px 8px">Tất cả</button>
+        </div>
+        <!-- Date range -->
+        <input type="date" id="fin-date-from" onchange="finDateFilter()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit"/>
+        <span style="font-size:12px;color:var(--muted)">→</span>
+        <input type="date" id="fin-date-to" onchange="finDateFilter()" style="padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-size:12px;font-family:inherit"/>
+        <!-- Month selector (fallback) -->
+        <select id="fin-month-sel" onchange="finMonthFilter()" style="padding:4px 8px;border-radius:6px;border:1px solid var(--border);font-size:12px;font-family:inherit;background:var(--bg2)">
+          <option value="">— Chọn tháng —</option>
+        </select>
+      </div>
     </div>
     <table><thead><tr><th>Thời gian</th><th>Loại</th><th>Danh mục</th><th>Số tiền</th><th>Ghi chú</th><th></th></tr></thead>
     <tbody id="fin-list"></tbody></table>
@@ -6674,30 +6687,104 @@ function getMonthKey(timeStr){
   return '';
 }
 
-function renderFinance(){
-  if(!D.transactions) return; // Chưa load xong
-  const monthSel=document.getElementById('fin-month-sel');
+// ── Finance filter state ──────────────────────
+let _finDateFrom = '', _finDateTo = '';
 
-  // Tổng hợp auto txs + manual txs
-  const curMonth=monthSel?.value||'';
-  const autoTxs=buildAutoTxs(curMonth)||[];
-  const manualTxs=(D.transactions||[]).filter(t=>{
-    if(curMonth) return getMonthKey(t.time)===curMonth;
+function finQuickFilter(mode, btn) {
+  document.querySelectorAll('[id^="fin-quick-"]').forEach(b=>b.className='btn btn-ghost btn-sm');
+  if(btn) btn.className = 'btn btn-sm';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const fmt8 = d => d.toISOString().slice(0,10);
+  const fromEl = document.getElementById('fin-date-from');
+  const toEl   = document.getElementById('fin-date-to');
+  const monthSel = document.getElementById('fin-month-sel');
+  if(monthSel) monthSel.value = '';
+  if(mode==='today') {
+    _finDateFrom = _finDateTo = fmt8(today);
+  } else if(mode==='week') {
+    const from = new Date(today); from.setDate(today.getDate()-6);
+    _finDateFrom = fmt8(from); _finDateTo = fmt8(today);
+  } else if(mode==='month') {
+    const from = new Date(today.getFullYear(), today.getMonth(), 1);
+    _finDateFrom = fmt8(from); _finDateTo = fmt8(today);
+  } else {
+    _finDateFrom = _finDateTo = '';
+  }
+  if(fromEl) fromEl.value = _finDateFrom;
+  if(toEl)   toEl.value   = _finDateTo;
+  renderFinance();
+}
+
+function finDateFilter() {
+  _finDateFrom = document.getElementById('fin-date-from')?.value||'';
+  _finDateTo   = document.getElementById('fin-date-to')?.value||'';
+  // Clear quick buttons and month selector
+  document.querySelectorAll('[id^="fin-quick-"]').forEach(b=>b.className='btn btn-ghost btn-sm');
+  const monthSel = document.getElementById('fin-month-sel');
+  if(monthSel) monthSel.value = '';
+  renderFinance();
+}
+
+function finMonthFilter() {
+  // Clear date range when month selected
+  _finDateFrom = _finDateTo = '';
+  const fromEl = document.getElementById('fin-date-from');
+  const toEl   = document.getElementById('fin-date-to');
+  if(fromEl) fromEl.value = '';
+  if(toEl)   toEl.value   = '';
+  document.querySelectorAll('[id^="fin-quick-"]').forEach(b=>b.className='btn btn-ghost btn-sm');
+  renderFinance();
+}
+
+function txMatchesFilter(t) {
+  const timeStr = t.time||'';
+  // Date range filter
+  if(_finDateFrom || _finDateTo) {
+    // Parse DD/MM/YYYY HH:mm
+    let txDate = null;
+    const m1 = timeStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if(m1) txDate = new Date(+m1[3], +m1[2]-1, +m1[1]);
+    else {
+      const m2 = timeStr.match(/(\d{4})-(\d{2})-(\d{2})/);
+      if(m2) txDate = new Date(+m2[1], +m2[2]-1, +m2[3]);
+    }
+    if(!txDate) return false;
+    txDate.setHours(0,0,0,0);
+    if(_finDateFrom) { const f=new Date(_finDateFrom); if(txDate<f) return false; }
+    if(_finDateTo)   { const t2=new Date(_finDateTo);  t2.setHours(23,59,59,999); if(txDate>t2) return false; }
     return true;
-  });
+  }
+  // Month filter
+  const curMonth = document.getElementById('fin-month-sel')?.value||'';
+  if(curMonth) return getMonthKey(timeStr)===curMonth;
+  return true;
+}
 
-  // Populate months từ cả 2 nguồn
+function renderFinance(){
+  if(!D.transactions) return;
+  const monthSel=document.getElementById('fin-month-sel');
+  const curMonth=monthSel?.value||'';
+
+  // Build filter func
+  const filterFn = _finDateFrom||_finDateTo ? (t=>txMatchesFilter(t)) :
+                   curMonth ? (t=>getMonthKey(t.time)===curMonth) : ()=>true;
+
+  const autoTxs=buildAutoTxs(curMonth&&!_finDateFrom&&!_finDateTo?curMonth:'')||[];
+  const autoFiltered = (_finDateFrom||_finDateTo) ? autoTxs.filter(filterFn) : autoTxs;
+  const manualTxs=(D.transactions||[]).filter(filterFn);
+
+  // Populate months dropdown
   const allTimes=[...D.transactions.map(t=>t.time),...D.orders.map(o=>o.time)];
   const months=[...new Set(allTimes.map(t=>getMonthKey(t)).filter(Boolean))].sort().reverse();
   if(monthSel){
-    monthSel.innerHTML='<option value="">Tất cả tháng</option>'+months.map(m=>{
+    monthSel.innerHTML='<option value="">— Chọn tháng —</option>'+months.map(m=>{
       const [y,mo]=m.split('-');
       return`<option value="${m}" ${m===curMonth?'selected':''}>Tháng ${+mo}/${y}</option>`;
     }).join('');
   }
 
   // Gộp và lọc theo tab
-  let allTxs=([...autoTxs,...manualTxs]||[]).sort((a,b)=>(b.time||'').localeCompare(a.time||''));
+  let allTxs=([...autoFiltered,...manualTxs]||[]).sort((a,b)=>(b.time||'').localeCompare(a.time||''));
   let txs=[...allTxs];
   if(finFilter==='thu') txs=allTxs.filter(t=>t.type==='thu');
   if(finFilter==='chi') txs=allTxs.filter(t=>t.type==='chi');
@@ -6761,7 +6848,7 @@ async function addTransaction(type){
     renderFinance();
     notify('✓ Đã lưu phiếu '+(type==='thu'?'thu':'chi')+': '+fmt(amount));
     tgMsg((type==='thu'?'💚 *Phiếu thu*':'🔴 *Phiếu chi*')+'\n\n💰 '+fmt(amount)+'\n📂 '+cat+(note?'\n📝 '+note:'')+'\n🕐 '+nowDT()+'\n\n_Trương Dáng Hương Academy_');
-    gsSend({sheet:'ThuChi',rows:gsThuChi(),time:nowDT()});
+    setTimeout(()=>gsSend({sheet:'ThuChi',rows:gsThuChi(),time:nowDT()}),500);
   }catch(e){notify('Lỗi lưu: '+e.message,false);}
 }
 
