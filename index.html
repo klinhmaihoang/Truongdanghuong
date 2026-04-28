@@ -6687,9 +6687,8 @@ function printRetailPDF(order){
         <td style="text-align:right;padding:3px 0">T.tiền</td>
       </tr>
       ${(()=>{
-        // Parse tất cả items trước để tính catalog total
         const itemList = (order.items||'').split(',').map(s=>s.trim()).filter(Boolean);
-        const parsed = itemList.map(s=>{
+        return itemList.map(s=>{
           const mFull = s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)\s*\(([^)]+)\)$/i);
           const mQty  = s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)$/i);
           let name, qty, unitStr;
@@ -6698,25 +6697,17 @@ function printRetailPDF(order){
           else          { name=s; qty=1; unitStr=''; }
           const prod = D.products.find(p=>p.name===name);
           const unit = unitStr || prod?.unit || '';
-          const catalogPrice = prod?.price || 0;
-          return { name, qty, unit, catalogPrice, lineTotal: catalogPrice * qty };
-        });
-        const catalogTotal = parsed.reduce((s,p)=>s+p.lineTotal, 0);
-        const actualTotal  = order.subtotal || order.total || 0;
-        const ratio = (catalogTotal > 0 && Math.abs(catalogTotal - actualTotal) > 100)
-          ? actualTotal / catalogTotal : 1;
-        return parsed.map(({name, qty, unit, catalogPrice, lineTotal})=>{
-          const displayPrice   = ratio !== 1 ? Math.round(lineTotal * ratio / qty) : catalogPrice;
-          const displaySubtotal = displayPrice * qty;
-          const displayQty = Number.isInteger(qty) ? qty : qty.toFixed(2).replace(/\.?0+$/,'');
+          const unitPrice = prod?.price || 0;
+          const lineTotal = Math.round(unitPrice * qty);
+          const displayQty = Number.isInteger(qty) ? qty : +qty.toFixed(2);
           return `<tr style="border-bottom:1px dashed #f0f0f0">
             <td style="padding:5px 0;font-size:11px">
               <div style="font-weight:600">${name}</div>
               ${unit?`<div style="font-size:9px;color:#999">${unit}</div>`:''}
             </td>
             <td style="text-align:center;padding:5px 4px;font-size:11px;color:#555;white-space:nowrap">x${displayQty}</td>
-            <td style="text-align:right;padding:5px 0;font-size:11px;color:#888;white-space:nowrap">${displayPrice>0?fmt(displayPrice):''}</td>
-            <td style="text-align:right;padding:5px 0;font-size:11px;font-weight:700;color:#cc5500;white-space:nowrap">${displaySubtotal>0?fmt(displaySubtotal):''}</td>
+            <td style="text-align:right;padding:5px 0;font-size:11px;color:#888;white-space:nowrap">${unitPrice>0?fmt(unitPrice):''}</td>
+            <td style="text-align:right;padding:5px 0;font-size:11px;font-weight:700;color:#cc5500;white-space:nowrap">${lineTotal>0?fmt(lineTotal):''}</td>
           </tr>`;
         }).join('');
       })()}
@@ -9746,12 +9737,10 @@ function showOrderDetail(id) {
     return {name, qty, unit, prod, lineTotal};
   });
   const actualTotal = o.subtotal || o.total || 0;
-  const ratio = catalogTotal > 0 && Math.abs(catalogTotal - actualTotal) > 100
-    ? actualTotal / catalogTotal : 1;
-  itemsEl.innerHTML = parsedItems.map(({name, qty, unit, prod, lineTotal}) => {
-    const displayQty      = Number.isInteger(qty) ? qty : +qty.toFixed(2);
-    const lineSubtotal    = ratio !== 1 ? Math.round(lineTotal * ratio) : lineTotal;
-    const unitPrice       = qty > 0 ? Math.round(lineSubtotal / qty) : 0;
+  itemsEl.innerHTML = parsedItems.map(({name, qty, unit, prod}) => {
+    const displayQty   = Number.isInteger(qty) ? qty : +qty.toFixed(2);
+    const unitPrice    = prod?.price || 0;
+    const lineSubtotal = Math.round(unitPrice * qty);
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
       <span>
         <span style="font-weight:600">${name}</span>
