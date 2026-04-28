@@ -438,12 +438,15 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
         <div class="fg"><label>Chiết khấu tổng bill (%)</label>
           <input id="c-discount" type="number" min="0" max="100" placeholder="0" oninput="updateCartTotal()"/>
         </div>
-        <div class="fg"></div>
+        <div class="fg"><label>🚚 Phí ship (₫)</label>
+          <input id="c-ship-fee" type="number" min="0" step="1000" placeholder="0" oninput="updateCartTotal()"/>
+        </div>
       </div>
       <!-- Hiển thị tổng sau VAT/chiết khấu -->
       <div id="cart-summary" style="display:none;background:var(--bg2);border-radius:8px;padding:10px 12px;margin:8px 0;font-size:12px">
         <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Tạm tính (đã VAT theo SP):</span><span id="cs-subtotal">0đ</span></div>
         <div style="display:flex;justify-content:space-between" id="cs-discount-row"><span style="color:var(--red)">Chiết khấu tổng bill:</span><span id="cs-discount">0đ</span></div>
+        <div style="display:flex;justify-content:space-between" id="cs-ship-row"><span style="color:var(--teal)">Phí ship:</span><span id="cs-ship">0đ</span></div>
         <div style="display:flex;justify-content:space-between;font-weight:700;color:var(--brand);margin-top:4px;padding-top:4px;border-top:1px solid var(--border)"><span>Tổng thanh toán:</span><span id="cs-total-final">0đ</span></div>
       </div>
       <div class="fg" style="margin-bottom:10px"><label>Ghi chú</label><input id="c-note" placeholder="Ghi chú..."/></div>
@@ -1482,8 +1485,10 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <!-- Summary box -->
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;background:var(--brand-light);border-radius:10px;padding:12px;margin-bottom:14px;text-align:center">
       <div>
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Tổng tiền</div>
-        <div style="font-size:20px;font-weight:800;color:var(--orange)" id="od-total"></div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Tiền hàng</div>
+        <div style="font-size:16px;font-weight:800;color:var(--brown)" id="od-subtotal-display"></div>
+        <div id="od-ship-fee-display" style="display:none;font-size:11px;color:var(--teal);font-weight:600"></div>
+        <div style="font-size:18px;font-weight:800;color:var(--orange)" id="od-total"></div>
       </div>
       <div>
         <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Thời gian</div>
@@ -1576,6 +1581,12 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
           <input id="od-edit-discount" type="number" min="0" max="100" step="1" placeholder="0" oninput="odCalcLive()"/>
         </div>
         <div class="fg">
+          <label>🚚 Phí ship (₫)</label>
+          <input id="od-edit-ship-fee" type="number" min="0" step="1000" placeholder="0" oninput="odCalcLive()"
+            style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;outline:none;width:100%;box-sizing:border-box"/>
+        </div>
+      </div>
+        <div class="fg">
           <label>Trạng thái</label>
           <select id="od-edit-status" onchange="odStatusChange()" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;outline:none">
             <option>Chờ xác nhận</option>
@@ -1634,9 +1645,21 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <div id="od-edit-summary" style="background:var(--brand-light);border-radius:8px;padding:10px 14px;margin-bottom:14px;font-size:13px">
         <div style="display:flex;justify-content:space-between"><span style="color:var(--muted)">Tạm tính</span><span id="od-edit-subtotal" style="font-weight:600"></span></div>
         <div id="od-edit-discount-row" style="display:none;display:flex;justify-content:space-between"><span style="color:var(--muted)">Giảm giá</span><span id="od-edit-discount-amt" style="color:var(--red)"></span></div>
+        <div id="od-edit-ship-row" style="display:none;justify-content:space-between"><span style="color:var(--muted)">Phí ship</span><span id="od-edit-ship-amt" style="color:var(--teal)"></span></div>
         <div style="display:flex;justify-content:space-between;margin-top:6px;padding-top:6px;border-top:1px solid var(--border)">
-          <span style="font-weight:700">Tổng cộng</span>
+          <span style="font-weight:700">Tổng thanh toán</span>
           <span id="od-edit-total" style="font-weight:800;color:var(--orange);font-size:16px"></span>
+        </div>
+      </div>
+      <!-- QR thanh toán preview -->
+      <div id="od-qr-preview" style="display:none;background:#fff;border:1.5px solid rgba(255,140,0,.3);border-radius:10px;padding:12px;margin-bottom:14px;text-align:center">
+        <div style="font-size:11px;font-weight:700;color:var(--brown);margin-bottom:8px">📱 QR thanh toán ngay</div>
+        <img id="od-qr-img" src="" style="width:150px;height:150px;border-radius:8px;border:2px solid var(--brand)" onerror="this.style.display='none'"/>
+        <div style="margin-top:6px;font-size:15px;font-weight:800;color:var(--brand)" id="od-qr-amount"></div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px" id="od-qr-content"></div>
+        <div style="display:flex;gap:6px;justify-content:center;margin-top:8px">
+          <button class="btn btn-sm" style="font-size:11px;padding:4px 12px" onclick="odOpenQR()">🔗 Mở QR</button>
+          <button class="btn btn-ghost btn-sm" style="font-size:11px;padding:4px 12px" onclick="document.getElementById('od-qr-preview').style.display='none'">Ẩn</button>
         </div>
       </div>
       <!-- Quick action: chuyển bước tiếp (nhân viên tự bấm) -->
@@ -5196,19 +5219,25 @@ function updateCartTotal(){
   // Chiết khấu tổng bill
   const discount=Math.min(100,Math.max(0,+document.getElementById('c-discount')?.value||0));
   const discountAmt=Math.round(subtotal*discount/100);
-  const finalTotal=subtotal-discountAmt;
+  // Phí ship
+  const shipFee=Math.max(0,+document.getElementById('c-ship-fee')?.value||0);
+  const finalTotal=subtotal-discountAmt+shipFee;
 
   document.getElementById('cart-total').textContent=fmt(finalTotal);
 
   const sumEl=document.getElementById('cart-summary');
   if(sumEl){
-    const hasExtra=discount>0;
+    const hasExtra=discount>0||shipFee>0;
     sumEl.style.display=hasExtra&&cart.length?'block':'none';
     if(hasExtra){
       document.getElementById('cs-subtotal').textContent=fmt(subtotal);
       const discRow=document.getElementById('cs-discount-row');
       if(discRow) discRow.style.display=discount>0?'flex':'none';
       document.getElementById('cs-discount').textContent='-'+fmt(discountAmt)+' (-'+discount+'%)';
+      const shipRow=document.getElementById('cs-ship-row');
+      if(shipRow) shipRow.style.display=shipFee>0?'flex':'none';
+      const shipEl=document.getElementById('cs-ship');
+      if(shipEl) shipEl.textContent='+'+fmt(shipFee);
       document.getElementById('cs-total-final').textContent=fmt(finalTotal);
     }
   }
@@ -5230,19 +5259,20 @@ async function checkout(){
   const name=document.getElementById('c-name').value.trim()||'Khách lẻ';
   const subtotal=cart.reduce((a,c)=>a+c.price*c.qty,0);
   const discount=Math.min(100,Math.max(0,+document.getElementById('c-discount')?.value||0));
+  const shipFee=Math.max(0,+document.getElementById('c-ship-fee')?.value||0);
   const discountAmt=Math.round(subtotal*discount/100);
-  const total=subtotal-discountAmt;
+  const total=subtotal-discountAmt+shipFee;
   const id='HĐ'+Date.now().toString().slice(-6);
   const items=cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')+(c.unit?' ('+c.unit+')':'')).join(', ');
   const address=document.getElementById('c-address')?.value?.trim()||'';
   const payment=document.getElementById('c-payment')?.value||'Tiền mặt';
   const shipping=document.getElementById('c-shipping')?.value||'Khách tới lấy';
   const noteRaw=document.getElementById('c-note')?.value?.trim()||'';
-  const extraNote=[address?'ĐC: '+address:'',payment,shipping,discount>0?'CK '+discount+'%':'',vatPct>0?'VAT '+vatPct+'%':''].filter(Boolean).join(' | ');
+  const extraNote=[address?'ĐC: '+address:'',payment,shipping,discount>0?'CK '+discount+'%':'',shipFee>0?'Ship '+shipFee.toLocaleString('vi-VN')+'đ':'',vatPct>0?'VAT '+vatPct+'%':''].filter(Boolean).join(' | ');
   const note=noteRaw?extraNote+' | '+noteRaw:extraNote;
   invoice={id,name,phone:document.getElementById('c-phone')?.value?.trim()||'',
     email:'',note,total,items,time:nowDT(),
-    address,payment,shipping,discount,discountAmt,vatPct,vatAmt,subtotal};
+    address,payment,shipping,discount,discountAmt,ship_fee:shipFee,vatPct,vatAmt,subtotal};
   const bankId=cfg.bankId||'VCB';
   const accNo=cfg.bankAcc||'';
   const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
@@ -5261,7 +5291,7 @@ async function checkout(){
   // Lưu đơn chờ
   const phone_val=document.getElementById('c-phone')?.value?.trim()||'';
   const pendingOrder={id,customer:name,phone:phone_val,email:'',items,total,time:nowDT(),note,status:'Chờ xác nhận',
-    address,payment,shipping,discount,subtotal,tracking_url:'',created_at:Date.now()};
+    address,payment,shipping,discount,ship_fee:shipFee2||0,subtotal,tracking_url:'',created_at:Date.now()};
   await sbUpsert('orders',pendingOrder);
   D.orders.push(pendingOrder);
   showM('modal-qr');
@@ -5498,8 +5528,9 @@ async function saveDraft(){
   const name=document.getElementById('c-name').value.trim()||'Khách lẻ';
   const subtotal=cart.reduce((a,c)=>a+c.price*c.qty,0);
   const discount=Math.min(100,Math.max(0,+document.getElementById('c-discount')?.value||0));
+  const shipFee2=Math.max(0,+document.getElementById('c-ship-fee')?.value||0);
   const discountAmt=Math.round(subtotal*discount/100);
-  const total=subtotal-discountAmt;
+  const total=subtotal-discountAmt+shipFee2;
   const id='HĐ'+Date.now().toString().slice(-6);
   const items=cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')+(c.unit?' ('+c.unit+')':'')).join(', ');
   const address=document.getElementById('c-address')?.value?.trim()||'';
@@ -5508,7 +5539,7 @@ async function saveDraft(){
   const note=document.getElementById('c-note')?.value?.trim()||'';
   const order_phone=document.getElementById('c-phone')?.value?.trim()||'';
   const order={id,customer:name,phone:order_phone,email:'',items,total,time:nowDT(),note,status:'Chờ xác nhận',
-    address,payment,shipping,discount,subtotal,tracking_url:'',created_at:Date.now()};
+    address,payment,shipping,discount,ship_fee:shipFee2||0,subtotal,tracking_url:'',created_at:Date.now()};
   try{
     await sbUpsert('orders',order);
     D.orders.push(order);
@@ -6710,6 +6741,7 @@ function printRetailPDF(order){
   </div>
   ${order.discount>0?`<div class="row" style="font-size:11px"><span class="label">Tạm tính:</span><span class="value">${fmt(order.subtotal||order.total)}</span></div><div class="row" style="font-size:11px;color:#e74c3c"><span class="label">Giảm giá (${order.discount}%):</span><span class="value">-${fmt(Math.round((order.subtotal||order.total)*order.discount/100))}</span></div>`:''}
   ${order.payment?`<div class="row" style="font-size:11px"><span class="label">Thanh toán:</span><span class="value">${order.payment}</span></div>`:''}
+  ${order.ship_fee>0?`<div class="row" style="font-size:11px"><span class="label">Phí ship:</span><span class="value" style="color:var(--teal);font-weight:600">+${fmt(order.ship_fee)}</span></div>`:''}
   ${order.shipping&&order.shipping!=='Khách tới lấy'?`<div class="row" style="font-size:11px"><span class="label">Giao hàng:</span><span class="value">${order.shipping}</span></div>`:''}
   ${order.address?`<div class="row" style="font-size:11px"><span class="label">Địa chỉ:</span><span class="value" style="font-size:10px">${order.address}</span></div>`:''}
   ${qrUrl?`<div class="qr">
@@ -9665,6 +9697,18 @@ function showOrderDetail(id) {
   // Populate header
   document.getElementById('od-id').textContent = o.id;
   document.getElementById('od-total').textContent = fmt(o.total||0);
+  const subtotalDisplay = document.getElementById('od-subtotal-display');
+  const shipFeeDisplay  = document.getElementById('od-ship-fee-display');
+  if(subtotalDisplay) {
+    if(o.ship_fee > 0) {
+      subtotalDisplay.textContent = fmt(o.subtotal||0);
+      subtotalDisplay.style.display = '';
+      if(shipFeeDisplay) { shipFeeDisplay.textContent = '+ Ship '+fmt(o.ship_fee); shipFeeDisplay.style.display=''; }
+    } else {
+      subtotalDisplay.style.display = 'none';
+      if(shipFeeDisplay) shipFeeDisplay.style.display = 'none';
+    }
+  }
   document.getElementById('od-time').textContent = o.time||'—';
   // Wait time
   const waitHours = o.created_at ? Math.round((Date.now()-o.created_at)/3600000) : 0;
@@ -9762,6 +9806,11 @@ function showOrderDetail(id) {
   }
 }
 
+function odOpenQR() {
+  const src = document.getElementById('od-qr-img')?.src;
+  if(src) window.open(src, '_blank');
+}
+
 function odEnterEdit() {
   const o = OD_current;
   if(!o) return;
@@ -9772,6 +9821,8 @@ function odEnterEdit() {
   document.getElementById('od-edit-phone').value    = o.phone||'';
   document.getElementById('od-edit-address').value  = o.address||'';
   document.getElementById('od-edit-discount').value = o.discount||'';
+  const shipFeeEl = document.getElementById('od-edit-ship-fee');
+  if(shipFeeEl) shipFeeEl.value = o.ship_fee||'';
   document.getElementById('od-edit-note').value     = o.note||'';
   // Map legacy status → new status options
   const legacyStatusMap = {'Chờ thanh toán':'Chờ thu tiền','Đã lên đơn':'Chờ xác nhận','Chờ lấy hàng':'Đã book ship'};
@@ -9868,17 +9919,36 @@ function odQtyChange(inp) {
 function odCalcLive() {
   let subtotal = 0;
   document.querySelectorAll('.od-item-row').forEach(row=>{
-    const lineTotal = parseFloat(row.querySelector('.od-i-subtotal')?.value)||0;
-    subtotal += lineTotal;
+    subtotal += parseFloat(row.querySelector('.od-i-subtotal')?.value)||0;
   });
   const disc    = Math.min(100,Math.max(0,parseFloat(document.getElementById('od-edit-discount')?.value)||0));
+  const shipFee = Math.max(0, parseFloat(document.getElementById('od-edit-ship-fee')?.value)||0);
   const discAmt = Math.round(subtotal*disc/100);
-  const total   = subtotal-discAmt;
-  document.getElementById('od-edit-subtotal').textContent = fmt(subtotal);
+  const total   = subtotal - discAmt + shipFee;
+
+  // Update summary
+  setEl('od-edit-subtotal', fmt(subtotal));
   const discRow = document.getElementById('od-edit-discount-row');
-  discRow.style.display = disc>0?'flex':'none';
-  document.getElementById('od-edit-discount-amt').textContent = '-'+fmt(discAmt);
-  document.getElementById('od-edit-total').textContent = fmt(total);
+  if(discRow) discRow.style.display = disc>0?'flex':'none';
+  setEl('od-edit-discount-amt', '-'+fmt(discAmt));
+  const shipRow = document.getElementById('od-edit-ship-row');
+  if(shipRow) shipRow.style.display = shipFee>0?'flex':'none';
+  setEl('od-edit-ship-amt', '+'+fmt(shipFee));
+  setEl('od-edit-total', fmt(total));
+
+  // Generate QR nếu có thông tin ngân hàng
+  if(total > 0 && cfg.bankAcc && cfg.bankId) {
+    const customer = document.getElementById('od-edit-customer')?.value || OD_current?.customer || '';
+    const orderId  = OD_current?.id || 'DH';
+    const content  = orderId + ' ' + customer;
+    const qrUrl = `https://img.vietqr.io/image/${cfg.bankId}-${cfg.bankAcc}-qr_only.png?amount=${total}&addInfo=${encodeURIComponent(content)}&accountName=${encodeURIComponent(cfg.accName||'TRUONG DANG HUONG')}`;
+    const qrImg = document.getElementById('od-qr-img');
+    const qrPreview = document.getElementById('od-qr-preview');
+    if(qrImg) { qrImg.src = qrUrl; qrImg.style.display=''; }
+    setEl('od-qr-amount', fmt(total));
+    setEl('od-qr-content', 'Nội dung: ' + content);
+    if(qrPreview) qrPreview.style.display = '';
+  }
 }
 
 async function odSaveEdit() {
@@ -9900,13 +9970,14 @@ async function odSaveEdit() {
   });
   if(!items.length){notify('Thêm ít nhất 1 sản phẩm!',false);return;}
   const disc    = Math.min(100,Math.max(0,parseFloat(document.getElementById('od-edit-discount')?.value)||0));
+  const shipFee = Math.max(0, parseFloat(document.getElementById('od-edit-ship-fee')?.value)||0);
   // Tính total từ thành tiền (od-i-subtotal)
   let subtotal=0;
   document.querySelectorAll('.od-item-row').forEach(row=>{
     subtotal += parseFloat(row.querySelector('.od-i-subtotal')?.value)||0;
   });
   const discAmt = Math.round(subtotal*disc/100);
-  const total   = subtotal-discAmt;
+  const total   = subtotal - discAmt + shipFee;
   const newStatus = document.getElementById('od-edit-status').value;
   // Update order object
   const updates = {
@@ -9918,6 +9989,7 @@ async function odSaveEdit() {
     payment:  document.getElementById('od-edit-payment')?.value||o.payment||'',
     shipping: document.getElementById('od-edit-shipping')?.value||o.shipping||'',
     discount: disc,
+    ship_fee: shipFee,
     subtotal,
     total,
     status:   newStatus,
@@ -10215,6 +10287,7 @@ async function runMigration() {
     `ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_url TEXT DEFAULT ''`,
     `ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount NUMERIC DEFAULT 0`,
     `ALTER TABLE orders ADD COLUMN IF NOT EXISTS subtotal NUMERIC DEFAULT 0`,
+    `ALTER TABLE orders ADD COLUMN IF NOT EXISTS ship_fee NUMERIC DEFAULT 0`,
     // products — thêm unit
     `ALTER TABLE products ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT ''`,
     // app_users
