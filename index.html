@@ -618,6 +618,23 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <tbody id="stock-log"></tbody></table>
   </div>
 </div>
+<!-- ĐƠN HÀNG -->
+
+  </div><!-- /inv-panel-stock -->
+
+  <!-- Panel: Hàng hóa -->
+  <div id="inv-panel-products" style="display:none">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">Danh sách hàng hóa &amp; giá bán</span>
+        <button class="btn btn-sm" onclick="showM('modal-add-product')">+ Thêm sản phẩm</button>
+      </div>
+      <table><thead><tr><th>Icon</th><th>Tên sản phẩm</th><th>Giá bán (₫)</th><th class="hide-mobile">Giá nhập (₫)</th><th class="hide-mobile">Lợi nhuận</th><th class="hide-mobile">Nguyên liệu</th><th class="hide-mobile">Đơn vị tính</th><th></th></tr></thead>
+      <tbody id="product-list"></tbody></table>
+    </div>
+  </div><!-- /inv-panel-products -->
+
+</div><!-- /page-inventory merged -->
 
 <!-- KHÁCH HÀNG -->
 <div class="page" id="page-customers">
@@ -670,23 +687,6 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   </div>
 </div>
 
-<!-- ĐƠN HÀNG -->
-
-  </div><!-- /inv-panel-stock -->
-
-  <!-- Panel: Hàng hóa -->
-  <div id="inv-panel-products" style="display:none">
-    <div class="card">
-      <div class="card-head">
-        <span class="card-title">Danh sách hàng hóa &amp; giá bán</span>
-        <button class="btn btn-sm" onclick="showM('modal-add-product')">+ Thêm sản phẩm</button>
-      </div>
-      <table><thead><tr><th>Icon</th><th>Tên sản phẩm</th><th>Giá bán (₫)</th><th class="hide-mobile">Giá nhập (₫)</th><th class="hide-mobile">Lợi nhuận</th><th class="hide-mobile">Nguyên liệu</th><th class="hide-mobile">Đơn vị tính</th><th></th></tr></thead>
-      <tbody id="product-list"></tbody></table>
-    </div>
-  </div><!-- /inv-panel-products -->
-
-</div><!-- /page-inventory merged -->
 
 <!-- BÁO CÁO -->
 <!-- THU CHI -->
