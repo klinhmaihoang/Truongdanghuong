@@ -9847,11 +9847,11 @@ function odEnterEdit() {
     : 1;
 
   parsed.forEach(({name, qty, catalogPrice, lineTotal}) => {
-    // Tính giá thực từng dòng theo tỷ lệ
-    const actualLinePrice = ratio !== 1
-      ? Math.round(lineTotal * ratio / qty)  // đơn giá sau khi điều chỉnh
-      : catalogPrice;
-    odAddItem(name, qty, actualLinePrice || null);
+    // Tính thành tiền thực của dòng (không phải đơn giá)
+    const actualLineSubtotal = ratio !== 1
+      ? Math.round(lineTotal * ratio)   // thành tiền = tổng dòng × tỷ lệ
+      : Math.round(catalogPrice * qty); // thành tiền = đơn giá × qty
+    odAddItem(name, qty, actualLineSubtotal || null);
   });
   odCalcLive();
 }
@@ -9873,21 +9873,22 @@ function odAddItem(name='', qty=1, actualPrice=null) {
   row.innerHTML = `
     <input class="od-i-name" list="od-prod-datalist" value="${name}" placeholder="Tên sản phẩm..." oninput="odItemChange(this);odCalcLive()"
       style="border:1.5px solid var(--border);border-radius:6px;padding:6px 9px;font-size:13px;font-family:inherit;outline:none"/>
-    <input class="od-i-qty" type="number" min="0.01" step="any" value="${qty}" oninput="odCalcLive()"
+    <input class="od-i-qty" type="number" min="0.01" step="any" value="${qty}" oninput="odQtyChange(this);odCalcLive()"
       style="border:1.5px solid var(--border);border-radius:6px;padding:6px 6px;font-size:13px;font-family:inherit;outline:none;text-align:right"/>
-    <input class="od-i-price" type="number" min="0" placeholder="Đơn giá"
-      style="border:1.5px solid var(--border);border-radius:6px;padding:6px 6px;font-size:13px;font-family:inherit;outline:none;text-align:right"
+    <input class="od-i-subtotal" type="number" min="0" placeholder="Thành tiền"
+      style="border:1.5px solid var(--border);border-radius:6px;padding:6px 6px;font-size:13px;font-family:inherit;outline:none;text-align:right;color:var(--brown);font-weight:600"
       oninput="odCalcLive()"/>
     <button onclick="this.closest('.od-item-row').remove();odCalcLive()"
       style="background:var(--red);color:#fff;border:none;border-radius:6px;width:27px;height:27px;cursor:pointer;font-size:13px;flex-shrink:0">✕</button>`;
   container.appendChild(row);
-  // Ưu tiên: 1) giá thực từ đơn, 2) giá catalog nếu sản phẩm mới
-  const priceInp = row.querySelector('.od-i-price');
+  // Ưu tiên: 1) thành tiền thực từ đơn, 2) catalog price × qty nếu sản phẩm mới
+  const subtotalInp = row.querySelector('.od-i-subtotal');
+  const qty0 = qty || 1;
   if(actualPrice !== null && actualPrice !== undefined) {
-    priceInp.value = actualPrice; // Giữ nguyên giá thực từ đơn hàng
+    subtotalInp.value = actualPrice; // actualPrice = thành tiền (đã tính qty×đơn giá)
   } else {
     const prod = D.products.find(p=>p.name===name);
-    if(prod) priceInp.value = prod.price;
+    if(prod) subtotalInp.value = Math.round(prod.price * qty0);
   }
   odCalcLive();
 }
@@ -9903,15 +9904,30 @@ setTimeout(()=>{
 function odItemChange(inp) {
   const row = inp.closest('.od-item-row');
   const prod = D.products.find(p=>p.name===inp.value);
-  if(prod&&row) row.querySelector('.od-i-price').value = prod.price;
+  if(prod && row) {
+    const qty = parseFloat(row.querySelector('.od-i-qty')?.value)||1;
+    row.querySelector('.od-i-subtotal').value = Math.round(prod.price * qty);
+    odCalcLive();
+  }
+}
+
+function odQtyChange(inp) {
+  // Khi đổi số lượng, cập nhật thành tiền nếu biết đơn giá từ catalog
+  const row = inp.closest('.od-item-row');
+  const name = row.querySelector('.od-i-name')?.value?.trim();
+  const prod = name ? D.products.find(p=>p.name===name) : null;
+  if(prod && row) {
+    const qty = parseFloat(inp.value)||1;
+    row.querySelector('.od-i-subtotal').value = Math.round(prod.price * qty);
+    odCalcLive();
+  }
 }
 
 function odCalcLive() {
   let subtotal = 0;
   document.querySelectorAll('.od-item-row').forEach(row=>{
-    const qty   = parseFloat(row.querySelector('.od-i-qty')?.value)||1;
-    const price = parseFloat(row.querySelector('.od-i-price')?.value)||0;
-    subtotal += qty*price;
+    const lineTotal = parseFloat(row.querySelector('.od-i-subtotal')?.value)||0;
+    subtotal += lineTotal;
   });
   const disc    = Math.min(100,Math.max(0,parseFloat(document.getElementById('od-edit-discount')?.value)||0));
   const discAmt = Math.round(subtotal*disc/100);
@@ -9932,17 +9948,16 @@ async function odSaveEdit() {
   const items = [];
   document.querySelectorAll('.od-item-row').forEach(row=>{
     const name  = row.querySelector('.od-i-name')?.value?.trim();
-    const qty   = parseInt(row.querySelector('.od-i-qty')?.value)||1;
-    if(name) items.push(name+(qty>1?' x'+qty:''));
+    const qty   = parseFloat(row.querySelector('.od-i-qty')?.value)||1;
+    const qtyDisplay = Number.isInteger(qty) ? qty : qty;
+    if(name) items.push(name+(qtyDisplay>1?' x'+qtyDisplay:''));
   });
   if(!items.length){notify('Thêm ít nhất 1 sản phẩm!',false);return;}
   const disc    = Math.min(100,Math.max(0,parseFloat(document.getElementById('od-edit-discount')?.value)||0));
-  // Recalc total
+  // Tính total từ thành tiền (od-i-subtotal)
   let subtotal=0;
   document.querySelectorAll('.od-item-row').forEach(row=>{
-    const qty=parseInt(row.querySelector('.od-i-qty')?.value)||1;
-    const price=parseFloat(row.querySelector('.od-i-price')?.value)||0;
-    subtotal+=qty*price;
+    subtotal += parseFloat(row.querySelector('.od-i-subtotal')?.value)||0;
   });
   const discAmt = Math.round(subtotal*disc/100);
   const total   = subtotal-discAmt;
