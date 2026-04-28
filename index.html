@@ -6541,12 +6541,38 @@ function printRetailPDF(order){
   <hr class="divider"/>
   <div class="items">
     <h3>SẢN PHẨM</h3>
-    ${(order.items||'').split(',').map(i=>`<div class="item">• ${i.trim()}</div>`).join('')}
+    <table style="width:100%;border-collapse:collapse">
+      <tr style="border-bottom:1px solid #eee;font-size:10px;color:#888">
+        <td style="padding:3px 0">Tên sản phẩm</td>
+        <td style="text-align:center;padding:3px 4px">SL</td>
+        <td style="text-align:right;padding:3px 0">Đơn giá</td>
+        <td style="text-align:right;padding:3px 0">T.tiền</td>
+      </tr>
+      ${(order.items||'').split(',').map(i=>{
+        const s = i.trim();
+        const m = s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)$/i);
+        const name = m ? m[1].trim() : s;
+        const qty  = m ? +m[2] : 1;
+        const prod = D.products.find(p=>p.name===name);
+        const price = prod ? prod.price : 0;
+        const subtotal = price * qty;
+        return `<tr style="border-bottom:1px dashed #f0f0f0">
+          <td style="padding:4px 0;font-size:11px;font-weight:600">${name}</td>
+          <td style="text-align:center;padding:4px;font-size:11px;color:#555">x${qty}</td>
+          <td style="text-align:right;padding:4px 0;font-size:11px;color:#888">${price>0?fmt(price):''}</td>
+          <td style="text-align:right;padding:4px 0;font-size:11px;font-weight:600;color:#cc5500">${subtotal>0?fmt(subtotal):''}</td>
+        </tr>`;
+      }).join('')}
+    </table>
   </div>
   <div class="total-box">
     <span class="label">TỔNG CỘNG:</span>
     <span class="amount">${fmt(order.total||0)}</span>
   </div>
+  ${order.discount>0?`<div class="row" style="font-size:11px"><span class="label">Tạm tính:</span><span class="value">${fmt(order.subtotal||order.total)}</span></div><div class="row" style="font-size:11px;color:#e74c3c"><span class="label">Giảm giá (${order.discount}%):</span><span class="value">-${fmt(Math.round((order.subtotal||order.total)*order.discount/100))}</span></div>`:''}
+  ${order.payment?`<div class="row" style="font-size:11px"><span class="label">Thanh toán:</span><span class="value">${order.payment}</span></div>`:''}
+  ${order.shipping&&order.shipping!=='Khách tới lấy'?`<div class="row" style="font-size:11px"><span class="label">Giao hàng:</span><span class="value">${order.shipping}</span></div>`:''}
+  ${order.address?`<div class="row" style="font-size:11px"><span class="label">Địa chỉ:</span><span class="value" style="font-size:10px">${order.address}</span></div>`:''}
   ${qrUrl?`<div class="qr"><img src="${qrUrl}" onerror="this.style.display='none'"/><p>Quét mã QR để thanh toán</p></div>`:''}
   ${order.note?`<div class="row"><span class="label">Ghi chú:</span><span class="value">${order.note}</span></div>`:''}
   <div class="footer">Trương Dáng Hương Academy — Phiếu xuất tự động từ hệ thống</div>
