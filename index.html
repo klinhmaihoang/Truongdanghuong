@@ -10488,27 +10488,24 @@ function renderPrep() {
   setEl('prep-stat-revenue', Math.round(orders.reduce((s,o)=>s+(o.total||0),0)/1000)+'K');
   setEl('prep-stat-pending', notDelivered.length);
 
-  // Tổng hợp sản phẩm
+  // Tổng hợp sản phẩm — dùng parseItemStr để xử lý đúng @giá
   const byProduct = {};
   orders.forEach(o => {
     (o.items||'').split(',').forEach(item => {
       const s = item.trim();
-      // Parse "Tên x3 (đơn vị)" hoặc "Tên x3" hoặc "Tên"
-      const mFull = s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)\s*\(([^)]+)\)$/i);
-      const mQty  = s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)$/i);
-      let name, qty, unitStr;
-      if(mFull)     { name=mFull[1].trim(); qty=+mFull[2]; unitStr=mFull[3]; }
-      else if(mQty) { name=mQty[1].trim();  qty=+mQty[2];  unitStr=''; }
-      else          { name=s; qty=1; unitStr=''; }
+      if(!s) return;
+      const parsed = parseItemStr(s);
+      const { name, qty, unit, prod, lineTotal } = parsed;
       if(!name) return;
 
-      const prod = D.products.find(p=>p.name===name);
-      const unit = unitStr || prod?.unit || '';
-      const price = prod?.price || 0;
+      const displayUnit = unit || prod?.unit || '';
+      // Doanh thu: dùng lineTotal từ parseItemStr (đã handle @saved price)
+      const revenue = lineTotal || 0;
 
-      if(!byProduct[name]) byProduct[name] = {name, unit, qty:0, orders:[], revenue:0, statuses:{}};
+      if(!byProduct[name]) byProduct[name] = {name, unit:displayUnit, qty:0, orders:[], revenue:0, statuses:{}};
       byProduct[name].qty += qty;
-      byProduct[name].revenue += price * qty;
+      byProduct[name].revenue += revenue;
+      if(displayUnit && !byProduct[name].unit) byProduct[name].unit = displayUnit;
       byProduct[name].orders.push({id:o.id, customer:o.customer, qty, status:o.status, time:o.time||''});
       byProduct[name].statuses[o.status] = (byProduct[name].statuses[o.status]||0) + 1;
     });
