@@ -3702,10 +3702,11 @@ function renderCustomers() {
 
   // Stats
   const now = new Date(); const thisMonth = now.getMonth(); const thisYear = now.getFullYear();
-  setEl('cust-stat-total',   D.customers.length);
-  setEl('cust-stat-vip',     D.customers.filter(c=>(c.points||0)>=200).length);
-  setEl('cust-stat-revenue', (D.customers.reduce((s,c)=>s+(c.total_spent||0),0)/1000000).toFixed(1)+'M');
-  setEl('cust-stat-new',     D.customers.filter(c=>{
+  const _se = (id,val)=>{ const e=document.getElementById(id); if(e) e.textContent=val; };
+  _se('cust-stat-total',   D.customers.length);
+  _se('cust-stat-vip',     D.customers.filter(c=>(c.points||0)>=200).length);
+  _se('cust-stat-revenue', (D.customers.reduce((s,c)=>s+(c.total_spent||0),0)/1000000).toFixed(1)+'M');
+  _se('cust-stat-new',     D.customers.filter(c=>{
     if(!c.created_at) return false;
     const d=new Date(c.created_at);
     return d.getMonth()===thisMonth&&d.getFullYear()===thisYear;
@@ -4014,45 +4015,7 @@ async function addCustomer(){
   }catch(e){notify('Lỗi: '+e.message,false);}
 }
 
-function openCustomerDetail(id){
-  const c=D.customers.find(x=>x.id===id);if(!c)return;
-  selectedCustomerId=id;
-  const lvl=c.points>=500?'💎 VIP':c.points>=200?'🥇 Gold':c.points>=50?'🥈 Silver':'🥉 Member';
-  // Lịch sử mua hàng
-  const history=D.orders.filter(o=>o.customer===c.name||(c.phone&&o.phone===c.phone)).slice(-5).reverse();
-  document.getElementById('customer-detail-content').innerHTML=`
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
-      <div class="detail-avatar" style="font-size:26px">${lvl.split(' ')[0]}</div>
-      <div>
-        <div style="font-size:18px;font-weight:700">${c.name}</div>
-        <div style="font-size:13px;color:var(--muted)">${c.phone||''} ${c.email?'· '+c.email:''}</div>
-      </div>
-      <div style="margin-left:auto;text-align:right">
-        <div style="font-size:24px;font-weight:800;color:var(--brand)">${c.points||0}</div>
-        <div style="font-size:11px;color:var(--muted)">điểm · ${lvl}</div>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px">
-      <div style="background:var(--brand-light);border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:16px;font-weight:800;color:var(--brand)">${fmt(c.total_spent||0)}</div>
-        <div style="font-size:10px;color:var(--muted)">Tổng chi tiêu</div>
-      </div>
-      <div style="background:var(--brand-light);border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:16px;font-weight:800;color:var(--brand)">${c.visit_count||0}</div>
-        <div style="font-size:10px;color:var(--muted)">Lần mua</div>
-      </div>
-      <div style="background:var(--brand-light);border-radius:8px;padding:10px;text-align:center">
-        <div style="font-size:16px;font-weight:800;color:var(--brand)">${c.last_visit||'—'}</div>
-        <div style="font-size:10px;color:var(--muted)">Lần cuối</div>
-      </div>
-    </div>
-    ${c.note?`<div class="guide" style="margin-bottom:12px">📝 ${c.note}</div>`:''}
-    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">Lịch sử mua gần đây</div>
-    ${history.length?history.map(o=>`<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:12px">
-      <span>${cleanItems(o.items)}</span><span style="color:var(--brand);font-weight:700">${fmt(o.total)}</span>
-    </div>`).join(''):'<div style="color:var(--muted);font-size:12px">Chưa có lịch sử</div>'}`;
-  showM('modal-customer-detail');
-}
+// openCustomerDetail (legacy removed - using new version above)
 
 async function addPointsManual(){
   const c=D.customers.find(x=>x.id===selectedCustomerId);if(!c)return;
