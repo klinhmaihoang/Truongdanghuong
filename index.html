@@ -2489,7 +2489,28 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       <div class="fg"><label>Giá nhập / giá vốn (₫)</label><input id="fp-cost" type="number" placeholder="20000"/></div>
     </div>
     <div class="form-row">
+      <div class="fg">
+        <label>Đơn vị tính</label>
+        <select id="fp-unit" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;outline:none;width:100%">
+          <option value="">— Không có —</option>
+          <option value="hộp">Hộp</option>
+          <option value="gói">Gói</option>
+          <option value="kg">Kg</option>
+          <option value="g">Gram</option>
+          <option value="lít">Lít</option>
+          <option value="ml">ml</option>
+          <option value="chai">Chai</option>
+          <option value="túi">Túi</option>
+          <option value="lon">Lon</option>
+          <option value="thùng">Thùng</option>
+          <option value="cái">Cái</option>
+          <option value="ly">Ly</option>
+          <option value="phần">Phần</option>
+        </select>
+      </div>
       <div class="fg"><label>Nguyên liệu liên kết</label><select id="fp-mat"></select></div>
+    </div>
+    <div class="form-row">
       <div class="fg"><label>Lượng dùng/lần</label><input id="fp-use" type="number" placeholder="0.1" step="0.01"/></div>
     </div>
     <div class="btn-group">
@@ -2517,6 +2538,25 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       <div class="fg"><label>Lượng dùng/lần</label><input id="ep-use" type="number" step="0.01"/></div>
     </div>
     <div class="form-row">
+      <div class="fg">
+        <label>Đơn vị tính</label>
+        <select id="ep-unit" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;outline:none;width:100%">
+          <option value="">— Không có —</option>
+          <option value="hộp">Hộp</option>
+          <option value="gói">Gói</option>
+          <option value="kg">Kg</option>
+          <option value="g">Gram</option>
+          <option value="lít">Lít</option>
+          <option value="ml">ml</option>
+          <option value="chai">Chai</option>
+          <option value="túi">Túi</option>
+          <option value="lon">Lon</option>
+          <option value="thùng">Thùng</option>
+          <option value="cái">Cái</option>
+          <option value="ly">Ly</option>
+          <option value="phần">Phần</option>
+        </select>
+      </div>
       <div class="fg"><label>VAT sản phẩm</label>
         <select id="ep-vat">
           <option value="0">Không VAT</option>
@@ -4893,7 +4933,7 @@ function renderProductList(){
     const profitColor=profit===null?'var(--muted)':profit>0?'var(--teal)':'var(--red)';
     return`<tr>
       <td style="font-size:22px">${p.icon||'📦'}</td>
-      <td><strong>${p.name}</strong></td>
+      <td><strong>${p.name}</strong>${p.unit?`<span style="font-size:10px;color:var(--muted);margin-left:5px">/${p.unit}</span>`:''}</td>
       <td style="color:var(--gold2);font-weight:700">${fmt(p.price)}</td>
       <td class="hide-mobile" style="font-weight:600">${cost>0?fmt(cost):'<span style="color:var(--muted)">—</span>'}</td>
       <td class="hide-mobile" style="font-weight:700;color:${profitColor}">${profit===null?'—':fmt(profit)}</td>
@@ -4918,6 +4958,7 @@ function openEditProd(id){
   setTimeout(()=>{
     document.getElementById('ep-mat').value=p.mat_id||'';
     document.getElementById('ep-use').value=p.mat_use||0;
+    const unitEl=document.getElementById('ep-unit');if(unitEl)unitEl.value=p.unit||'';
     const vatEl=document.getElementById('ep-vat');if(vatEl)vatEl.value=String(p.vat||0);
     const discEl=document.getElementById('ep-discount');if(discEl)discEl.value=p.discount||0;
   },150);
@@ -4930,6 +4971,7 @@ async function saveProduct(){
   if(!name){notify('Nhập tên sản phẩm!',false);return;}
   const upd={name,icon:document.getElementById('ep-icon').value||'📦',price,
     cost:+document.getElementById('ep-cost').value||0,
+    unit:document.getElementById('ep-unit')?.value||'',
     vat:+document.getElementById('ep-vat')?.value||0,
     discount:+document.getElementById('ep-discount')?.value||0,
     mat_id:document.getElementById('ep-mat').value,mat_use:+document.getElementById('ep-use').value||0};
@@ -4958,11 +5000,13 @@ async function addProduct(){
   if(!name){notify('Nhập tên sản phẩm!',false);return;}
   const p={id:uid(),name,icon:document.getElementById('fp-icon').value||'📦',price,
     cost:+document.getElementById('fp-cost').value||0,
+    unit:document.getElementById('fp-unit')?.value||'',
     mat_id:document.getElementById('fp-mat').value,mat_use:+document.getElementById('fp-use').value||0,created_at:Date.now()};
   try{
     await sbUpsert('products',p);D.products.push(p);
     closeM('modal-add-product');
     ['fp-name','fp-icon','fp-price','fp-cost','fp-use'].forEach(id=>document.getElementById(id).value='');
+    const unitEl=document.getElementById('fp-unit');if(unitEl)unitEl.value='';
     render();notify('Đã thêm: '+name);
     if(document.getElementById('at-prod').checked)
       tgMsg(`🆕 *Thêm sản phẩm mới!*\n\n📦 ${name}\n💰 Giá bán: ${fmt(price)}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
@@ -6555,9 +6599,10 @@ function printRetailPDF(order){
         const qty  = m ? +m[2] : 1;
         const prod = D.products.find(p=>p.name===name);
         const price = prod ? prod.price : 0;
+        const unit  = prod?.unit || '';
         const subtotal = price * qty;
         return `<tr style="border-bottom:1px dashed #f0f0f0">
-          <td style="padding:4px 0;font-size:11px;font-weight:600">${name}</td>
+          <td style="padding:4px 0;font-size:11px;font-weight:600">${name}${unit?`<span style="font-size:9px;color:#999;font-weight:400"> (${unit})</span>`:''}</td>
           <td style="text-align:center;padding:4px;font-size:11px;color:#555">x${qty}</td>
           <td style="text-align:right;padding:4px 0;font-size:11px;color:#888">${price>0?fmt(price):''}</td>
           <td style="text-align:right;padding:4px 0;font-size:11px;font-weight:600;color:#cc5500">${subtotal>0?fmt(subtotal):''}</td>
