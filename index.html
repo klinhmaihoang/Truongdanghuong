@@ -706,6 +706,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <button class="btn btn-green btn-sm" onclick="showM('modal-add-thu')">+ Thêm phiếu thu</button>
     <button class="btn btn-red btn-sm" onclick="showM('modal-add-chi')">− Thêm phiếu chi</button>
     <button class="btn btn-tg btn-sm" onclick="syncThuChiToSheet()">📊 Sync GG Sheet</button>
+    <button class="btn btn-sm" onclick="syncBaoCao()" style="background:linear-gradient(135deg,#1E8449,#27AE60)">📈 Báo cáo Lãi Lỗ</button>
     <button class="btn btn-excel btn-sm" onclick="xlExport('finance')">📊 Excel</button>
   </div>
   <div class="card">
@@ -6179,6 +6180,8 @@ async function gsSyncAll(){
     await gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
     await new Promise(r=>setTimeout(r,500));
     await gsSend({sheet:'TomTatKho',rows:gsTomTatKho(),time:nowDT()});
+    await new Promise(r=>setTimeout(r,500));
+    await gsSend({sheet:'BaoCaoLaiLo',rows:gsBaoCaoData(),time:nowDT()});
     notify('✅ Đã sync toàn bộ lên Google Sheet!');
   }catch(e){notify('Lỗi sync: '+e.message,false);}
 }
@@ -11071,6 +11074,84 @@ function custLevel(pts) {
   if(pts >= (t.gold   ?? 200)) return { label:'🥇 Gold',   color:'#e67e22' };
   if(pts >= (t.silver ?? 50))  return { label:'🥈 Silver', color:'#7f8c8d' };
   return { label:'🥉 Member', color:'#cd7f32' };
+}
+
+
+// ══════════════════════════════════════════════════
+// BÁO CÁO LÃI LỖ ACADEMY vs RETAIL
+// ══════════════════════════════════════════════════
+function gsBaoCaoData() {
+  // Gom tất cả transaction theo tháng
+  const monthMap = {};
+
+  const getMonth = (timeStr) => {
+    if(!timeStr) return null;
+    const m1 = (timeStr||'').match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if(m1) return m1[3]+'-'+m1[2];
+    const m2 = (timeStr||'').match(/(\d{4})-(\d{2})/);
+    if(m2) return m2[1]+'-'+m2[2];
+    return null;
+  };
+
+  const ensure = (mo) => {
+    if(!monthMap[mo]) monthMap[mo] = {month:mo,acaThu:0,acaChi:0,retThu:0,retChi:0};
+  };
+
+  // Academy Thu: đơn HP đã thanh toán (học phí)
+  D.orders.filter(o=>o.id.startsWith('HP')&&o.status==='Đã thanh toán').forEach(o=>{
+    const mo = getMonth(o.time); if(!mo) return;
+    ensure(mo); monthMap[mo].acaThu += (o.total||0);
+  });
+
+  // Retail Thu: đơn HĐ đã thanh toán
+  D.orders.filter(o=>!o.id.startsWith('HP')&&o.status==='Đã thanh toán').forEach(o=>{
+    const mo = getMonth(o.time); if(!mo) return;
+    ensure(mo); monthMap[mo].retThu += (o.total||0);
+  });
+
+  // Chi phí từ transactions thủ công + tự động
+  const allTx = [...(D.transactions||[])];
+  allTx.filter(t=>t.type==='chi').forEach(t=>{
+    const mo = getMonth(t.time); if(!mo) return;
+    ensure(mo);
+    const cat = (t.category||'').toLowerCase();
+    // Academy chi: học phí liên quan, giảng dạy
+    if(cat.includes('học phí')||cat.includes('giảng')||cat.includes('academy')||cat.includes('giáo')||cat.includes('khóa')) {
+      monthMap[mo].acaChi += (t.amount||0);
+    } else {
+      // Retail chi: NVL, vận hành, ship...
+      monthMap[mo].retChi += (t.amount||0);
+    }
+  });
+
+  // Tính profit từng tháng
+  const rows = Object.values(monthMap).map(m=>({
+    month: m.month,
+    acaThu: m.acaThu, acaChi: m.acaChi, acaProfit: m.acaThu - m.acaChi,
+    retThu: m.retThu, retChi: m.retChi, retProfit: m.retThu - m.retChi,
+    totalThu: m.acaThu + m.retThu,
+    totalChi: m.acaChi + m.retChi,
+    totalProfit: (m.acaThu + m.retThu) - (m.acaChi + m.retChi)
+  })).sort((a,b)=>a.month.localeCompare(b.month));
+
+  // Dòng tổng cộng
+  const tong = rows.reduce((acc,r)=>({
+    month:'TONG',
+    acaThu: acc.acaThu+r.acaThu, acaChi: acc.acaChi+r.acaChi, acaProfit: acc.acaProfit+r.acaProfit,
+    retThu: acc.retThu+r.retThu, retChi: acc.retChi+r.retChi, retProfit: acc.retProfit+r.retProfit,
+    totalThu: acc.totalThu+r.totalThu, totalChi: acc.totalChi+r.totalChi, totalProfit: acc.totalProfit+r.totalProfit
+  }), {month:'TONG',acaThu:0,acaChi:0,acaProfit:0,retThu:0,retChi:0,retProfit:0,totalThu:0,totalChi:0,totalProfit:0});
+
+  return [...rows, tong];
+}
+
+async function syncBaoCao() {
+  notify('⏳ Đang tạo báo cáo lãi lỗ...');
+  try {
+    const rows = gsBaoCaoData();
+    await gsSend({sheet:'BaoCaoLaiLo', rows, time:nowDT()});
+    notify('✅ Đã sync báo cáo lãi lỗ lên Google Sheets!');
+  } catch(e) { notify('Lỗi: '+e.message, false); }
 }
 
 boot();
