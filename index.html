@@ -1730,14 +1730,14 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
     <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="thu-note" placeholder="VD: Thu học phí Nguyễn Văn A..."/></div>
     <div class="fg" style="margin-bottom:12px">
-      <label>📎 Ảnh chứng từ (tùy chọn)</label>
+      <label>📎 Ảnh chứng từ (tùy chọn, nhiều ảnh)</label>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <label style="cursor:pointer;padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px">
-          📷 Chọn ảnh <input type="file" id="thu-img" accept="image/*" style="display:none" onchange="previewReceipt('thu')"/>
+          📷 Chọn ảnh <input type="file" id="thu-img" accept="image/*" multiple style="display:none" onchange="previewReceipts('thu')"/>
         </label>
         <span id="thu-img-name" style="font-size:11px;color:var(--muted)"></span>
       </div>
-      <img id="thu-img-preview" style="display:none;max-width:100%;max-height:150px;margin-top:8px;border-radius:8px;border:1px solid var(--border)"/>
+      <div id="thu-img-previews" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
     </div>
     <div class="btn-group">
       <button class="btn btn-green btn-sm" onclick="addTransaction('thu')">💾 Lưu phiếu thu</button>
@@ -1765,14 +1765,14 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
     <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="chi-note" placeholder="VD: Mua rượu, chanh..."/></div>
     <div class="fg" style="margin-bottom:12px">
-      <label>📎 Ảnh chứng từ (tùy chọn)</label>
+      <label>📎 Ảnh chứng từ (tùy chọn, nhiều ảnh)</label>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <label style="cursor:pointer;padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px">
-          📷 Chọn ảnh <input type="file" id="chi-img" accept="image/*" style="display:none" onchange="previewReceipt('chi')"/>
+          📷 Chọn ảnh <input type="file" id="chi-img" accept="image/*" multiple style="display:none" onchange="previewReceipts('chi')"/>
         </label>
         <span id="chi-img-name" style="font-size:11px;color:var(--muted)"></span>
       </div>
-      <img id="chi-img-preview" style="display:none;max-width:100%;max-height:150px;margin-top:8px;border-radius:8px;border:1px solid var(--border)"/>
+      <div id="chi-img-previews" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
     </div>
     <div class="btn-group">
       <button class="btn btn-red btn-sm" onclick="addTransaction('chi')">💾 Lưu phiếu chi</button>
@@ -2853,14 +2853,14 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       <div id="im-payment-note" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
     </div>
     <div class="fg" style="margin-bottom:12px">
-      <label>📎 Ảnh chứng từ / hoá đơn NCC (tùy chọn)</label>
+      <label>📎 Ảnh hoá đơn NCC (tùy chọn, nhiều ảnh)</label>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <label style="cursor:pointer;padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px">
-          📷 Chọn ảnh <input type="file" id="im-img" accept="image/*" style="display:none" onchange="previewReceipt('im')"/>
+          📷 Chọn ảnh <input type="file" id="im-img" accept="image/*" multiple style="display:none" onchange="previewReceipts('im')"/>
         </label>
         <span id="im-img-name" style="font-size:11px;color:var(--muted)"></span>
       </div>
-      <img id="im-img-preview" style="display:none;max-width:100%;max-height:150px;margin-top:8px;border-radius:8px;border:1px solid var(--border)"/>
+      <div id="im-img-previews" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
     </div>
     <div class="btn-group">
       <button class="btn btn-green btn-sm" onclick="importStock()">📥 Nhập kho</button>
@@ -6870,7 +6870,14 @@ function renderFinance(){
     </td>
     <td style="font-size:12px;color:var(--muted)">${t.note||'—'}</td>
     <td style="white-space:nowrap">
-      ${t.receipt_url?`<a href="${t.receipt_url}" target="_blank" title="Xem chứng từ" style="font-size:16px;margin-right:4px;text-decoration:none">🖼</a>`:''}
+      ${t.receipt_url?(()=>{
+        try {
+          const urls = JSON.parse(t.receipt_url);
+          return urls.map((u,i)=>`<a href="#" onclick="showReceiptModal('${u}');return false" title="Ảnh ${i+1}" style="font-size:15px;margin-right:2px;text-decoration:none">🖼</a>`).join('');
+        } catch(e) {
+          return `<a href="#" onclick="showReceiptModal('${t.receipt_url}');return false" style="font-size:15px;text-decoration:none">🖼</a>`;
+        }
+      })():''}
       ${t._auto
         ?`<a href="#" onclick="go('pos',null);posTab('orders',document.getElementById('pos-tab-orders'));return false" style="font-size:11px;color:var(--teal)">Xem đơn</a>`
         :`<button class="btn btn-ghost btn-sm" style="color:var(--red);font-size:11px" onclick="deleteTransaction('${t.id}')">✕</button>`
@@ -6885,8 +6892,8 @@ async function addTransaction(type){
   if(!amount||amount<=0){notify('Nhập số tiền hợp lệ!',false);return;}
   const cat=document.getElementById(type+'-cat').value;
   const note=document.getElementById(type+'-note').value.trim();
-  // Upload ảnh chứng từ nếu có
-  const receiptUrl = await uploadReceipt(type);
+  // Upload nhiều ảnh chứng từ nếu có
+  const receiptUrls = await uploadReceipts(type);
   const tx={
     id:'TX'+Date.now(),
     type,
@@ -6895,7 +6902,7 @@ async function addTransaction(type){
     note,
     time:nowDT(),
     created_at:Date.now(),
-    receipt_url: receiptUrl||''
+    receipt_url: receiptUrls.length ? JSON.stringify(receiptUrls) : ''
   };
   try{
     await sbUpsert('transactions',tx);
@@ -11214,53 +11221,71 @@ async function syncBaoCao() {
 
 
 // ══════════════════════════════════════════════════
-// UPLOAD ẢNH CHỨNG TỪ — SUPABASE STORAGE
+// UPLOAD NHIỀU ẢNH CHỨNG TỪ — SUPABASE STORAGE
 // ══════════════════════════════════════════════════
-function previewReceipt(prefix) {
-  const file = document.getElementById(prefix+'-img')?.files?.[0];
-  if(!file) return;
+function previewReceipts(prefix) {
+  const files = Array.from(document.getElementById(prefix+'-img')?.files||[]);
+  if(!files.length) return;
   const nameEl = document.getElementById(prefix+'-img-name');
-  const prevEl = document.getElementById(prefix+'-img-preview');
-  if(nameEl) nameEl.textContent = file.name + ' (' + (file.size/1024).toFixed(0) + 'KB)';
+  const prevEl = document.getElementById(prefix+'-img-previews');
+  if(nameEl) nameEl.textContent = files.length + ' ảnh đã chọn';
   if(prevEl) {
-    const reader = new FileReader();
-    reader.onload = e => { prevEl.src = e.target.result; prevEl.style.display = 'block'; };
-    reader.readAsDataURL(file);
+    prevEl.innerHTML = '';
+    files.forEach((file, idx) => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const wrapper = document.createElement('div');
+        wrapper.style.cssText = 'position:relative;display:inline-block';
+        wrapper.innerHTML = `
+          <img src="${e.target.result}" style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:pointer" onclick="showReceiptModal('${e.target.result}')"/>
+          <button onclick="removeReceiptPreview('${prefix}',${idx})" style="position:absolute;top:-6px;right:-6px;background:#e74c3c;color:#fff;border:none;border-radius:50%;width:18px;height:18px;font-size:11px;cursor:pointer;line-height:1">✕</button>
+        `;
+        prevEl.appendChild(wrapper);
+      };
+      reader.readAsDataURL(file);
+    });
   }
 }
 
+function removeReceiptPreview(prefix, idx) {
+  const input = document.getElementById(prefix+'-img');
+  const dt = new DataTransfer();
+  Array.from(input.files).forEach((f,i) => { if(i!==idx) dt.items.add(f); });
+  input.files = dt.files;
+  previewReceipts(prefix);
+}
+
+async function uploadReceipts(prefix) {
+  const files = Array.from(document.getElementById(prefix+'-img')?.files||[]);
+  if(!files.length) return [];
+  const urls = [];
+  for(const file of files) {
+    const maxSize = 2 * 1024 * 1024;
+    let uploadFile = file.size > maxSize ? await resizeImage(file, 1200) : file;
+    const ext = file.name.split('.').pop().toLowerCase()||'jpg';
+    const fileName = `receipts/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
+    try {
+      const res = await fetch(`${SUPABASE_URL}/storage/v1/object/receipts/${fileName}`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'Content-Type': uploadFile.type||'image/jpeg',
+          'x-upsert': 'true'
+        },
+        body: uploadFile
+      });
+      if(res.ok) urls.push(`${SUPABASE_URL}/storage/v1/object/public/receipts/${fileName}`);
+      else console.warn('Upload failed:', await res.text());
+    } catch(e) { console.warn('Upload error:', e.message); }
+  }
+  return urls;
+}
+
+// Backward compat
 async function uploadReceipt(prefix) {
-  const fileInput = document.getElementById(prefix+'-img');
-  const file = fileInput?.files?.[0];
-  if(!file) return null;
-
-  // Resize nếu ảnh quá lớn (> 2MB)
-  const maxSize = 2 * 1024 * 1024;
-  let uploadFile = file;
-  if(file.size > maxSize) {
-    uploadFile = await resizeImage(file, 1200);
-  }
-
-  const ext = file.name.split('.').pop().toLowerCase();
-  const fileName = `receipts/${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`;
-
-  try {
-    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/receipts/${fileName}`, {
-      method: 'POST',
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': 'Bearer ' + SUPABASE_KEY,
-        'Content-Type': uploadFile.type,
-        'x-upsert': 'true'
-      },
-      body: uploadFile
-    });
-    if(!res.ok) { console.warn('Upload receipt failed:', await res.text()); return null; }
-    return `${SUPABASE_URL}/storage/v1/object/public/receipts/${fileName}`;
-  } catch(e) {
-    console.warn('Upload receipt error:', e.message);
-    return null;
-  }
+  const urls = await uploadReceipts(prefix);
+  return urls.length ? urls[0] : null;
 }
 
 function resizeImage(file, maxWidth) {
@@ -11283,10 +11308,24 @@ function resizeImage(file, maxWidth) {
 function clearReceiptInput(prefix) {
   const fi = document.getElementById(prefix+'-img');
   const nm = document.getElementById(prefix+'-img-name');
-  const pv = document.getElementById(prefix+'-img-preview');
+  const pv = document.getElementById(prefix+'-img-previews');
   if(fi) fi.value = '';
   if(nm) nm.textContent = '';
-  if(pv) { pv.src=''; pv.style.display='none'; }
+  if(pv) pv.innerHTML = '';
+}
+
+function showReceiptModal(src) {
+  let overlay = document.getElementById('receipt-view-overlay');
+  if(!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'receipt-view-overlay';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out';
+    overlay.onclick = () => overlay.style.display='none';
+    overlay.innerHTML = '<img id="receipt-view-img" style="max-width:95vw;max-height:92vh;border-radius:10px;box-shadow:0 8px 40px rgba(0,0,0,.5)"/>';
+    document.body.appendChild(overlay);
+  }
+  document.getElementById('receipt-view-img').src = src;
+  overlay.style.display = 'flex';
 }
 
 boot();
