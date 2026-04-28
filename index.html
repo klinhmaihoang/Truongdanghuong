@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+\<!DOCTYPE html>
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
@@ -1708,8 +1708,59 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="tab active" onclick="rpTab(this,'sales')">🛒 Bán hàng</div>
     <div class="tab" onclick="rpTab(this,'monthly')">📅 Theo tháng</div>
     <div class="tab" onclick="rpTab(this,'drinks')">💧 Đồ uống</div>
+    <div class="tab" onclick="rpTab(this,'prep')">📋 Chuẩn bị hàng</div>
     <div class="tab" onclick="rpTab(this,'inventory')">📦 Xuất nhập kho</div>
     <div class="tab" onclick="rpTab(this,'students')">🎓 Học viên</div>
+  </div>
+
+  <!-- ══ TAB: CHUẨN BỊ HÀNG ══ -->
+  <div id="rp-prep" style="display:none">
+    <!-- Bộ lọc -->
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:14px">
+      <div style="display:flex;gap:5px">
+        <button class="btn btn-sm" id="prep-btn-today"   onclick="prepSetDate('today',this)">Hôm nay</button>
+        <button class="btn btn-ghost btn-sm" id="prep-btn-tomorrow" onclick="prepSetDate('tomorrow',this)">Ngày mai</button>
+        <button class="btn btn-ghost btn-sm" id="prep-btn-week"     onclick="prepSetDate('week',this)">7 ngày tới</button>
+        <button class="btn btn-ghost btn-sm" id="prep-btn-custom"   onclick="prepSetDate('custom',this)">Tùy chọn</button>
+      </div>
+      <input type="date" id="prep-date-from" onchange="renderPrep()"
+        style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none"/>
+      <span style="font-size:13px;color:var(--muted)">→</span>
+      <input type="date" id="prep-date-to" onchange="renderPrep()"
+        style="padding:7px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none"/>
+      <button class="btn btn-excel btn-sm" onclick="exportPrepExcel()" style="margin-left:auto">📊 Xuất Excel</button>
+    </div>
+
+    <!-- Stats nhanh -->
+    <div class="stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:14px">
+      <div class="stat"><div class="stat-num" id="prep-stat-orders">0</div><div class="stat-label">Đơn cần xử lý</div></div>
+      <div class="stat" style="--accent:var(--teal)"><div class="stat-num" id="prep-stat-products">0</div><div class="stat-label">Loại sản phẩm</div></div>
+      <div class="stat" style="--accent:var(--green)"><div class="stat-num" id="prep-stat-revenue">0</div><div class="stat-label">Doanh thu (₫)</div></div>
+      <div class="stat" style="--accent:var(--orange)"><div class="stat-num" id="prep-stat-pending">0</div><div class="stat-label">Chưa giao</div></div>
+    </div>
+
+    <!-- Bảng tổng hợp sản phẩm -->
+    <div class="card" style="margin-bottom:12px">
+      <div class="card-head">
+        <span class="card-title">📦 Tổng số lượng cần chuẩn bị</span>
+        <span id="prep-date-label" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <table><thead><tr>
+        <th>Sản phẩm</th>
+        <th style="text-align:center">Đơn vị</th>
+        <th style="text-align:center">Tổng SL</th>
+        <th style="text-align:center">Số đơn</th>
+        <th style="text-align:right">Doanh thu</th>
+        <th style="text-align:center">Trạng thái đơn</th>
+      </tr></thead>
+      <tbody id="prep-product-list"></tbody></table>
+    </div>
+
+    <!-- Chi tiết từng đơn theo sản phẩm -->
+    <div class="card">
+      <div class="card-head"><span class="card-title">🔍 Chi tiết đơn theo sản phẩm</span></div>
+      <div id="prep-order-detail"></div>
+    </div>
   </div>
 
   <!-- ══ TAB: ĐỒ UỐNG ══ -->
@@ -4029,13 +4080,18 @@ function renderMonthly(){
 function rpTab(el,tab){
   document.querySelectorAll('#page-reports .tab').forEach(x=>x.classList.remove('active'));
   el.classList.add('active');
-  ['sales','monthly','inventory','students','drinks'].forEach(t=>{
+  ['sales','monthly','inventory','students','drinks','prep'].forEach(t=>{
     const panel=document.getElementById('rp-'+t);
     if(panel) panel.style.display=t===tab?'block':'none';
   });
   rpCurrent=tab;
   if(tab==='monthly') renderMonthly();
   else if(tab==='drinks') drinkRpRender();
+  else if(tab==='prep') {
+    if(!document.getElementById('prep-date-from').value)
+      prepSetDate('today', document.getElementById('prep-btn-today'));
+    else renderPrep();
+  }
   else renderReports();
 }
 
@@ -10205,6 +10261,222 @@ function odAdvanceStatus(newStatus) {
   if(sel) { sel.value = newStatus; odStatusChange(); }
   odSaveEdit();
 }
+
+// ═══════════════════════════════════════════════════════════════
+// BÁO CÁO CHUẨN BỊ HÀNG
+// ═══════════════════════════════════════════════════════════════
+function prepSetDate(mode, btn) {
+  document.querySelectorAll('[id^="prep-btn-"]').forEach(b=>b.className='btn btn-ghost btn-sm');
+  if(btn) btn.className='btn btn-sm';
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const fmt8  = d => d.toISOString().slice(0,10);
+  const fromEl = document.getElementById('prep-date-from');
+  const toEl   = document.getElementById('prep-date-to');
+
+  if(mode==='today') {
+    fromEl.value = toEl.value = fmt8(today);
+  } else if(mode==='tomorrow') {
+    const tm = new Date(today); tm.setDate(today.getDate()+1);
+    fromEl.value = toEl.value = fmt8(tm);
+  } else if(mode==='week') {
+    const end = new Date(today); end.setDate(today.getDate()+6);
+    fromEl.value = fmt8(today); toEl.value = fmt8(end);
+  }
+  // custom: để người dùng tự chọn
+  renderPrep();
+}
+
+function renderPrep() {
+  const fromStr = document.getElementById('prep-date-from')?.value;
+  const toStr   = document.getElementById('prep-date-to')?.value;
+  if(!fromStr) return;
+
+  const from = new Date(fromStr); from.setHours(0,0,0,0);
+  const to   = toStr ? new Date(toStr) : new Date(fromStr);
+  to.setHours(23,59,59,999);
+
+  // Label
+  const labelEl = document.getElementById('prep-date-label');
+  if(labelEl) {
+    labelEl.textContent = fromStr===toStr
+      ? new Date(fromStr).toLocaleDateString('vi-VN',{weekday:'long',day:'2-digit',month:'2-digit',year:'numeric'})
+      : `${new Date(fromStr).toLocaleDateString('vi-VN')} → ${new Date(toStr).toLocaleDateString('vi-VN')}`;
+  }
+
+  // Lọc đơn hàng trong khoảng ngày — tất cả đơn CHƯA hủy và CHƯA thanh toán hoàn toàn
+  const EXCLUDE = ['Đã thanh toán','Đã hủy'];
+  const orders = D.orders.filter(o=>{
+    if(o.id.startsWith('HP')) return false;
+    if(EXCLUDE.includes(o.status)) return false;
+    // Lọc theo ngày tạo đơn
+    const d = o.created_at ? new Date(o.created_at) : (o.time ? new Date(o.time.split(' ').reverse().join('T')) : null);
+    if(!d) return false;
+    return d >= from && d <= to;
+  });
+
+  // Stats
+  const statusColors = {
+    'Chờ xác nhận':'#8e44ad','Đã xác nhận':'#2980b9','Đang chuẩn bị':'#e67e22',
+    'Đã book ship':'#d35400','Đang giao':'#1abc9c','Đã giao':'#27ae60',
+    'Chờ thu tiền':'#FF8C00','Chờ thanh toán':'#FF8C00'
+  };
+  const notDelivered = orders.filter(o=>!['Đã giao','Đang giao','Đã thanh toán'].includes(o.status));
+  setEl('prep-stat-orders',  orders.length);
+  setEl('prep-stat-revenue', Math.round(orders.reduce((s,o)=>s+(o.total||0),0)/1000)+'K');
+  setEl('prep-stat-pending', notDelivered.length);
+
+  // Tổng hợp sản phẩm
+  const byProduct = {};
+  orders.forEach(o => {
+    (o.items||'').split(',').forEach(item => {
+      const s = item.trim();
+      // Parse "Tên x3 (đơn vị)" hoặc "Tên x3" hoặc "Tên"
+      const mFull = s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)\s*\(([^)]+)\)$/i);
+      const mQty  = s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)$/i);
+      let name, qty, unitStr;
+      if(mFull)     { name=mFull[1].trim(); qty=+mFull[2]; unitStr=mFull[3]; }
+      else if(mQty) { name=mQty[1].trim();  qty=+mQty[2];  unitStr=''; }
+      else          { name=s; qty=1; unitStr=''; }
+      if(!name) return;
+
+      const prod = D.products.find(p=>p.name===name);
+      const unit = unitStr || prod?.unit || '';
+      const price = prod?.price || 0;
+
+      if(!byProduct[name]) byProduct[name] = {name, unit, qty:0, orders:[], revenue:0, statuses:{}};
+      byProduct[name].qty += qty;
+      byProduct[name].revenue += price * qty;
+      byProduct[name].orders.push({id:o.id, customer:o.customer, qty, status:o.status, time:o.time||''});
+      byProduct[name].statuses[o.status] = (byProduct[name].statuses[o.status]||0) + 1;
+    });
+  });
+
+  setEl('prep-stat-products', Object.keys(byProduct).length);
+
+  const products = Object.values(byProduct).sort((a,b)=>b.qty-a.qty);
+  const tbody = document.getElementById('prep-product-list');
+  if(!tbody) return;
+
+  if(!products.length) {
+    tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:20px;color:var(--muted)">
+      Không có đơn hàng nào trong khoảng thời gian này</td></tr>`;
+    document.getElementById('prep-order-detail').innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = products.map(p => {
+    const statusBadges = Object.entries(p.statuses).map(([st, cnt]) =>
+      `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:${statusColors[st]||'var(--muted)'}22;color:${statusColors[st]||'var(--muted)'};font-weight:600;margin-right:3px">${st} (${cnt})</span>`
+    ).join('');
+    return `<tr style="cursor:pointer" onclick="prepToggleDetail('${p.name}')">
+      <td style="font-weight:700">${p.name}</td>
+      <td style="text-align:center;color:var(--muted)">${p.unit||'—'}</td>
+      <td style="text-align:center">
+        <span style="font-size:20px;font-weight:800;color:var(--brand)">${p.qty}</span>
+        ${p.unit?`<span style="font-size:11px;color:var(--muted)"> ${p.unit}</span>`:''}
+      </td>
+      <td style="text-align:center;color:var(--muted)">${p.orders.length} đơn</td>
+      <td style="text-align:right;font-weight:700;color:var(--teal)">${p.revenue>0?Math.round(p.revenue/1000)+'K₫':'—'}</td>
+      <td>${statusBadges}</td>
+    </tr>`;
+  }).join('');
+
+  // Chi tiết đơn
+  const detailEl = document.getElementById('prep-order-detail');
+  if(detailEl) {
+    detailEl.innerHTML = products.map(p => `
+      <div id="prep-detail-${p.name.replace(/\s/g,'_')}" style="display:none;margin-bottom:14px">
+        <div style="font-weight:700;font-size:13px;color:var(--brown);margin-bottom:6px;padding:6px 10px;background:var(--brand-light);border-radius:6px">
+          📦 ${p.name} — Tổng: <strong style="color:var(--brand)">${p.qty} ${p.unit||'cái'}</strong>
+        </div>
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead><tr style="background:var(--bg)">
+            <th style="padding:5px 8px;text-align:left;font-size:11px;color:var(--muted)">Mã đơn</th>
+            <th style="padding:5px 8px;text-align:left;font-size:11px;color:var(--muted)">Khách hàng</th>
+            <th style="padding:5px 8px;text-align:center;font-size:11px;color:var(--muted)">SL</th>
+            <th style="padding:5px 8px;text-align:left;font-size:11px;color:var(--muted)">Thời gian</th>
+            <th style="padding:5px 8px;text-align:center;font-size:11px;color:var(--muted)">Trạng thái</th>
+          </tr></thead>
+          <tbody>
+            ${p.orders.map(o => `<tr style="border-bottom:1px solid var(--border)">
+              <td style="padding:6px 8px;font-family:monospace;color:var(--orange);font-weight:700;cursor:pointer" onclick="closeM('x');showOrderDetail('${o.id}')">${o.id}</td>
+              <td style="padding:6px 8px;font-weight:600">${o.customer}</td>
+              <td style="padding:6px 8px;text-align:center;font-weight:700;font-size:14px;color:var(--brand)">${o.qty} ${p.unit||''}</td>
+              <td style="padding:6px 8px;color:var(--muted)">${o.time}</td>
+              <td style="padding:6px 8px;text-align:center">
+                <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;background:${statusColors[o.status]||'var(--muted)'}22;color:${statusColors[o.status]||'var(--muted)'}">${o.status}</span>
+              </td>
+            </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`).join('');
+  }
+}
+
+function prepToggleDetail(name) {
+  const id = 'prep-detail-' + name.replace(/\s/g,'_');
+  const el = document.getElementById(id);
+  if(!el) return;
+  // Toggle — đóng tất cả rồi mở cái được chọn
+  document.querySelectorAll('[id^="prep-detail-"]').forEach(e => {
+    if(e.id !== id) e.style.display = 'none';
+  });
+  el.style.display = el.style.display === 'none' ? '' : 'none';
+}
+
+function exportPrepExcel() {
+  if(!window.XLSX) { notify('Cần load thư viện XLSX!', false); return; }
+  const fromStr = document.getElementById('prep-date-from')?.value || dateStr(new Date());
+  const toStr   = document.getElementById('prep-date-to')?.value   || fromStr;
+
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Tổng hợp theo sản phẩm
+  const rows1 = [['Sản phẩm','Đơn vị','Tổng SL','Số đơn','Doanh thu (₫)']];
+  document.querySelectorAll('#prep-product-list tr').forEach(tr => {
+    const cells = tr.querySelectorAll('td');
+    if(cells.length >= 5)
+      rows1.push([cells[0].textContent.trim(), cells[1].textContent.trim(),
+        cells[2].querySelector('span')?.textContent.trim()||cells[2].textContent.trim(),
+        cells[3].textContent.trim(), cells[4].textContent.trim()]);
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(rows1);
+  ws1['!cols'] = [{wch:25},{wch:10},{wch:10},{wch:8},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Tổng hợp SP');
+
+  // Sheet 2: Chi tiết từng đơn
+  const EXCLUDE = ['Đã thanh toán','Đã hủy'];
+  const from = new Date(fromStr); from.setHours(0,0,0,0);
+  const to   = new Date(toStr);   to.setHours(23,59,59,999);
+  const orders = D.orders.filter(o => {
+    if(o.id.startsWith('HP')||EXCLUDE.includes(o.status)) return false;
+    const d = o.created_at?new Date(o.created_at):null; if(!d) return false;
+    return d>=from&&d<=to;
+  });
+
+  const rows2 = [['Mã đơn','Khách hàng','Sản phẩm','Số lượng','Đơn vị','Trạng thái','Thời gian']];
+  orders.forEach(o => {
+    (o.items||'').split(',').forEach(item => {
+      const s=item.trim();
+      const mFull=s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)\s*\(([^)]+)\)$/i);
+      const mQty=s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)$/i);
+      const name=mFull?mFull[1].trim():mQty?mQty[1].trim():s;
+      const qty=mFull?+mFull[2]:mQty?+mQty[2]:1;
+      const unitStr=mFull?mFull[3]:'';
+      const prod=D.products.find(p=>p.name===name);
+      rows2.push([o.id,o.customer,name,qty,unitStr||prod?.unit||'',o.status,o.time||'']);
+    });
+  });
+  const ws2 = XLSX.utils.aoa_to_sheet(rows2);
+  ws2['!cols'] = [{wch:14},{wch:18},{wch:25},{wch:8},{wch:8},{wch:18},{wch:16}];
+  XLSX.utils.book_append_sheet(wb, ws2, 'Chi tiết đơn');
+
+  XLSX.writeFile(wb, `ChuanBiHang_${fromStr}_${toStr}.xlsx`);
+  notify('✅ Đã xuất Excel chuẩn bị hàng!');
+}
+
+// rpTab patch removed — logic inlined into original function
 
 boot();
 </script>
