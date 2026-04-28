@@ -3381,41 +3381,21 @@ function setSyncStatus(ok,label){
 // BOOT — load tất cả từ Supabase
 // ══════════════════════════════════════════════════
 async function boot(){
-  // Load TG config từ localStorage ngay (không cần chờ Supabase)
   loadLocalCfg();
-
   setSyncStatus(false,'Đang kết nối...');
   try{
-    const [students,inventory,products,orders,stockLog,settings,recipes,courses,customers,transactions] = await Promise.all([
+    // ── NHÓM 1: Data cốt lõi — load ngay, hiển thị UI sớm ──
+    const [orders, students, transactions, settings] = await Promise.all([
+      sbGet('orders','?order=created_at.desc&limit=500'),
       sbGet('students','?order=created_at.asc'),
-      sbGet('inventory','?order=created_at.asc'),
-      sbGet('products','?order=created_at.asc'),
-      sbGet('orders','?order=created_at.asc'),
-      sbGet('stock_log','?order=created_at.desc&limit=200'),
+      sbGet('transactions','?order=created_at.desc&limit=500'),
       sbGet('settings','?id=eq.main'),
-      sbGet('recipes','?order=created_at.asc'),
-      sbGet('courses','?order=created_at.asc'),
-      sbGet('customers','?order=created_at.asc'),
     ]);
 
-    D.students = students||[];
-    D.inventory = inventory&&inventory.length ? inventory : DEFAULTS.inventory;
-    D.products  = (products&&products.length ? products : DEFAULTS.products).map(p=>({unit:'', ...p}));
-    D.orders    = orders||[];
-    D.stockLog  = stockLog||[];
-    D.recipes   = recipes||[];
-    D.courses   = courses||[];
-    D.customers = customers||[];
+    D.orders       = orders||[];
+    D.students     = students||[];
+    D.transactions = transactions||[];
 
-    // Seed defaults nếu inventory/products trống
-    if(!inventory||!inventory.length){
-      for(const row of DEFAULTS.inventory) await sbUpsert('inventory',row);
-    }
-    if(!products||!products.length){
-      for(const row of DEFAULTS.products) await sbUpsert('products',row);
-    }
-
-    // Load settings từ Supabase (sẽ ghi đè localStorage nếu có)
     if(settings&&settings.length){
       const s=settings[0];
       cfg={
@@ -3424,6 +3404,7 @@ async function boot(){
         bankAcc:  s.bank_acc  ||cfg.bankAcc ||'',
         bankId:   s.bank_id   ||cfg.bankId  ||'VCB',
         accName:  s.acc_name  ||cfg.accName ||'TRUONG DANG HUONG',
+        accPhone: s.acc_phone ||cfg.accPhone||'0984830303',
         gsUrl:    s.gs_url    ||cfg.gsUrl   ||''
       };
       saveCfgLocal();
@@ -3431,7 +3412,35 @@ async function boot(){
     }
 
     setSyncStatus(true,'Đã đồng bộ — '+nowTime());
-    render();
+    render(); // Render ngay với data cốt lõi
+
+    // ── NHÓM 2: Data phụ — load ngầm sau khi UI đã hiện ──
+    setTimeout(async()=>{
+      try{
+        const [inventory,products,courses,customers,stockLog,recipes] = await Promise.all([
+          sbGet('inventory','?order=created_at.asc'),
+          sbGet('products','?order=created_at.asc'),
+          sbGet('courses','?order=created_at.asc'),
+          sbGet('customers','?order=created_at.asc'),
+          sbGet('stock_log','?order=created_at.desc&limit=200'),
+          sbGet('recipes','?order=created_at.asc'),
+        ]);
+
+        D.inventory = inventory&&inventory.length ? inventory : DEFAULTS.inventory;
+        D.products  = (products&&products.length ? products : DEFAULTS.products).map(p=>({unit:'', ...p}));
+        D.courses   = courses||[];
+        D.customers = customers||[];
+        D.stockLog  = stockLog||[];
+        D.recipes   = recipes||[];
+
+        // Seed defaults nếu trống
+        if(!inventory||!inventory.length) for(const row of DEFAULTS.inventory) await sbUpsert('inventory',row);
+        if(!products||!products.length)   for(const row of DEFAULTS.products)  await sbUpsert('products',row);
+
+        setSyncStatus(true,'Đã đồng bộ — '+nowTime());
+        render(); // Re-render với đầy đủ data
+      } catch(e){ console.warn('Boot group 2 error:', e.message); }
+    }, 100);
 
     // Polling realtime mỗi 15s
     startPolling();
