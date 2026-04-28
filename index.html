@@ -1732,9 +1732,9 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="fg" style="margin-bottom:12px">
       <label>📎 Ảnh chứng từ (tùy chọn, nhiều ảnh)</label>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <label style="cursor:pointer;padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px">
-          📷 Chọn ảnh <input type="file" id="thu-img" accept="image/*" multiple style="display:none" onchange="previewReceipts('thu')"/>
-        </label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="file" id="thu-img" accept="image/*" multiple onchange="previewReceipts('thu')" style="font-size:12px;max-width:200px"/>
+        </div>
         <span id="thu-img-name" style="font-size:11px;color:var(--muted)"></span>
       </div>
       <div id="thu-img-previews" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
@@ -1767,9 +1767,9 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="fg" style="margin-bottom:12px">
       <label>📎 Ảnh chứng từ (tùy chọn, nhiều ảnh)</label>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <label style="cursor:pointer;padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px">
-          📷 Chọn ảnh <input type="file" id="chi-img" accept="image/*" multiple style="display:none" onchange="previewReceipts('chi')"/>
-        </label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="file" id="chi-img" accept="image/*" multiple onchange="previewReceipts('chi')" style="font-size:12px;max-width:200px"/>
+        </div>
         <span id="chi-img-name" style="font-size:11px;color:var(--muted)"></span>
       </div>
       <div id="chi-img-previews" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
@@ -2855,9 +2855,9 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     <div class="fg" style="margin-bottom:12px">
       <label>📎 Ảnh hoá đơn NCC (tùy chọn, nhiều ảnh)</label>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <label style="cursor:pointer;padding:8px 14px;border:1.5px dashed var(--border);border-radius:8px;font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px">
-          📷 Chọn ảnh <input type="file" id="im-img" accept="image/*" multiple style="display:none" onchange="previewReceipts('im')"/>
-        </label>
+        <div style="display:flex;align-items:center;gap:6px">
+          <input type="file" id="im-img" accept="image/*" multiple onchange="previewReceipts('im')" style="font-size:12px;max-width:200px"/>
+        </div>
         <span id="im-img-name" style="font-size:11px;color:var(--muted)"></span>
       </div>
       <div id="im-img-previews" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
