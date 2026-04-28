@@ -2789,17 +2789,36 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
 <!-- Import -->
 <div class="overlay" id="modal-import">
   <div class="modal">
-    <div class="modal-title">Nhập kho</div>
+    <div class="modal-title">📥 Nhập kho</div>
     <div class="form-row">
-      <div class="fg"><label>Nguyên liệu</label><select id="im-mat"></select></div>
-      <div class="fg"><label>Số lượng</label><input id="im-qty" type="number" placeholder="10" min="0.01" step="0.01"/></div>
+      <div class="fg"><label>Nguyên liệu</label><select id="im-mat" onchange="imCalcTotal()"></select></div>
+      <div class="fg"><label>Số lượng</label><input id="im-qty" type="number" placeholder="10" min="0.01" step="0.01" oninput="imCalcTotal()"/></div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Nhà cung cấp</label><input id="im-sup" placeholder="Tên NCC"/></div>
-      <div class="fg"><label>Giá nhập (₫/đv)</label><input id="im-price" type="number" placeholder="50000"/></div>
+      <div class="fg"><label>Giá nhập (₫/đv)</label><input id="im-price" type="number" placeholder="50000" oninput="imCalcTotal()"/></div>
+    </div>
+    <div class="form-row">
+      <div class="fg">
+        <label>Thanh toán NCC</label>
+        <select id="im-payment" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;outline:none;width:100%">
+          <option value="paid">💵 Trả ngay — tạo phiếu chi</option>
+          <option value="debt">📋 Ghi nợ — chưa trả tiền</option>
+          <option value="none">🚫 Không tạo phiếu chi</option>
+        </select>
+      </div>
+      <div class="fg"><label>Ghi chú</label><input id="im-note" placeholder="VD: Đặt hàng tháng 4..."/></div>
+    </div>
+    <!-- Tổng tiền preview -->
+    <div id="im-total-preview" style="display:none;background:var(--brand-light);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="color:var(--muted)">Tổng tiền nhập:</span>
+        <span id="im-total-amount" style="font-size:18px;font-weight:800;color:var(--brand)">0₫</span>
+      </div>
+      <div id="im-payment-note" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
     </div>
     <div class="btn-group">
-      <button class="btn btn-green btn-sm" onclick="importStock()">Nhập kho</button>
+      <button class="btn btn-green btn-sm" onclick="importStock()">📥 Nhập kho</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-import')">Hủy</button>
     </div>
   </div>
@@ -5868,26 +5887,75 @@ async function addMaterial(){
   }catch(e){notify('Lỗi: '+e.message,false);}
 }
 
+function imCalcTotal() {
+  const qty   = parseFloat(document.getElementById('im-qty')?.value)||0;
+  const price = +document.getElementById('im-price')?.value||0;
+  const total = Math.round(qty * price);
+  const prev  = document.getElementById('im-total-preview');
+  const pmt   = document.getElementById('im-payment')?.value||'paid';
+  if(total > 0) {
+    prev.style.display = '';
+    document.getElementById('im-total-amount').textContent = fmt(total);
+    const notes = {paid:'💵 Sẽ tự động tạo phiếu chi', debt:'📋 Ghi nợ — nhớ thanh toán sau', none:'🚫 Không tạo phiếu chi'};
+    document.getElementById('im-payment-note').textContent = notes[pmt]||'';
+  } else {
+    prev.style.display = 'none';
+  }
+}
+
 async function importStock(){
-  const id=document.getElementById('im-mat').value;
-  const qty=parseFloat(document.getElementById('im-qty').value)||0;
-  const sup=document.getElementById('im-sup').value||'—';
-  const price=+document.getElementById('im-price').value||0;
+  const id      = document.getElementById('im-mat').value;
+  const qty     = parseFloat(document.getElementById('im-qty').value)||0;
+  const sup     = document.getElementById('im-sup').value.trim()||'—';
+  const price   = +document.getElementById('im-price').value||0;
+  const payment = document.getElementById('im-payment')?.value||'paid';
+  const note    = document.getElementById('im-note')?.value.trim()||'';
   if(!qty||qty<=0){notify('Nhập số lượng hợp lệ!',false);return;}
   const mat=D.inventory.find(i=>i.id===id);if(!mat)return;
   const oldQty=mat.qty;
+  const total = Math.round(qty * price);
   mat.qty=Math.round((mat.qty+qty)*100)/100;
   try{
     await sbPatch('inventory',{qty:mat.qty},`?id=eq.${id}`);
+    const logNote = [sup, price?fmt(price)+'/đv':'', note].filter(Boolean).join(' — ');
     const log={id:uid(),time:nowDT(),name:mat.name,type:'Nhập',qty:qty,unit:mat.unit,
-      note:sup+(price?' ('+fmt(price)+'/đv)':''),created_at:Date.now()};
+      note:logNote,created_at:Date.now()};
     await sbUpsert('stock_log',log);D.stockLog.unshift(log);
-    closeM('modal-import');['im-qty','im-sup','im-price'].forEach(id=>document.getElementById(id).value='');
-    render();notify(`Đã nhập: +${qty} ${mat.unit} ${mat.name}`);
+
+    // Tự động tạo phiếu chi nếu có giá tiền và chọn trả ngay/ghi nợ
+    if(total > 0 && payment !== 'none') {
+      const txCategory = payment==='debt' ? 'Nhập kho (ghi nợ)' : 'Nhập kho NVL';
+      const txNote = `${mat.name} x${qty}${mat.unit} @${fmt(price)}/đv — NCC: ${sup}${note?' ('+note+')':''}`;
+      const tx = {
+        id: uid(),
+        type: 'chi',
+        category: txCategory,
+        amount: total,
+        note: txNote,
+        time: nowDT(),
+        created_at: Date.now(),
+        _auto: true,
+        payment_status: payment  // 'paid' hoặc 'debt'
+      };
+      await sbUpsert('transactions', tx);
+      D.transactions.unshift(tx);
+    }
+
+    closeM('modal-import');
+    ['im-qty','im-sup','im-price','im-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    document.getElementById('im-total-preview').style.display='none';
+    render();
+
+    const payLabel = payment==='paid'?'💵 Đã tạo phiếu chi':payment==='debt'?'📋 Ghi nợ NCC':'';
+    notify(`✅ Đã nhập: +${qty} ${mat.unit} ${mat.name}${total>0?' — '+fmt(total)+(payLabel?' ('+payLabel+')':''):''}`);
+
     if(document.getElementById('at-import').checked)
-      tgMsg(`📦 *Nhập kho!*\n\n${mat.name}: +${qty} ${mat.unit}\nNCC: ${sup}\nTồn: ${mat.qty} ${mat.unit}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
-    gsSend({sheet:'LichSuKho',id:D.stockLog[0]?.id||uid(),time:nowDT(),name:mat.name,type:'Nhập',qty:qty,unit:mat.unit,note:sup,mat_id:id,mat_qty:qty});
+      tgMsg(`📦 *Nhập kho!*\n\n📦 ${mat.name}: +${qty} ${mat.unit}\n🏭 NCC: ${sup}\n${total>0?'💰 Tổng tiền: '+fmt(total)+'\n':''}${payment==='paid'?'💵 Đã tạo phiếu chi\n':payment==='debt'?'📋 Ghi nợ — chưa trả\n':''}🔢 Tồn kho: ${mat.qty} ${mat.unit}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+
+    gsSend({sheet:'LichSuKho',id:log.id,time:nowDT(),name:mat.name,type:'Nhập',qty:qty,unit:mat.unit,note:logNote,mat_id:id,mat_qty:qty});
     gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
+    if(total>0 && payment!=='none') gsSend({sheet:'ThuChi',rows:gsThuChi(),time:nowDT()});
+
   }catch(e){mat.qty=oldQty;notify('Lưu thất bại: '+e.message,false);}
 }
 
