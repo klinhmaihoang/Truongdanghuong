@@ -4156,8 +4156,14 @@ function renderMonthly(){
     const pad=String(m).padStart(2,'0');
     const monthOrders=D.orders.filter(o=>{
       const t=o.time||'';
-      // Support DD/MM/YYYY and YYYY-MM-DD
-      return (t.includes('/'+pad+'/'+currentYear)||t.includes(currentYear+'-'+pad))&&o.status==='Đã thanh toán';
+      if(o.status!=='Đã thanh toán') return false;
+      // DD/MM/YYYY — tháng có thể có hoặc không có số 0 đứng đầu: /4/2026 hoặc /04/2026
+      const matchDMY = t.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if(matchDMY) return +matchDMY[2]===m && +matchDMY[3]===currentYear;
+      // YYYY-MM-DD
+      const matchYMD = t.match(/(\d{4})-(\d{2})/);
+      if(matchYMD) return +matchYMD[2]===m && +matchYMD[1]===currentYear;
+      return false;
     });
     const retail=monthOrders.filter(o=>!o.id.startsWith('HP')).reduce((a,o)=>a+(o.total||0),0);
     const tuition=monthOrders.filter(o=>o.id.startsWith('HP')).reduce((a,o)=>a+(o.total||0),0);
