@@ -635,6 +635,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <span class="card-title">👥 Danh sách khách hàng</span>
       <div class="btn-group">
         <button class="btn btn-sm" onclick="openAddCustomer()">+ Thêm khách</button>
+        <button class="btn btn-green btn-sm" onclick="syncCustomersFromOrders()" id="btn-sync-customers">🔄 Sync từ đơn hàng</button>
         <button class="btn btn-excel btn-sm" onclick="xlExport('customers')">📊 Excel</button>
         <button class="btn btn-ghost btn-sm" onclick="exportAds()" style="color:var(--blue)">📤 Xuất Ads</button>
       </div>
@@ -10024,11 +10025,14 @@ async function odSaveEdit() {
     renderOrders();
     renderPendingOrders();
     renderDash();
-    // TG notify khi giao hàng
+    // TG notify cho tất cả thay đổi trạng thái
     const newSt = document.getElementById('od-edit-status')?.value;
-    if(newSt==='Đang giao'||newSt==='Đã giao') {
+    if(newSt) {
+      const _stIcons2 = {'Đã xác nhận':'✅','Đang chuẩn bị':'🧺','Đã book ship':'📦',
+        'Đang giao':'🚚','Đã giao':'🏠','Chờ thu tiền':'💳','Đã thanh toán':'💰','Đã hủy':'✕'};
+      const _icon2 = _stIcons2[newSt]||'🔄';
       const pv = trkVal&&odDetectProvider?odDetectProvider(trkVal):null;
-      tgMsg(`${newSt==='Đang giao'?'🚚':'🏠'} *${newSt}!*\n\n📋 Đơn: \`${o.id}\`\n👤 ${o.customer}\n💰 ${fmt(o.total||0)}`+(trkVal?`\n\n🔗 Tracking${pv?' ('+pv.name+')':''}:\n${trkVal}`:'')+`\n\n_Trương Dáng Hương Academy_`);
+      tgMsg(`${_icon2} *${newSt}!*\n\n📋 Đơn: \`${o.id}\`\n👤 ${o.customer}\n💰 ${fmt(o.total||0)}`+(trkVal?`\n\n🔗 Tracking${pv?' ('+pv.name+')':''}:\n${trkVal}`:'')+`\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
     }
     // Update modal view
     showOrderDetail(o.id);
@@ -10373,12 +10377,13 @@ async function odQuickUpdateStatus(newStatus) {
     // Re-render modal với status mới
     showOrderDetail(o.id);
     notify(`✅ Đã chuyển: ${oldStatus} → ${newStatus}`);
-    // Gửi TG nếu đang giao hoặc đã giao
-    if(newStatus==='Đang giao'||newStatus==='Đã giao') {
-      const trkUrl = o.tracking_url||'';
-      const pv = trkUrl&&odDetectProvider ? odDetectProvider(trkUrl) : null;
-      tgMsg(`${newStatus==='Đang giao'?'🚚':'🏠'} *${newStatus}!*\n\n📋 Đơn: \`${o.id}\`\n👤 ${o.customer}\n💰 ${fmt(o.total||0)}`+(trkUrl?`\n\n🔗 Tracking${pv?' ('+pv.name+')':''}:\n${trkUrl}`:'')+`\n\n_Trương Dáng Hương Academy_`);
-    }
+    // Gửi TG cho tất cả thay đổi trạng thái đơn
+    const _stIcons = {'Đã xác nhận':'✅','Đang chuẩn bị':'🧺','Đã book ship':'📦',
+      'Đang giao':'🚚','Đã giao':'🏠','Chờ thu tiền':'💳','Đã thanh toán':'💰','Đã hủy':'✕'};
+    const _icon = _stIcons[newStatus]||'🔄';
+    const trkUrl = o.tracking_url||'';
+    const pv = trkUrl&&odDetectProvider ? odDetectProvider(trkUrl) : null;
+    tgMsg(`${_icon} *${newStatus}!*\n\n📋 Đơn: \`${o.id}\`\n👤 ${o.customer}\n💰 ${fmt(o.total||0)}`+(trkUrl?`\n\n🔗 Tracking${pv?' ('+pv.name+')':''}:\n${trkUrl}`:'')+`\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
   } catch(e) {
     o.status = oldStatus; // rollback
     notify('Lỗi cập nhật: ' + e.message, false);
@@ -10697,6 +10702,82 @@ function cleanItems(items) {
   return (items||'').split(',').map(s=>
     s.trim().replace(/\s*@\d+\s*$/,'')
   ).join(', ');
+}
+
+
+// ══════════════════════════════════════════════════
+// SYNC KHÁCH HÀNG TỪ ĐƠN HÀNG
+// ══════════════════════════════════════════════════
+async function syncCustomersFromOrders() {
+  const btn = document.getElementById('btn-sync-customers');
+  if(btn) { btn.textContent = '⏳ Đang sync...'; btn.disabled = true; }
+
+  const paidOrders = D.orders.filter(o =>
+    !o.id.startsWith('HP') &&
+    o.customer && o.customer !== 'Khách lẻ' &&
+    o.status !== 'Đã hủy'
+  );
+
+  // Gom nhóm theo tên + sđt
+  const map = {};
+  paidOrders.forEach(o => {
+    const key = (o.phone ? o.phone : o.customer).trim();
+    if(!map[key]) {
+      map[key] = {
+        name: o.customer, phone: o.phone||'', email: o.email||'',
+        total_spent: 0, visit_count: 0, last_visit: '',
+        last_ts: 0, orders: []
+      };
+    }
+    map[key].total_spent += (o.total||0);
+    map[key].visit_count += 1;
+    map[key].orders.push(o);
+    const ts = o.created_at||0;
+    if(ts > map[key].last_ts) {
+      map[key].last_ts = ts;
+      map[key].last_visit = o.time||'';
+    }
+  });
+
+  let created = 0, updated = 0;
+  for(const key of Object.keys(map)) {
+    const d = map[key];
+    const pts = Math.floor(d.total_spent / 1000);
+    // Tìm KH hiện có theo sđt hoặc tên
+    let existing = D.customers.find(c =>
+      (d.phone && c.phone === d.phone) || c.name === d.name
+    );
+    if(!existing) {
+      // Tạo mới
+      const c = {
+        id: uid(), name: d.name, phone: d.phone, email: d.email,
+        points: pts, total_spent: d.total_spent,
+        visit_count: d.visit_count, last_visit: d.last_visit,
+        birthday:'', gender:'', address:'', source:'', segment:'', tags:'', note:'',
+        created_at: Date.now()
+      };
+      try { await sbUpsert('customers', c); D.customers.push(c); created++; }
+      catch(e) { console.warn('sync skip:', d.name, e.message); }
+    } else {
+      // Cập nhật nếu số liệu thay đổi
+      const upd = {
+        points: Math.max(existing.points||0, pts),
+        total_spent: Math.max(existing.total_spent||0, d.total_spent),
+        visit_count: Math.max(existing.visit_count||0, d.visit_count),
+        last_visit: d.last_visit || existing.last_visit || ''
+      };
+      // Bổ sung phone/email nếu KH cũ chưa có
+      if(!existing.phone && d.phone) upd.phone = d.phone;
+      if(!existing.email && d.email) upd.email = d.email;
+      Object.assign(existing, upd);
+      try { await sbPatch('customers', upd, `?id=eq.${existing.id}`); updated++; }
+      catch(e) { console.warn('sync update skip:', existing.name, e.message); }
+    }
+  }
+
+  renderCustomers();
+  if(btn) { btn.textContent = '🔄 Sync từ đơn hàng'; btn.disabled = false; }
+  notify(`✅ Sync xong! Tạo mới: ${created}, cập nhật: ${updated} khách hàng`);
 }
 
 boot();
