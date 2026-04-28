@@ -3112,8 +3112,23 @@ async function sb(method, table, data=null, filter=''){
 }
 const sbGet  = (t,f='')     => sb('GET',t,null,f);
 const sbPost = (t,d)        => sb('POST',t,d);
-const sbPatch= (t,d,f)      => sb('PATCH',t,d,f);
 const sbDel  = (t,f)        => sb('DELETE',t,null,f);
+
+// sbPatch với graceful fallback cho orders (chỉ patch cột có sẵn nếu lỗi schema)
+const sbPatch = async (t,d,f) => {
+  try {
+    return await sb('PATCH',t,d,f);
+  } catch(e) {
+    // Nếu lỗi column not found và đang patch orders → chỉ patch status + time
+    if(e.message?.includes('could not find') && t==='orders') {
+      const safe = {};
+      const safeKeys = ['status','time','note','total','items','customer','email'];
+      safeKeys.forEach(k=>{ if(k in d) safe[k]=d[k]; });
+      if(Object.keys(safe).length) return await sb('PATCH',t,safe,f);
+    }
+    throw e;
+  }
+};
 const sbUpsert = async (t,d)=> {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${t}`, {
     method:'POST',
@@ -9705,16 +9720,38 @@ function showOrderDetail(id) {
   // Items — parse "Sản phẩm x3, Sản phẩm2" into tags
   const itemsEl = document.getElementById('od-items-view');
   const itemList = (o.items||'').split(',').map(s=>s.trim()).filter(Boolean);
-  itemsEl.innerHTML = itemList.map(item => {
-    const m = item.match(/^(.+?)(?:\s+x(\d+))?$/);
-    const name = m?.[1]||item, qty = m?.[2]||'1';
+  // Tính tổng giá từ catalog để phân bổ tỷ lệ
+  let catalogTotal = 0;
+  const parsedItems = itemList.map(item => {
+    const mFull = item.match(/^(.+?)\s+x(\d+(?:\.\d+)?)\s*\(([^)]+)\)$/i);
+    const mQty  = item.match(/^(.+?)\s+x(\d+(?:\.\d+)?)$/i);
+    let name, qty, unit;
+    if(mFull)     { name=mFull[1].trim(); qty=+mFull[2]; unit=mFull[3]; }
+    else if(mQty) { name=mQty[1].trim();  qty=+mQty[2];  unit=''; }
+    else          { name=item; qty=1; unit=''; }
     const prod = D.products.find(p=>p.name===name);
-    const price = prod?.price||0;
-    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid var(--border)">
-      <span style="font-weight:600">${name}</span>
-      <span style="display:flex;align-items:center;gap:10px">
-        <span style="color:var(--muted);font-size:12px">x${qty}</span>
-        ${price>0?`<span style="font-weight:700;color:var(--brand)">${fmt(price*+qty)}</span>`:''}
+    unit = unit || prod?.unit || '';
+    const lineTotal = (prod?.price||0) * qty;
+    catalogTotal += lineTotal;
+    return {name, qty, unit, prod, lineTotal};
+  });
+  // Nếu catalog total khớp với o.total → dùng giá catalog
+  // Nếu không khớp (do discount, NVL kg...) → phân bổ tỷ lệ từ o.total thực
+  const actualTotal = o.subtotal || o.total || 0;
+  const useRatio = catalogTotal > 0 && Math.abs(catalogTotal - actualTotal) > 1000;
+  itemsEl.innerHTML = parsedItems.map(({name, qty, unit, prod, lineTotal}) => {
+    const displayQty  = Number.isInteger(qty) ? qty : qty.toFixed(1);
+    const displayPrice = useRatio && actualTotal > 0
+      ? Math.round(lineTotal / catalogTotal * actualTotal)
+      : lineTotal;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--border)">
+      <span>
+        <span style="font-weight:600">${name}</span>
+        ${unit?`<span style="font-size:10px;color:var(--muted);margin-left:4px">${unit}</span>`:''}
+      </span>
+      <span style="display:flex;align-items:center;gap:10px;flex-shrink:0">
+        <span style="color:var(--muted);font-size:12px">x${displayQty}</span>
+        ${displayPrice>0?`<span style="font-weight:700;color:var(--brand)">${fmt(displayPrice)}</span>`:''}
       </span>
     </div>`;
   }).join('');
