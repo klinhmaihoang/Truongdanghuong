@@ -5852,7 +5852,7 @@ function renderInventory(){
         <div style="font-size:10px;color:var(--muted);margin-top:2px">${pct}%</div>
       </td>
       <td class="btn-group" style="gap:4px">
-        <button class="btn btn-green btn-sm" onclick="showImportModal('${item.id}')">📥</button>
+        <button class="btn btn-green btn-sm" onclick="showM('modal-import');setTimeout(()=>{const el=document.getElementById('im-mat');if(el){el.value='${item.id}';imCalcTotal();}},50)">📥</button>
         <button class="btn btn-ghost btn-sm" onclick="openEditMat('${item.id}')">✏️</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteMat('${item.id}')">🗑</button>
       </td>
