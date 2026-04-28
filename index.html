@@ -1474,8 +1474,9 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
         <span id="od-status-badge" style="font-size:12px;font-weight:700;padding:4px 12px;border-radius:20px"></span>
-        <div style="display:flex;gap:5px" id="od-action-buttons">
+        <div style="display:flex;gap:5px;flex-wrap:wrap" id="od-action-buttons">
           <button class="btn btn-sm" onclick="odEnterEdit()">✏️ Sửa</button>
+          <button class="btn btn-ghost btn-sm" onclick="odRecalcTotal()" style="font-size:11px" title="Tính lại tổng tiền từ thành tiền các dòng sản phẩm">🔄 Tính lại tổng</button>
           <button class="btn btn-green btn-sm" id="od-collect-btn" style="display:none" onclick="odCollect()">💰 Thu tiền</button>
           <button class="btn btn-pdf btn-sm" onclick="exportPDF(document.getElementById('od-id').textContent)">📄 PDF</button>
         </div>
@@ -9692,6 +9693,15 @@ function showOrderDetail(id) {
   const o = D.orders.find(x => x.id === id);
   if(!o) return;
   OD_current = o;
+  // Cảnh báo nếu tổng bất thường (> 50tr) — gợi ý sửa lại
+  if((o.total||0) > 50000000) {
+    const fix = confirm(
+      `⚠️ Đơn "${o.id}" có tổng tiền ${fmt(o.total||0)} — có vẻ bất thường!\n\n` +
+      `Có thể do giá sản phẩm bị tính sai (VD: giá/kg nhân với số lượng lớn).\n\n` +
+      `Bấm OK để mở chỉnh sửa ngay, Cancel để xem thôi.`
+    );
+    if(fix) { setTimeout(()=>odEnterEdit(), 300); }
+  }
   // Reset về view mode
   odCancelEdit();
   // Populate header
@@ -10362,6 +10372,33 @@ async function odQuickUpdateStatus(newStatus) {
     notify('Lỗi cập nhật: ' + e.message, false);
     document.getElementById('od-status-select').value = '';
   }
+}
+
+// Tính lại tổng tiền từ parseItemStr (dùng @saved hoặc catalog price)
+async function odRecalcTotal() {
+  const o = OD_current; if(!o) return;
+  const itemList = (o.items||'').split(',').map(s=>s.trim()).filter(Boolean);
+  let newTotal = 0;
+  const details = [];
+  itemList.forEach(s => {
+    const {name, qty, lineTotal, unitPrice} = parseItemStr(s);
+    newTotal += lineTotal;
+    details.push(`${name} x${qty} = ${fmt(lineTotal)}`);
+  });
+  newTotal += (o.ship_fee||0);
+  if(!confirm(
+    `Tính lại tổng tiền đơn ${o.id}:\n\n${details.join('\n')}` +
+    (o.ship_fee>0?`\nPhí ship: +${fmt(o.ship_fee)}`:'') +
+    `\n\n→ Tổng mới: ${fmt(newTotal)}\n` +
+    `(Hiện tại: ${fmt(o.total||0)})\n\nBấm OK để lưu tổng mới?`
+  )) return;
+  o.total = newTotal; o.subtotal = newTotal - (o.ship_fee||0);
+  try {
+    await sbPatch('orders', {total: newTotal, subtotal: o.subtotal}, `?id=eq.${o.id}`);
+    showOrderDetail(o.id);
+    renderOrders(); renderPendingOrders(); renderDash();
+    notify(`✅ Đã cập nhật tổng: ${fmt(newTotal)}`);
+  } catch(e) { notify('Lỗi: '+e.message, false); }
 }
 
 function odAdvanceStatus(newStatus) {
