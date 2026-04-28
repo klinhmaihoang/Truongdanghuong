@@ -5046,7 +5046,7 @@ function addToCart(pid){
   const ex=cart.find(c=>c.pid===pid);
   if(ex){ex.qty++;renderCart();return;}
   const p=D.products.find(x=>x.id===pid);if(!p)return;
-  cart.push({pid,name:p.name,price:p.price,qty:1,vat:p.vat||0,discount:p.discount||0});
+  cart.push({pid,name:p.name,price:p.price,qty:1,unit:p.unit||'',vat:p.vat||0,discount:p.discount||0});
   renderCart();
 }
 function renderCart(){
@@ -5142,7 +5142,7 @@ async function checkout(){
   const discountAmt=Math.round(subtotal*discount/100);
   const total=subtotal-discountAmt;
   const id='HĐ'+Date.now().toString().slice(-6);
-  const items=cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')).join(', ');
+  const items=cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')+(c.unit?' ('+c.unit+')':'')).join(', ');
   const address=document.getElementById('c-address')?.value?.trim()||'';
   const payment=document.getElementById('c-payment')?.value||'Tiền mặt';
   const shipping=document.getElementById('c-shipping')?.value||'Khách tới lấy';
@@ -5410,7 +5410,7 @@ async function saveDraft(){
   const discountAmt=Math.round(subtotal*discount/100);
   const total=subtotal-discountAmt;
   const id='HĐ'+Date.now().toString().slice(-6);
-  const items=cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')).join(', ');
+  const items=cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')+(c.unit?' ('+c.unit+')':'')).join(', ');
   const address=document.getElementById('c-address')?.value?.trim()||'';
   const payment=document.getElementById('c-payment')?.value||'Tiền mặt';
   const shipping=document.getElementById('c-shipping')?.value||'Khách tới lấy';
@@ -6597,18 +6597,26 @@ function printRetailPDF(order){
       </tr>
       ${(order.items||'').split(',').map(i=>{
         const s = i.trim();
-        const m = s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)$/i);
-        const name = m ? m[1].trim() : s;
-        const qty  = m ? +m[2] : 1;
+        // Parse: "Tên sản phẩm x3 (hộp)" hoặc "Tên sản phẩm x3" hoặc "Tên sản phẩm"
+        const mFull = s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)\s*\(([^)]+)\)$/i); // có unit trong ()
+        const mQty  = s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)$/i);               // có số lượng
+        let name, qty, unitStr;
+        if(mFull)      { name=mFull[1].trim(); qty=+mFull[2]; unitStr=mFull[3]; }
+        else if(mQty)  { name=mQty[1].trim();  qty=+mQty[2];  unitStr=''; }
+        else           { name=s; qty=1; unitStr=''; }
+        // Fallback: lấy unit từ D.products nếu có
         const prod = D.products.find(p=>p.name===name);
         const price = prod ? prod.price : 0;
-        const unit  = prod?.unit || '';
+        const unit  = unitStr || prod?.unit || '';
         const subtotal = price * qty;
         return `<tr style="border-bottom:1px dashed #f0f0f0">
-          <td style="padding:4px 0;font-size:11px;font-weight:600">${name}${unit?`<span style="font-size:9px;color:#999;font-weight:400"> (${unit})</span>`:''}</td>
-          <td style="text-align:center;padding:4px;font-size:11px;color:#555">x${qty}</td>
-          <td style="text-align:right;padding:4px 0;font-size:11px;color:#888">${price>0?fmt(price):''}</td>
-          <td style="text-align:right;padding:4px 0;font-size:11px;font-weight:600;color:#cc5500">${subtotal>0?fmt(subtotal):''}</td>
+          <td style="padding:5px 0;font-size:11px">
+            <div style="font-weight:600">${name}</div>
+            ${unit?`<div style="font-size:9px;color:#999">${unit}</div>`:''}
+          </td>
+          <td style="text-align:center;padding:5px 4px;font-size:11px;color:#555;white-space:nowrap">x${qty}</td>
+          <td style="text-align:right;padding:5px 0;font-size:11px;color:#888;white-space:nowrap">${price>0?fmt(price):''}</td>
+          <td style="text-align:right;padding:5px 0;font-size:11px;font-weight:700;color:#cc5500;white-space:nowrap">${subtotal>0?fmt(subtotal):''}</td>
         </tr>`;
       }).join('')}
     </table>
