@@ -2051,6 +2051,9 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   ADD COLUMN IF NOT EXISTS discount NUMERIC DEFAULT 0,
   ADD COLUMN IF NOT EXISTS subtotal NUMERIC DEFAULT 0;
 
+ALTER TABLE products
+  ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT '';
+
 CREATE TABLE IF NOT EXISTS app_users (
   username TEXT PRIMARY KEY,
   pass_hash TEXT NOT NULL,
@@ -6547,7 +6550,7 @@ function exportPDF(orderId){
 function printRetailPDF(order){
   const student=null;
   const qrUrl=cfg.bankAcc&&cfg.bankId
-    ?`https://img.vietqr.io/image/${cfg.bankId}-${cfg.bankAcc}-compact2.png?amount=${order.total}&addInfo=${encodeURIComponent(order.id+' '+order.customer)}&accountName=${encodeURIComponent(cfg.accName||'TRUONG DANG HUONG')}`
+    ?`https://img.vietqr.io/image/${cfg.bankId}-${cfg.bankAcc}-qr_only.png?amount=${order.total}&addInfo=${encodeURIComponent(order.id+' '+order.customer)}&accountName=${encodeURIComponent(cfg.accName||'TRUONG DANG HUONG')}`
     :'';
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>Hóa đơn ${order.id}</title>
@@ -6568,9 +6571,9 @@ function printRetailPDF(order){
     .total-box{background:#fff3e0;border:1.5px solid #FF8C00;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin:12px 0}
     .total-box .label{font-size:13px;font-weight:bold;color:#cc5500}
     .total-box .amount{font-size:14px;font-weight:bold;color:#cc5500}
-    .qr{text-align:center;margin:14px 0}
-    .qr img{width:70px;height:70px}
-    .qr p{font-size:9px;color:#888;margin-top:4px}
+    .qr{text-align:center;margin:14px 0;padding:10px;background:#f9f9f9;border-radius:8px}
+    .qr img{width:160px;height:160px;border-radius:6px;border:2px solid #FF8C00}
+    .qr p{font-size:10px;color:#555;margin-top:6px;font-weight:600}
     .footer{text-align:center;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:12px}
     @page{size:80mm auto;margin:0}@media print{body{width:80mm;padding:3mm 3mm}}
   </style></head><body>
@@ -6618,7 +6621,14 @@ function printRetailPDF(order){
   ${order.payment?`<div class="row" style="font-size:11px"><span class="label">Thanh toán:</span><span class="value">${order.payment}</span></div>`:''}
   ${order.shipping&&order.shipping!=='Khách tới lấy'?`<div class="row" style="font-size:11px"><span class="label">Giao hàng:</span><span class="value">${order.shipping}</span></div>`:''}
   ${order.address?`<div class="row" style="font-size:11px"><span class="label">Địa chỉ:</span><span class="value" style="font-size:10px">${order.address}</span></div>`:''}
-  ${qrUrl?`<div class="qr"><img src="${qrUrl}" onerror="this.style.display='none'"/><p>Quét mã QR để thanh toán</p></div>`:''}
+  ${qrUrl?`<div class="qr">
+    <div style="font-size:10px;color:#888;margin-bottom:6px">Quét mã QR để chuyển khoản</div>
+    <img src="${qrUrl}" onerror="this.style.display='none'" style="width:160px;height:160px"/>
+    <div style="margin-top:8px;font-size:11px;font-weight:700;color:#cc5500">${fmt(order.total||0)}</div>
+    ${cfg.bankId&&cfg.bankAcc?`<div style="font-size:10px;color:#555;margin-top:3px">${cfg.bankId.toUpperCase()} — ${cfg.bankAcc}</div>`:''}
+    ${cfg.accName?`<div style="font-size:10px;color:#888">${cfg.accName}</div>`:''}
+    <div style="font-size:10px;color:#888;margin-top:2px">Nội dung: ${order.id} ${order.customer||''}</div>
+  </div>`:''}
   ${order.note?`<div class="row"><span class="label">Ghi chú:</span><span class="value">${order.note}</span></div>`:''}
   <div class="footer">Trương Dáng Hương Academy — Phiếu xuất tự động từ hệ thống</div>
   </body></html>`;
@@ -10086,6 +10096,8 @@ async function runMigration() {
     `ALTER TABLE orders ADD COLUMN IF NOT EXISTS tracking_url TEXT DEFAULT ''`,
     `ALTER TABLE orders ADD COLUMN IF NOT EXISTS discount NUMERIC DEFAULT 0`,
     `ALTER TABLE orders ADD COLUMN IF NOT EXISTS subtotal NUMERIC DEFAULT 0`,
+    // products — thêm unit
+    `ALTER TABLE products ADD COLUMN IF NOT EXISTS unit TEXT DEFAULT ''`,
     // app_users
     `CREATE TABLE IF NOT EXISTS app_users (username TEXT PRIMARY KEY, pass_hash TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW())`,
     `ALTER TABLE app_users ENABLE ROW LEVEL SECURITY`,
