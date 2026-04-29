@@ -11482,7 +11482,7 @@ function gsBaoCaoData() {
       acaThu:0, retThu:0,
       // Chi phí theo nhóm — Retail
       ret_nvl:0, ret_ship:0, ret_baobao:0,       // COGS biến phí
-      ret_marketing:0, ret_thietbi:0, ret_khac:0, // OPEX
+      ret_marketing:0, ret_thietbi:0, ret_khac:0, ret_luong:0, // OPEX
       // Chi phí theo nhóm — Academy
       aca_marketing:0, aca_luong:0, aca_khac:0,
       // Tổng định phí / biến phí
@@ -11556,6 +11556,8 @@ function gsBaoCaoData() {
       retOPEX, retChi, retEBIT,
       // Chi phí Academy
       aca_marketing: m.aca_marketing, aca_luong: m.aca_luong, aca_khac: m.aca_khac,
+      // Tổng lương (cả 2 mảng)
+      total_luong: m.aca_luong + m.ret_luong,
       acaChi, acaEBIT,
       // Tổng
       totalChi, totalProfit: m.acaThu+m.retThu - totalChi,
@@ -11574,6 +11576,7 @@ function gsBaoCaoData() {
     ret_marketing:sum('ret_marketing'), ret_thietbi:sum('ret_thietbi'), ret_khac:sum('ret_khac'),
     retOPEX:sum('retOPEX'), retChi:sum('retChi'), retEBIT:sum('retEBIT'),
     aca_marketing:sum('aca_marketing'), aca_luong:sum('aca_luong'), aca_khac:sum('aca_khac'),
+    total_luong:sum('total_luong'),
     acaChi:sum('acaChi'), acaEBIT:sum('acaEBIT'),
     totalChi:sum('totalChi'), totalProfit:sum('totalProfit'),
     fixed:sum('fixed'), variable:sum('variable'),
