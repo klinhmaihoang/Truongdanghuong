@@ -10311,7 +10311,8 @@ function odCalcLive() {
 async function odSaveEdit() {
   const o = OD_current;
   if(!o) return;
-  const customer = (document.getElementById('od-edit-customer').value||'').trim();
+  // Trên mobile, field có thể bị empty do scroll — fallback về tên cũ
+  const customer = (document.getElementById('od-edit-customer').value||'').trim() || o.customer || '';
   if(!customer){notify('Nhập tên khách!',false);return;}
   // Collect items — lưu kèm thành tiền để bill luôn đúng
   const items = [];
@@ -10363,6 +10364,9 @@ async function odSaveEdit() {
     renderOrders();
     renderPendingOrders();
     renderDash();
+    // Re-populate edit form với data mới để tránh bị trống lần sau
+    document.getElementById('od-edit-customer').value = o.customer||'';
+    document.getElementById('od-edit-phone').value    = o.phone||'';
     // TG notify cho tất cả thay đổi trạng thái
     const newSt = document.getElementById('od-edit-status')?.value;
     if(newSt) {
@@ -10372,7 +10376,11 @@ async function odSaveEdit() {
       const pv = trkVal&&odDetectProvider?odDetectProvider(trkVal):null;
       tgMsg(`${_icon2} *${newSt}!*\n\n📋 Đơn: \`${o.id}\`\n👤 ${o.customer}\n💰 ${fmt(o.total||0)}`+(trkVal?`\n\n🔗 Tracking${pv?' ('+pv.name+')':''}:\n${trkVal}`:'')+`\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
     }
-    // Update modal view
+    // Update modal view — quay về view mode
+    const editPanel = document.getElementById('od-edit');
+    const viewPanel = document.getElementById('od-view');
+    if(editPanel) editPanel.style.display = 'none';
+    if(viewPanel) viewPanel.style.display = '';
     showOrderDetail(o.id);
     notify('✅ Đã cập nhật đơn '+o.id);
   } catch(e) { notify('Lỗi lưu: '+e.message, false); }
