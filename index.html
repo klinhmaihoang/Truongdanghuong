@@ -11481,7 +11481,7 @@ function gsBaoCaoData() {
       // Doanh thu
       acaThu:0, retThu:0,
       // Chi phí theo nhóm — Retail
-      ret_nvl:0, ret_ship:0, ret_baobì:0,       // COGS biến phí
+      ret_nvl:0, ret_ship:0, ret_baobao:0,       // COGS biến phí
       ret_marketing:0, ret_thietbi:0, ret_khac:0, // OPEX
       // Chi phí theo nhóm — Academy
       aca_marketing:0, aca_luong:0, aca_khac:0,
@@ -11537,7 +11537,7 @@ function gsBaoCaoData() {
 
   // Tính tổng chi, profit, COGS, OPEX
   const rows = Object.values(monthMap).map(m => {
-    const retCOGS = m.ret_nvl + m.ret_ship + m.ret_baobì;
+    const retCOGS = m.ret_nvl + m.ret_ship + m.ret_baobao;
     const retOPEX = m.ret_marketing + m.ret_thietbi + m.ret_khac;
     const acaChi  = m.aca_marketing + m.aca_luong + m.aca_khac;
     const retChi  = retCOGS + retOPEX;
@@ -11550,7 +11550,7 @@ function gsBaoCaoData() {
       // Doanh thu
       acaThu: m.acaThu, retThu: m.retThu, totalThu: m.acaThu+m.retThu,
       // Chi phí Retail
-      ret_nvl: m.ret_nvl, ret_ship: m.ret_ship, ret_baobì: m.ret_baobì,
+      ret_nvl: m.ret_nvl, ret_ship: m.ret_ship, ret_baobao: m.ret_baobao,
       retCOGS, grossProfit,
       ret_marketing: m.ret_marketing, ret_thietbi: m.ret_thietbi, ret_khac: m.ret_khac,
       retOPEX, retChi, retEBIT,
@@ -11569,7 +11569,7 @@ function gsBaoCaoData() {
   const tong = {
     month:'TONG',
     acaThu:sum('acaThu'), retThu:sum('retThu'), totalThu:sum('totalThu'),
-    ret_nvl:sum('ret_nvl'), ret_ship:sum('ret_ship'), ret_baobì:sum('ret_baobì'),
+    ret_nvl:sum('ret_nvl'), ret_ship:sum('ret_ship'), ret_baobao:sum('ret_baobao'),
     retCOGS:sum('retCOGS'), grossProfit:sum('grossProfit'),
     ret_marketing:sum('ret_marketing'), ret_thietbi:sum('ret_thietbi'), ret_khac:sum('ret_khac'),
     retOPEX:sum('retOPEX'), retChi:sum('retChi'), retEBIT:sum('retEBIT'),
