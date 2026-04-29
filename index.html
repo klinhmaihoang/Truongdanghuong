@@ -693,6 +693,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <h2 style="font-size:18px;font-weight:800;color:var(--brand);margin:0">💸 Quản lý Chi phí</h2>
     <button class="btn btn-red btn-sm" onclick="showM('modal-add-expense')">+ Thêm chi phí</button>
     <button class="btn btn-sm" onclick="showM('modal-expense-budget')" style="background:var(--bg2);color:var(--brown);border-color:var(--border)">🎯 Ngân sách</button>
+    <button class="btn btn-sm" onclick="bulkClassifyExpenses()" style="background:#8E44AD;color:#fff;border-color:#8E44AD">🔮 Phân loại tự động</button>
     <button class="btn btn-tg btn-sm" onclick="syncBaoCao()">📊 Sync Báo cáo</button>
   </div>
 
@@ -1927,16 +1928,29 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <div class="fg"><label>Số tiền (₫)</label><input id="chi-amount" type="number" placeholder="500000"/></div>
     </div>
     <div class="form-row">
-      <div class="fg"><label>Danh mục</label>
-        <select id="chi-cat">
-          <option>Mua nguyên liệu</option>
-          <option>Chi phí vận hành</option>
-          <option>Lương nhân viên</option>
-          <option>Marketing</option>
-          <option>Thiết bị dụng cụ</option>
-          <option>Chi khác</option>
+      <div class="fg">
+        <label>Nhóm chi phí</label>
+        <select id="chi-cat" onchange="chiCatChanged()">
+          <option value="nvl">📦 Nguyên vật liệu (NVL)</option>
+          <option value="ship">🚚 Phí vận chuyển / ship</option>
+          <option value="baobì">🛍️ Bao bì đóng gói</option>
+          <option value="luong">👥 Lương nhân viên</option>
+          <option value="marketing">📣 Marketing / Quảng cáo</option>
+          <option value="thietbi">🔧 Thiết bị dụng cụ</option>
+          <option value="khac">📋 Chi phí khác</option>
         </select>
       </div>
+      <div class="fg">
+        <label>Loại chi phí</label>
+        <select id="chi-cost-type" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+          <option value="variable">📈 Biến phí (thay đổi theo DT)</option>
+          <option value="fixed">📌 Định phí (cố định hàng tháng)</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>Tên chi tiết</label>
+      <input id="chi-detail" placeholder="VD: Mua trà oolong 5kg, Lương tháng 4..."/>
     </div>
     <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="chi-note" placeholder="VD: Mua rượu, chanh..."/></div>
     <div class="fg" style="margin-bottom:12px">
@@ -7178,17 +7192,20 @@ async function addTransaction(type){
   const note=document.getElementById(type+'-note').value.trim();
   // Upload nhiều ảnh chứng từ nếu có
   const receiptUrls = await uploadReceipts(type);
-  const mang = type==='chi' ? (document.getElementById('chi-mang')?.value||'retail') : 'thu';
+  const mang      = type==='chi' ? (document.getElementById('chi-mang')?.value||'retail') : 'thu';
+  const costGroup = type==='chi' ? (document.getElementById('chi-cat')?.value||'khac') : '';
+  const costType  = type==='chi' ? (document.getElementById('chi-cost-type')?.value||'variable') : '';
+  const detail    = type==='chi' ? (document.getElementById('chi-detail')?.value?.trim()||'') : '';
   const tx={
     id:'TX'+Date.now(),
     type,
-    category:cat,
+    category: costGroup ? (document.getElementById('chi-cat')?.options[document.getElementById('chi-cat')?.selectedIndex]?.text?.replace(/^[^\s]+\s/,'').split(' (')[0] || cat) : cat,
     amount,
-    note,
+    note: detail || note,
     time:nowDT(),
     created_at:Date.now(),
     receipt_url: receiptUrls.length ? JSON.stringify(receiptUrls) : '',
-    mang: mang
+    mang, cost_group: costGroup, cost_type: costType
   };
   try{
     await sbUpsert('transactions',tx);
@@ -12514,6 +12531,56 @@ function finSwitchTab(tab) {
   }
 }
 
+
+function chiCatChanged() {
+  const grp = document.getElementById('chi-cat')?.value;
+  const typeEl = document.getElementById('chi-cost-type');
+  if(!typeEl) return;
+  // Auto-suggest cost type based on group
+  const fixedGroups = ['luong','thietbi'];
+  typeEl.value = fixedGroups.includes(grp) ? 'fixed' : 'variable';
+}
+
+// ══════════════════════════════════════════════════════════════════
+// BULK CLASSIFY CHI PHÍ CŨ
+// ══════════════════════════════════════════════════════════════════
+async function bulkClassifyExpenses() {
+  const txs = (D.transactions||[]).filter(t => t.type==='chi' && !t.cost_group);
+  if(!txs.length) { notify('Tất cả phiếu chi đã được phân loại!'); return; }
+
+  // Auto-classify dựa vào category/note keywords
+  const rules = [
+    { keys:['nguyên liệu','nvl','trà','cà phê','bột','sữa','đường','mua kho','nhập kho'], group:'nvl', type:'variable', mang:'retail' },
+    { keys:['ship','vận chuyển','giao hàng','spx','ghn','ghtk'], group:'ship', type:'variable', mang:'retail' },
+    { keys:['bao bì','túi','hộp','ly','ống hút','nhãn','sticker'], group:'baobì', type:'variable', mang:'retail' },
+    { keys:['lương','thưởng','nhân viên','trợ cấp'], group:'luong', type:'fixed', mang:'chung' },
+    { keys:['marketing','quảng cáo','ads','facebook','instagram'], group:'marketing', type:'variable', mang:'chung' },
+    { keys:['thiết bị','dụng cụ','máy','cân','kệ','bàn'], group:'thietbi', type:'fixed', mang:'retail' },
+  ];
+
+  let updated = 0;
+  for(const tx of txs) {
+    const text = ((tx.category||'')+(tx.note||'')).toLowerCase();
+    let matched = null;
+    for(const rule of rules) {
+      if(rule.keys.some(k => text.includes(k))) { matched = rule; break; }
+    }
+    const updates = {
+      cost_group: matched ? matched.group : 'khac',
+      cost_type:  matched ? matched.type  : 'variable',
+      mang:       tx.mang || (matched ? matched.mang : 'retail')
+    };
+    try {
+      await sbPatch('transactions', updates, '?id=eq.'+tx.id);
+      Object.assign(tx, updates);
+      updated++;
+    } catch(e) { console.warn('bulk classify err:', e.message); }
+  }
+  notify('✅ Đã phân loại '+updated+'/'+txs.length+' phiếu chi!');
+  renderExpenses && renderExpenses();
+  renderFinance && renderFinance();
+  setTimeout(()=>gsSend({sheet:'BaoCaoLaiLo',rows:gsBaoCaoData(),time:nowDT()}), 1000);
+}
 boot();
 </script>
 </body>
