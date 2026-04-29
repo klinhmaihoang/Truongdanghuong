@@ -1915,7 +1915,17 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   <div class="modal">
     <div class="modal-title">🔴 Thêm phiếu chi</div>
     <div class="form-row">
+      <div class="fg">
+        <label>Thuộc mảng</label>
+        <select id="chi-mang" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+          <option value="retail">🛍️ Retail (bán sản phẩm)</option>
+          <option value="academy">🎓 Academy (dạy học)</option>
+          <option value="chung">⚖️ Chung (cả 2)</option>
+        </select>
+      </div>
       <div class="fg"><label>Số tiền (₫)</label><input id="chi-amount" type="number" placeholder="500000"/></div>
+    </div>
+    <div class="form-row">
       <div class="fg"><label>Danh mục</label>
         <select id="chi-cat">
           <option>Mua nguyên liệu</option>
@@ -7167,6 +7177,7 @@ async function addTransaction(type){
   const note=document.getElementById(type+'-note').value.trim();
   // Upload nhiều ảnh chứng từ nếu có
   const receiptUrls = await uploadReceipts(type);
+  const mang = type==='chi' ? (document.getElementById('chi-mang')?.value||'retail') : 'thu';
   const tx={
     id:'TX'+Date.now(),
     type,
@@ -7175,7 +7186,8 @@ async function addTransaction(type){
     note,
     time:nowDT(),
     created_at:Date.now(),
-    receipt_url: receiptUrls.length ? JSON.stringify(receiptUrls) : ''
+    receipt_url: receiptUrls.length ? JSON.stringify(receiptUrls) : '',
+    mang: mang
   };
   try{
     await sbUpsert('transactions',tx);
@@ -10906,6 +10918,7 @@ async function runMigration() {
     `CREATE TABLE IF NOT EXISTS app_users (username TEXT PRIMARY KEY, pass_hash TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW())`,
     `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS receipt_url TEXT DEFAULT ''`,
     `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS cost_group TEXT DEFAULT ''`,
+    `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS mang TEXT DEFAULT 'retail'`,
     `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS cost_type TEXT DEFAULT ''`,
     `ALTER TABLE app_users ENABLE ROW LEVEL SECURITY`,
     // nvl_orders
@@ -11463,18 +11476,21 @@ function gsBaoCaoData() {
     ensure(mo); monthMap[mo].retThu += (o.total||0);
   });
 
-  // Chi phí từ transactions thủ công + tự động
+  // Chi phí từ transactions — dùng field mang để phân loại
   const allTx = [...(D.transactions||[])];
   allTx.filter(t=>t.type==='chi').forEach(t=>{
     const mo = getMonth(t.time); if(!mo) return;
     ensure(mo);
-    const cat = (t.category||'').toLowerCase();
-    // Academy chi: học phí liên quan, giảng dạy
-    if(cat.includes('học phí')||cat.includes('giảng')||cat.includes('academy')||cat.includes('giáo')||cat.includes('khóa')) {
-      monthMap[mo].acaChi += (t.amount||0);
+    const mang = t.mang || 'retail'; // default retail nếu chưa có
+    const amount = t.amount||0;
+    if(mang==='academy') {
+      monthMap[mo].acaChi += amount;
+    } else if(mang==='chung') {
+      // Chia đôi
+      monthMap[mo].acaChi += amount/2;
+      monthMap[mo].retChi += amount/2;
     } else {
-      // Retail chi: NVL, vận hành, ship...
-      monthMap[mo].retChi += (t.amount||0);
+      monthMap[mo].retChi += amount;
     }
   });
 
@@ -12357,6 +12373,7 @@ async function saveExpense() {
   // Upload ảnh
   const receiptUrls = await uploadReceipts('exp-new');
 
+  const expMang = document.getElementById('exp-new-mang')?.value || 'retail';
   const tx = {
     id: 'TX'+Date.now(),
     type: 'chi',
@@ -12366,6 +12383,7 @@ async function saveExpense() {
     created_at: Date.now(),
     cost_group: grp,
     cost_type: ctype,
+    mang: expMang,
     receipt_url: receiptUrls.length ? JSON.stringify(receiptUrls) : ''
   };
 
