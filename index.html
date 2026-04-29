@@ -11448,9 +11448,7 @@ function custLevel(pts) {
 // BÁO CÁO LÃI LỖ ACADEMY vs RETAIL
 // ══════════════════════════════════════════════════
 function gsBaoCaoData() {
-  // Gom tất cả transaction theo tháng
   const monthMap = {};
-
   const getMonth = (timeStr) => {
     if(!timeStr) return null;
     const m1 = (timeStr||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
@@ -11459,59 +11457,110 @@ function gsBaoCaoData() {
     if(m2) return m2[1]+'-'+m2[2];
     return null;
   };
-
   const ensure = (mo) => {
-    if(!monthMap[mo]) monthMap[mo] = {month:mo,acaThu:0,acaChi:0,retThu:0,retChi:0};
+    if(!monthMap[mo]) monthMap[mo] = {
+      month:mo,
+      // Doanh thu
+      acaThu:0, retThu:0,
+      // Chi phí theo nhóm — Retail
+      ret_nvl:0, ret_ship:0, ret_baobì:0,       // COGS biến phí
+      ret_marketing:0, ret_thietbi:0, ret_khac:0, // OPEX
+      // Chi phí theo nhóm — Academy
+      aca_marketing:0, aca_luong:0, aca_khac:0,
+      // Tổng định phí / biến phí
+      fixed:0, variable:0
+    };
   };
 
-  // Academy Thu: đơn HP đã thanh toán (học phí)
+  // Doanh thu Academy
   D.orders.filter(o=>o.id.startsWith('HP')&&o.status==='Đã thanh toán').forEach(o=>{
-    const mo = getMonth(o.time); if(!mo) return;
+    const mo=getMonth(o.time); if(!mo) return;
     ensure(mo); monthMap[mo].acaThu += (o.total||0);
   });
-
-  // Retail Thu: đơn HĐ đã thanh toán
+  // Doanh thu Retail
   D.orders.filter(o=>!o.id.startsWith('HP')&&o.status==='Đã thanh toán').forEach(o=>{
-    const mo = getMonth(o.time); if(!mo) return;
+    const mo=getMonth(o.time); if(!mo) return;
     ensure(mo); monthMap[mo].retThu += (o.total||0);
   });
 
-  // Chi phí từ transactions — dùng field mang để phân loại
-  const allTx = [...(D.transactions||[])];
-  allTx.filter(t=>t.type==='chi').forEach(t=>{
-    const mo = getMonth(t.time); if(!mo) return;
+  // Chi phí — phân loại theo mang + cost_group + cost_type
+  ;(D.transactions||[]).filter(t=>t.type==='chi').forEach(t=>{
+    const mo=getMonth(t.time); if(!mo) return;
     ensure(mo);
-    const mang = t.mang || 'retail'; // default retail nếu chưa có
-    const amount = t.amount||0;
-    if(mang==='academy') {
-      monthMap[mo].acaChi += amount;
-    } else if(mang==='chung') {
-      // Chia đôi
-      monthMap[mo].acaChi += amount/2;
-      monthMap[mo].retChi += amount/2;
+    const amt    = t.amount||0;
+    const mang   = t.mang || 'retail';
+    const grp    = t.cost_group || isClassifyTx(t);
+    const ctype  = t.cost_type || (
+      ['luong','thietbi'].includes(grp) ? 'fixed' : 'variable'
+    );
+
+    // Tổng định phí/biến phí
+    if(ctype==='fixed') monthMap[mo].fixed += amt;
+    else                monthMap[mo].variable += amt;
+
+    // Phân vào đúng nhóm
+    const applyAmt = (base, half=false) => half ? amt/2 : amt;
+    const addTo = (side, g, a) => {
+      const key = side+'_'+g;
+      if(key in monthMap[mo]) monthMap[mo][key] += a;
+      else if(side==='ret') monthMap[mo].ret_khac += a;
+      else monthMap[mo].aca_khac += a;
+    };
+
+    if(mang==='chung') {
+      addTo('ret', grp, amt/2);
+      addTo('aca', grp, amt/2);
+    } else if(mang==='academy') {
+      addTo('aca', grp, amt);
     } else {
-      monthMap[mo].retChi += amount;
+      addTo('ret', grp, amt);
     }
   });
 
-  // Tính profit từng tháng
-  const rows = Object.values(monthMap).map(m=>({
-    month: m.month,
-    acaThu: m.acaThu, acaChi: m.acaChi, acaProfit: m.acaThu - m.acaChi,
-    retThu: m.retThu, retChi: m.retChi, retProfit: m.retThu - m.retChi,
-    totalThu: m.acaThu + m.retThu,
-    totalChi: m.acaChi + m.retChi,
-    totalProfit: (m.acaThu + m.retThu) - (m.acaChi + m.retChi)
-  })).sort((a,b)=>a.month.localeCompare(b.month));
+  // Tính tổng chi, profit, COGS, OPEX
+  const rows = Object.values(monthMap).map(m => {
+    const retCOGS = m.ret_nvl + m.ret_ship + m.ret_baobì;
+    const retOPEX = m.ret_marketing + m.ret_thietbi + m.ret_khac;
+    const acaChi  = m.aca_marketing + m.aca_luong + m.aca_khac;
+    const retChi  = retCOGS + retOPEX;
+    const totalChi = retChi + acaChi;
+    const grossProfit = m.retThu - retCOGS;
+    const retEBIT = m.retThu - retChi;
+    const acaEBIT = m.acaThu - acaChi;
+    return {
+      month: m.month,
+      // Doanh thu
+      acaThu: m.acaThu, retThu: m.retThu, totalThu: m.acaThu+m.retThu,
+      // Chi phí Retail
+      ret_nvl: m.ret_nvl, ret_ship: m.ret_ship, ret_baobì: m.ret_baobì,
+      retCOGS, grossProfit,
+      ret_marketing: m.ret_marketing, ret_thietbi: m.ret_thietbi, ret_khac: m.ret_khac,
+      retOPEX, retChi, retEBIT,
+      // Chi phí Academy
+      aca_marketing: m.aca_marketing, aca_luong: m.aca_luong, aca_khac: m.aca_khac,
+      acaChi, acaEBIT,
+      // Tổng
+      totalChi, totalProfit: m.acaThu+m.retThu - totalChi,
+      // Định/biến phí
+      fixed: m.fixed, variable: m.variable,
+      acaProfit: acaEBIT, retProfit: retEBIT
+    };
+  }).sort((a,b)=>a.month.localeCompare(b.month));
 
-  // Dòng tổng cộng
-  const tong = rows.reduce((acc,r)=>({
+  const sum = (key) => rows.reduce((s,r)=>s+(r[key]||0),0);
+  const tong = {
     month:'TONG',
-    acaThu: acc.acaThu+r.acaThu, acaChi: acc.acaChi+r.acaChi, acaProfit: acc.acaProfit+r.acaProfit,
-    retThu: acc.retThu+r.retThu, retChi: acc.retChi+r.retChi, retProfit: acc.retProfit+r.retProfit,
-    totalThu: acc.totalThu+r.totalThu, totalChi: acc.totalChi+r.totalChi, totalProfit: acc.totalProfit+r.totalProfit
-  }), {month:'TONG',acaThu:0,acaChi:0,acaProfit:0,retThu:0,retChi:0,retProfit:0,totalThu:0,totalChi:0,totalProfit:0});
-
+    acaThu:sum('acaThu'), retThu:sum('retThu'), totalThu:sum('totalThu'),
+    ret_nvl:sum('ret_nvl'), ret_ship:sum('ret_ship'), ret_baobì:sum('ret_baobì'),
+    retCOGS:sum('retCOGS'), grossProfit:sum('grossProfit'),
+    ret_marketing:sum('ret_marketing'), ret_thietbi:sum('ret_thietbi'), ret_khac:sum('ret_khac'),
+    retOPEX:sum('retOPEX'), retChi:sum('retChi'), retEBIT:sum('retEBIT'),
+    aca_marketing:sum('aca_marketing'), aca_luong:sum('aca_luong'), aca_khac:sum('aca_khac'),
+    acaChi:sum('acaChi'), acaEBIT:sum('acaEBIT'),
+    totalChi:sum('totalChi'), totalProfit:sum('totalProfit'),
+    fixed:sum('fixed'), variable:sum('variable'),
+    acaProfit:sum('acaProfit'), retProfit:sum('retProfit')
+  };
   return [...rows, tong];
 }
 
