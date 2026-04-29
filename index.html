@@ -234,15 +234,13 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <span id="sync-label">Đang kết nối...</span>
   </div>
   <div class="nav">
-    <button class="active" onclick="go('dashboard',this)">Tổng quan</button>
-    <button onclick="go('students',this)">Học viên</button>
-    <button onclick="go('pos',this)">Bán hàng</button>
-    <button onclick="go('inventory',this)">Kho</button>
+    <button class="active" onclick="go('dashboard',this)">🏠 Tổng quan</button>
+    <button onclick="go('students',this)">🎓 Học viên</button>
+    <button onclick="go('pos',this)">🛒 Bán hàng</button>
+    <button onclick="go('inventory',this)">📦 Kho</button>
     <button onclick="go('customers',this)">👥 Khách hàng</button>
-    <button onclick="go('reports',this)" style="color:var(--teal)">📊 Báo cáo</button>
-      <button onclick="go('finance',this)" style="color:var(--green)">💵 Thu chi</button>
-    <button onclick="go('costcalc',this)" style="color:#e67e22">💧 Tính Cost</button>
-    <button onclick="go('telegram',this)" style="color:#5bc8f0">⚡ Telegram</button>
+    <button onclick="go('finance',this)" style="color:var(--green)">💰 Tài chính</button>
+    <button onclick="go('telegram',this)" style="color:#5bc8f0">⚙️ Cài đặt</button>
   </div>
 </div>
 
@@ -257,24 +255,17 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   <button class="bottom-nav-btn" onclick="go('pos',this);syncBottomNav(this)">
     <span class="bn-icon">🛒</span>Bán hàng
   </button>
-
   <button class="bottom-nav-btn" onclick="go('inventory',this);syncBottomNav(this)">
     <span class="bn-icon">📦</span>Kho
   </button>
   <button class="bottom-nav-btn" onclick="go('customers',this);syncBottomNav(this)">
     <span class="bn-icon">👥</span>Khách hàng
   </button>
-  <button class="bottom-nav-btn" onclick="go('reports',this);syncBottomNav(this)">
-    <span class="bn-icon">📊</span>Báo cáo
-  </button>
   <button class="bottom-nav-btn" onclick="go('finance',this);syncBottomNav(this)">
-    <span class="bn-icon">💵</span>Thu chi
-  </button>
-  <button class="bottom-nav-btn" onclick="go('costcalc',this);syncBottomNav(this)">
-    <span class="bn-icon">💧</span>Tính Cost
+    <span class="bn-icon">💰</span>Tài chính
   </button>
   <button class="bottom-nav-btn" onclick="go('telegram',this);syncBottomNav(this)">
-    <span class="bn-icon">⚡</span>Cài đặt
+    <span class="bn-icon">⚙️</span>Cài đặt
   </button>
 </div>
 
@@ -690,8 +681,140 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 
 <!-- BÁO CÁO -->
 <!-- THU CHI -->
+
+<!-- ══════════════════════════════════════════════════════════
+     PAGE: CHI PHÍ
+     ══════════════════════════════════════════════════════════ -->
+<div class="page" id="page-expenses">
+
+  <!-- HEADER -->
+  <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px">
+    <h2 style="font-size:18px;font-weight:800;color:var(--brand);margin:0">💸 Quản lý Chi phí</h2>
+    <button class="btn btn-red btn-sm" onclick="showM('modal-add-expense')">+ Thêm chi phí</button>
+    <button class="btn btn-sm" onclick="showM('modal-expense-budget')" style="background:var(--bg2);color:var(--brown);border-color:var(--border)">🎯 Ngân sách</button>
+    <button class="btn btn-tg btn-sm" onclick="syncBaoCao()">📊 Sync Báo cáo</button>
+  </div>
+
+  <!-- KPI STATS -->
+  <div class="stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+    <div class="stat" style="--accent:var(--red)"><div class="stat-num" id="exp-total">0</div><div class="stat-label">Tổng chi (tháng này)</div></div>
+    <div class="stat" style="--accent:#8E44AD"><div class="stat-num" id="exp-fixed">0</div><div class="stat-label">Định phí</div></div>
+    <div class="stat" style="--accent:#E67E22"><div class="stat-num" id="exp-variable">0</div><div class="stat-label">Biến phí</div></div>
+    <div class="stat" style="--accent:var(--teal)"><div class="stat-num" id="exp-budget-pct">—</div><div class="stat-label">% Ngân sách</div></div>
+  </div>
+
+  <!-- BUDGET WARNING BANNER -->
+  <div id="exp-budget-warnings" style="margin-bottom:12px"></div>
+
+  <!-- FILTER + TABS -->
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px">
+    <div style="display:flex;gap:4px">
+      <button id="exp-tab-all" class="btn btn-sm" onclick="expTab('all',this)">Tất cả</button>
+      <button id="exp-tab-fixed" class="btn btn-ghost btn-sm" onclick="expTab('fixed',this)">📌 Định phí</button>
+      <button id="exp-tab-variable" class="btn btn-ghost btn-sm" onclick="expTab('variable',this)">📈 Biến phí</button>
+    </div>
+    <select id="exp-month-sel" onchange="renderExpenses()" style="padding:5px 9px;border-radius:6px;border:1px solid var(--border);font-size:12px;font-family:inherit;background:var(--bg2)">
+      <option value="">Tháng này</option>
+    </select>
+    <select id="exp-group-sel" onchange="renderExpenses()" style="padding:5px 9px;border-radius:6px;border:1px solid var(--border);font-size:12px;font-family:inherit;background:var(--bg2)">
+      <option value="">Tất cả nhóm</option>
+      <option value="nvl">Nguyên vật liệu</option>
+      <option value="ship">Phí vận chuyển</option>
+      <option value="baobì">Bao bì đóng gói</option>
+      <option value="luong">Lương nhân viên</option>
+      <option value="marketing">Marketing</option>
+      <option value="thietbi">Thiết bị dụng cụ</option>
+      <option value="khac">Chi phí khác</option>
+    </select>
+  </div>
+
+  <!-- EXPENSE LIST -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-head">
+      <span class="card-title" id="exp-list-title">Danh sách chi phí</span>
+      <span id="exp-list-count" style="font-size:12px;color:var(--muted)"></span>
+    </div>
+    <div id="exp-list"></div>
+  </div>
+
+  <!-- BREAKDOWN BY CATEGORY -->
+  <div class="card">
+    <div class="card-head"><span class="card-title">📊 Chi tiết theo nhóm</span></div>
+    <div id="exp-breakdown"></div>
+  </div>
+</div>
+
+<!-- Modal thêm chi phí -->
+<div class="overlay" id="modal-add-expense">
+  <div class="modal">
+    <div class="modal-title">💸 Thêm chi phí</div>
+    <div class="form-row">
+      <div class="fg">
+        <label>Nhóm chi phí</label>
+        <select id="exp-new-group" onchange="expGroupChanged()" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+          <option value="nvl">📦 Nguyên vật liệu (COGS)</option>
+          <option value="ship">🚚 Phí vận chuyển / ship (COGS)</option>
+          <option value="baobì">🛍️ Bao bì đóng gói (COGS)</option>
+          <option value="luong">👥 Lương nhân viên (OPEX)</option>
+          <option value="marketing">📣 Marketing / Quảng cáo (OPEX)</option>
+          <option value="thietbi">🔧 Thiết bị dụng cụ (OPEX)</option>
+          <option value="khac">📋 Chi phí khác</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label>Loại chi phí</label>
+        <select id="exp-new-type" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+          <option value="variable">📈 Biến phí (thay đổi theo DT)</option>
+          <option value="fixed">📌 Định phí (cố định hàng tháng)</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Số tiền (₫)</label><input id="exp-new-amount" type="number" placeholder="500000"/></div>
+      <div class="fg"><label>Danh mục chi tiết</label><input id="exp-new-cat" placeholder="VD: Mua trà oolong..."/></div>
+    </div>
+    <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="exp-new-note" placeholder="Ghi chú thêm..."/></div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>📎 Ảnh hoá đơn (tùy chọn)</label>
+      <input type="file" id="exp-new-img" accept="image/*" multiple onchange="previewReceipts('exp-new')"/>
+      <div id="exp-new-img-previews" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px"></div>
+    </div>
+    <div id="exp-new-hint" style="font-size:11px;color:var(--muted);background:var(--bg2);border-radius:7px;padding:8px 12px;margin-bottom:12px"></div>
+    <div class="btn-group">
+      <button class="btn btn-red btn-sm" onclick="saveExpense()">💾 Lưu chi phí</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-expense')">Hủy</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal ngân sách -->
+<div class="overlay" id="modal-expense-budget">
+  <div class="modal">
+    <div class="modal-title">🎯 Ngân sách chi phí / tháng</div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:14px">Nhập ngân sách tối đa cho từng nhóm. App sẽ cảnh báo khi chi vượt ngân sách.</div>
+    <div id="budget-inputs"></div>
+    <div class="btn-group">
+      <button class="btn btn-sm" onclick="saveBudget()">💾 Lưu ngân sách</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-expense-budget')">Hủy</button>
+    </div>
+  </div>
+</div>
+
 <div class="page" id="page-finance">
-  <div class="tabs">
+  <!-- MAIN TABS -->
+  <div style="display:flex;align-items:center;border-bottom:2px solid var(--border);margin-bottom:4px;flex-wrap:wrap;gap:4px;padding-bottom:4px">
+    <div class="tabs" style="margin:0;border:none;flex:1">
+      <div class="tab active" id="fin-mtab-thu-chi" onclick="finSwitchTab('thu-chi')" style="font-size:13px">💰 Thu Chi</div>
+      <div class="tab" id="fin-mtab-expenses" onclick="finSwitchTab('expenses')" style="font-size:13px">💸 Chi phí</div>
+      <div class="tab" id="fin-mtab-reports" onclick="finSwitchTab('reports')" style="font-size:13px">📊 Báo cáo</div>
+      <div class="tab" id="fin-mtab-costcalc" onclick="finSwitchTab('costcalc')" style="font-size:13px">💧 Tính Cost</div>
+    </div>
+    <button class="btn btn-tg btn-sm" onclick="gsSyncAll()" style="font-size:11px;flex-shrink:0">🔄 Sync GG</button>
+  </div>
+
+  <!-- SUB PANEL: THU CHI -->
+  <div id="fin-panel-thu-chi">
+  <div class="tabs" style="margin-top:8px">
     <div class="tab active" onclick="finTab(this,'all')">Tất cả</div>
     <div class="tab" onclick="finTab(this,'thu')">💚 Thu</div>
     <div class="tab" onclick="finTab(this,'chi')">🔴 Chi</div>
@@ -754,7 +877,18 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <tbody id="fin-nvl-list"></tbody></table>
     </div>
   </div>
-</div>
+  </div><!-- /fin-panel-thu-chi -->
+
+  <!-- SUB PANEL: CHI PHÍ -->
+  <div id="fin-panel-expenses" style="display:none"></div>
+
+  <!-- SUB PANEL: BÁO CÁO -->
+  <div id="fin-panel-reports" style="display:none"></div>
+
+  <!-- SUB PANEL: TÍNH COST -->
+  <div id="fin-panel-costcalc" style="display:none"></div>
+
+</div><!-- /page-finance -->
 
 
 <!-- TÍNH COST MÓN NƯỚC — BOM MODEL -->
@@ -1817,6 +1951,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   <div class="tabs" style="margin-bottom:16px">
     <div class="tab active" onclick="rpTab(this,'sales')">🛒 Bán hàng</div>
     <div class="tab" onclick="rpTab(this,'monthly')">📅 Theo tháng</div>
+    <div class="tab" onclick="rpTab(this,'income')">📊 Lãi Lỗ</div>
     <div class="tab" onclick="rpTab(this,'drinks')">💧 Đồ uống</div>
     <div class="tab" onclick="rpTab(this,'prep')">📋 Chuẩn bị hàng</div>
     <div class="tab" onclick="rpTab(this,'inventory')">📦 Xuất nhập kho</div>
@@ -1870,6 +2005,54 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="card">
       <div class="card-head"><span class="card-title">🔍 Chi tiết đơn theo sản phẩm</span></div>
       <div id="prep-order-detail"></div>
+    </div>
+  </div>
+
+
+  <!-- ══ TAB: INCOME STATEMENT ══ -->
+  <div id="rp-income" style="display:none">
+    <!-- Header + controls -->
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:12px 16px">
+      <span style="font-size:13px;font-weight:700;color:var(--brand)">📊 Income Statement</span>
+      <select id="is-month-sel" onchange="renderIncomeStatement()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px;font-family:inherit;background:var(--bg2)">
+        <option value="">Tất cả</option>
+      </select>
+      <button class="btn btn-sm" onclick="syncBaoCao()" style="background:linear-gradient(135deg,#1E8449,#27AE60);margin-left:auto">📤 Sync GG Sheets</button>
+    </div>
+
+    <!-- KPI Cards -->
+    <div class="stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px" id="is-kpi-cards">
+      <div class="stat" style="--accent:#1A5276"><div class="stat-num" id="is-aca-thu">0</div><div class="stat-label">🎓 Academy DT</div></div>
+      <div class="stat" style="--accent:#922B21"><div class="stat-num" id="is-ret-thu">0</div><div class="stat-label">🛍️ Retail DT</div></div>
+      <div class="stat" style="--accent:var(--teal)"><div class="stat-num" id="is-total-thu">0</div><div class="stat-label">💰 Tổng DT</div></div>
+      <div class="stat" style="--accent:var(--green)"><div class="stat-num" id="is-net-profit">0</div><div class="stat-label">✅ Lợi nhuận</div></div>
+    </div>
+
+    <!-- Main Income Statement Table -->
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head">
+        <span class="card-title">📋 Báo cáo kết quả kinh doanh</span>
+        <span id="is-period-label" style="font-size:12px;color:var(--muted)"></span>
+      </div>
+      <div id="is-table-wrap"></div>
+    </div>
+
+    <!-- Charts row -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><span class="card-title">📊 Doanh thu vs Chi phí vs Lợi nhuận</span></div>
+        <canvas id="is-bar-chart" height="200"></canvas>
+      </div>
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><span class="card-title">🥧 Cơ cấu chi phí</span></div>
+        <canvas id="is-pie-chart" height="200"></canvas>
+      </div>
+    </div>
+
+    <!-- Monthly trend -->
+    <div class="card">
+      <div class="card-head"><span class="card-title">📈 Xu hướng lợi nhuận theo tháng</span></div>
+      <canvas id="is-trend-chart" height="160"></canvas>
     </div>
   </div>
 
@@ -4271,12 +4454,13 @@ function renderMonthly(){
 function rpTab(el,tab){
   document.querySelectorAll('#page-reports .tab').forEach(x=>x.classList.remove('active'));
   el.classList.add('active');
-  ['sales','monthly','inventory','students','drinks','prep'].forEach(t=>{
+  ['sales','monthly','income','inventory','students','drinks','prep'].forEach(t=>{
     const panel=document.getElementById('rp-'+t);
     if(panel) panel.style.display=t===tab?'block':'none';
   });
   rpCurrent=tab;
   if(tab==='monthly') renderMonthly();
+  if(tab==='income')  renderIncomeStatement();
   else if(tab==='drinks') drinkRpRender();
   else if(tab==='prep') {
     if(!document.getElementById('prep-date-from').value)
@@ -4594,7 +4778,57 @@ function go(p,btn){
   });
   fillMatSelects();
   if(p==='reports')renderReports();
-  if(p==='finance')renderFinance();
+  // Tài chính page: gom finance + expenses + reports + costcalc
+  if(p==='finance') { finSwitchTab('thu-chi'); }
+  if(p==='expenses') {
+    // Redirect to finance page with expenses tab
+    document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+    const fp=document.getElementById('page-finance'); if(fp) fp.classList.add('active');
+    document.querySelectorAll('.bottom-nav-btn').forEach(x=>{
+      const oc=x.getAttribute('onclick')||'';
+      if(oc.includes("'finance'")) x.classList.add('active');
+      else x.classList.remove('active');
+    });
+    document.querySelectorAll('.nav button').forEach(x=>{
+      const oc=x.getAttribute('onclick')||'';
+      if(oc.includes("'finance'")) x.classList.add('active');
+      else x.classList.remove('active');
+    });
+    finSwitchTab('expenses');
+    return;
+  }
+  if(p==='reports') {
+    document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+    const fp=document.getElementById('page-finance'); if(fp) fp.classList.add('active');
+    document.querySelectorAll('.bottom-nav-btn').forEach(x=>{
+      const oc=x.getAttribute('onclick')||'';
+      if(oc.includes("'finance'")) x.classList.add('active');
+      else x.classList.remove('active');
+    });
+    document.querySelectorAll('.nav button').forEach(x=>{
+      const oc=x.getAttribute('onclick')||'';
+      if(oc.includes("'finance'")) x.classList.add('active');
+      else x.classList.remove('active');
+    });
+    finSwitchTab('reports');
+    return;
+  }
+  if(p==='costcalc') {
+    document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
+    const fp=document.getElementById('page-finance'); if(fp) fp.classList.add('active');
+    document.querySelectorAll('.bottom-nav-btn').forEach(x=>{
+      const oc=x.getAttribute('onclick')||'';
+      if(oc.includes("'finance'")) x.classList.add('active');
+      else x.classList.remove('active');
+    });
+    document.querySelectorAll('.nav button').forEach(x=>{
+      const oc=x.getAttribute('onclick')||'';
+      if(oc.includes("'finance'")) x.classList.add('active');
+      else x.classList.remove('active');
+    });
+    finSwitchTab('costcalc');
+    return;
+  }
   if(p==='telegram') setTimeout(_chpwUpdateInfo, 100);
 }
 
@@ -10671,6 +10905,8 @@ async function runMigration() {
     // app_users
     `CREATE TABLE IF NOT EXISTS app_users (username TEXT PRIMARY KEY, pass_hash TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW())`,
     `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS receipt_url TEXT DEFAULT ''`,
+    `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS cost_group TEXT DEFAULT ''`,
+    `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS cost_type TEXT DEFAULT ''`,
     `ALTER TABLE app_users ENABLE ROW LEVEL SECURITY`,
     // nvl_orders
     `CREATE TABLE IF NOT EXISTS nvl_orders (id TEXT PRIMARY KEY, customer TEXT, phone TEXT DEFAULT '', address TEXT DEFAULT '', items JSONB DEFAULT '[]', total NUMERIC DEFAULT 0, paid NUMERIC DEFAULT 0, status TEXT DEFAULT 'Chờ xác nhận', delivery_date TEXT, note TEXT, created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())*1000)`,
@@ -11574,6 +11810,640 @@ function cancelTxEdit() {
   document.getElementById('tx-edit-btn').style.display = '';
   document.getElementById('tx-save-btn').style.display = 'none';
   document.getElementById('tx-cancel-btn').style.display = 'none';
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+// INCOME STATEMENT — BÁO CÁO KẾT QUẢ KINH DOANH
+// ══════════════════════════════════════════════════════════════════
+
+// Phân loại chi phí theo từ khóa trong category
+const IS_CHI_CATS = {
+  'nvl':       { label:'Nguyên vật liệu (COGS)', keywords:['nguyên liệu','nvl','nhập kho','vật liệu','trà','cà phê','bột','sữa','đường'], color:'#E74C3C' },
+  'ship':      { label:'Phí vận chuyển / Ship',  keywords:['ship','vận chuyển','giao hàng','spx','ghn','ghtk','j&t','grab'], color:'#E67E22' },
+  'baobì':     { label:'Bao bì đóng gói',        keywords:['bao bì','túi','hộp','ly','ống hút','nhãn','sticker','đóng gói'], color:'#F39C12' },
+  'luong':     { label:'Lương nhân viên',         keywords:['lương','thưởng','nhân viên','trợ cấp'], color:'#8E44AD' },
+  'marketing': { label:'Marketing / Quảng cáo',   keywords:['marketing','quảng cáo','ads','facebook','instagram','chụp','thiết kế'], color:'#2980B9' },
+  'thietbi':   { label:'Thiết bị dụng cụ',        keywords:['thiết bị','dụng cụ','máy','cân','máy hàn','kệ','bàn','ghế'], color:'#16A085' },
+  'khac':      { label:'Chi phí khác',            keywords:[], color:'#7F8C8D' }
+};
+
+const IS_ACA_KEYWORDS = ['học phí','giảng','academy','khóa học','học viên','dạy'];
+
+function isClassifyTx(tx) {
+  const cat = (tx.category||'').toLowerCase();
+  const note = (tx.note||'').toLowerCase();
+  const text = cat + ' ' + note;
+  for(const [key, def] of Object.entries(IS_CHI_CATS)) {
+    if(key === 'khac') continue;
+    if(def.keywords.some(k => text.includes(k))) return key;
+  }
+  return 'khac';
+}
+
+function isGetMonthOptions() {
+  const allTimes = [
+    ...D.orders.map(o=>o.time),
+    ...(D.transactions||[]).map(t=>t.time)
+  ];
+  const months = [...new Set(allTimes.map(t=>getMonthKey(t)).filter(Boolean))].sort().reverse();
+  return months;
+}
+
+function renderIncomeStatement() {
+  const sel = document.getElementById('is-month-sel');
+  if(!sel) return;
+
+  // Populate month options
+  const months = isGetMonthOptions();
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Tất cả</option>' +
+    months.map(m => {
+      const [y,mo] = m.split('-');
+      return `<option value="${m}" ${m===cur?'selected':''}>Tháng ${+mo}/${y}</option>`;
+    }).join('');
+
+  const filterMonth = sel.value;
+
+  // Filter helper
+  const matchMonth = (timeStr) => {
+    if(!filterMonth) return true;
+    return getMonthKey(timeStr) === filterMonth;
+  };
+
+  // ── DOANH THU ──
+  const acaOrders = D.orders.filter(o => o.id.startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
+  const retOrders = D.orders.filter(o => !o.id.startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
+  const acaThu = acaOrders.reduce((s,o) => s+(o.total||0), 0);
+  const retThu = retOrders.reduce((s,o) => s+(o.total||0), 0);
+  const totalThu = acaThu + retThu;
+
+  // ── CHI PHÍ — phân loại ──
+  const chiTxs = (D.transactions||[]).filter(t => t.type==='chi' && matchMonth(t.time));
+  const chiByGroup = {};
+  Object.keys(IS_CHI_CATS).forEach(k => chiByGroup[k] = 0);
+
+  chiTxs.forEach(t => {
+    const grp = isClassifyTx(t);
+    chiByGroup[grp] = (chiByGroup[grp]||0) + (t.amount||0);
+  });
+
+  const totalChi = Object.values(chiByGroup).reduce((a,b)=>a+b, 0);
+
+  // ── COGS & GROSS PROFIT ──
+  const cogs = chiByGroup['nvl'] + chiByGroup['baobì'] + chiByGroup['ship'];
+  const grossProfit = totalThu - cogs;
+  const grossMargin = totalThu > 0 ? (grossProfit/totalThu*100).toFixed(1) : 0;
+
+  // ── OPERATING EXPENSES ──
+  const opex = chiByGroup['luong'] + chiByGroup['marketing'] + chiByGroup['thietbi'] + chiByGroup['khac'];
+  const ebit = grossProfit - opex;
+  const netMargin = totalThu > 0 ? (ebit/totalThu*100).toFixed(1) : 0;
+
+  // ── UPDATE KPI CARDS ──
+  const se = (id,val) => { const el=document.getElementById(id); if(el) el.textContent=fmt(val); };
+  se('is-aca-thu', acaThu);
+  se('is-ret-thu', retThu);
+  se('is-total-thu', totalThu);
+  const np = document.getElementById('is-net-profit');
+  if(np) { np.textContent = fmt(ebit); np.style.color = ebit>=0?'var(--green)':'var(--red)'; }
+
+  // Period label
+  const pl = document.getElementById('is-period-label');
+  if(pl) {
+    if(filterMonth) { const [y,m]=filterMonth.split('-'); pl.textContent=`Tháng ${+m}/${y}`; }
+    else pl.textContent = 'Tất cả thời gian';
+  }
+
+  // ── BUILD TABLE ──
+  const row = (label, val, indent=0, bold=false, color='', bg='') => {
+    const indentStr = indent ? `padding-left:${indent*16}px` : '';
+    const boldStr = bold ? 'font-weight:700' : '';
+    const colorStr = color ? `color:${color}` : '';
+    const bgStr = bg ? `background:${bg}` : '';
+    const valColor = val > 0 ? 'var(--green)' : val < 0 ? 'var(--red)' : 'var(--muted)';
+    const sign = val > 0 ? '+' : '';
+    return `<tr style="${bgStr}">
+      <td style="font-size:13px;padding:8px 12px;${indentStr}${boldStr?';'+boldStr:''}${colorStr?';'+colorStr:''}">${label}</td>
+      <td style="text-align:right;padding:8px 12px;font-size:13px;font-weight:${bold?700:500};color:${bold?valColor:'inherit'}">${val!==null?fmt(Math.abs(val)):''}</td>
+      <td style="text-align:right;padding:8px 12px;font-size:12px;color:var(--muted)">${val!==null&&totalThu>0?(Math.abs(val)/totalThu*100).toFixed(1)+'%':''}</td>
+    </tr>`;
+  };
+  const divider = (label='') => `<tr style="background:var(--bg2)"><td colspan="3" style="padding:6px 12px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">${label}</td></tr>`;
+  const spacer = () => `<tr><td colspan="3" style="height:4px"></td></tr>`;
+
+  const tableHtml = `
+    <table style="width:100%;border-collapse:collapse">
+      <thead>
+        <tr style="background:var(--brand);color:#fff">
+          <th style="text-align:left;padding:10px 12px;font-size:12px">Khoản mục</th>
+          <th style="text-align:right;padding:10px 12px;font-size:12px">Số tiền (₫)</th>
+          <th style="text-align:right;padding:10px 12px;font-size:12px">% Doanh thu</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${divider('I. DOANH THU')}
+        ${row('🎓 Doanh thu Academy (học phí, dạy học)', acaThu, 1)}
+        ${row('🛍️ Doanh thu Retail (bán sản phẩm)', retThu, 1)}
+        ${row('TỔNG DOANH THU', totalThu, 0, true, '', '#EBF5FB')}
+        ${spacer()}
+        ${divider('II. CHI PHÍ HÀNG BÁN (COGS)')}
+        ${row('📦 Nguyên vật liệu', chiByGroup['nvl'], 1)}
+        ${row('🛍️ Bao bì đóng gói', chiByGroup['baobì'], 1)}
+        ${row('🚚 Phí vận chuyển / ship', chiByGroup['ship'], 1)}
+        ${row('TỔNG COGS', -cogs, 0, true, '', '#FEF9E7')}
+        ${spacer()}
+        ${row('LỢI NHUẬN GỘP', grossProfit, 0, true, grossProfit>=0?'var(--green)':'var(--red)', grossProfit>=0?'#EAFAF1':'#FDEDEC')}
+        ${row(`Biên lợi nhuận gộp: ${grossMargin}%`, null, 1)}
+        ${spacer()}
+        ${divider('III. CHI PHÍ HOẠT ĐỘNG (OPEX)')}
+        ${row('👥 Lương nhân viên', chiByGroup['luong'], 1)}
+        ${row('📣 Marketing / Quảng cáo', chiByGroup['marketing'], 1)}
+        ${row('🔧 Thiết bị dụng cụ', chiByGroup['thietbi'], 1)}
+        ${row('📋 Chi phí khác', chiByGroup['khac'], 1)}
+        ${row('TỔNG OPEX', -opex, 0, true, '', '#FEF9E7')}
+        ${spacer()}
+        ${row('LỢI NHUẬN RÒNG (EBIT)', ebit, 0, true, ebit>=0?'var(--green)':'var(--red)', ebit>=0?'#D5F5E3':'#FADBD8')}
+        ${row(`Biên lợi nhuận ròng: ${netMargin}%`, null, 1)}
+      </tbody>
+    </table>`;
+
+  const wrap = document.getElementById('is-table-wrap');
+  if(wrap) wrap.innerHTML = tableHtml;
+
+  // ── CHARTS ──
+  isDrawBarChart(totalThu, totalChi, ebit, filterMonth);
+  isDrawPieChart(chiByGroup);
+  isDrawTrendChart();
+}
+
+function isDrawBarChart(thu, chi, profit, month) {
+  const canvas = document.getElementById('is-bar-chart');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 400;
+  canvas.width = W; canvas.height = 220;
+  ctx.clearRect(0,0,W,220);
+
+  const data = [
+    { label:'Doanh thu', val:thu, color:'#2980B9' },
+    { label:'Chi phí',   val:chi, color:'#E74C3C' },
+    { label:'Lợi nhuận', val:Math.abs(profit), color: profit>=0?'#27AE60':'#E74C3C' }
+  ];
+  const maxVal = Math.max(...data.map(d=>d.val), 1);
+  const barW = Math.min(80, (W-80)/3-20);
+  const chartH = 160;
+  const top = 20;
+
+  data.forEach((d,i) => {
+    const x = 40 + i*(barW+24);
+    const h = Math.max(2, (d.val/maxVal)*chartH);
+    const y = top + chartH - h;
+    ctx.fillStyle = d.color;
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(x,y,barW,h,4) : ctx.rect(x,y,barW,h);
+    ctx.fill();
+    // Label
+    ctx.fillStyle = '#333';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(d.label, x+barW/2, top+chartH+16);
+    // Value
+    ctx.fillStyle = d.color;
+    ctx.font = 'bold 11px sans-serif';
+    const valStr = d.val >= 1e6 ? (d.val/1e6).toFixed(1)+'M' : (d.val/1e3).toFixed(0)+'K';
+    ctx.fillText(valStr, x+barW/2, y-4);
+  });
+}
+
+function isDrawPieChart(chiByGroup) {
+  const canvas = document.getElementById('is-pie-chart');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 300;
+  canvas.width = W; canvas.height = 220;
+  ctx.clearRect(0,0,W,220);
+
+  const entries = Object.entries(IS_CHI_CATS)
+    .map(([k,def]) => ({ label:def.label.split('(')[0].trim(), val:chiByGroup[k]||0, color:def.color }))
+    .filter(e => e.val > 0);
+
+  if(!entries.length) {
+    ctx.fillStyle = 'var(--muted)';
+    ctx.font = '13px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Chưa có chi phí', W/2, 110);
+    return;
+  }
+
+  const total = entries.reduce((s,e)=>s+e.val, 0);
+  const cx = W*0.35, cy = 100, r = 75;
+  let startAngle = -Math.PI/2;
+
+  entries.forEach(e => {
+    const angle = (e.val/total) * Math.PI * 2;
+    ctx.beginPath();
+    ctx.moveTo(cx,cy);
+    ctx.arc(cx,cy,r,startAngle,startAngle+angle);
+    ctx.closePath();
+    ctx.fillStyle = e.color;
+    ctx.fill();
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    startAngle += angle;
+  });
+
+  // Legend
+  const legX = W*0.62;
+  entries.forEach((e,i) => {
+    const y = 20 + i*26;
+    ctx.fillStyle = e.color;
+    ctx.fillRect(legX, y, 12, 12);
+    ctx.fillStyle = '#333';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'left';
+    const pct = (e.val/total*100).toFixed(0)+'%';
+    ctx.fillText(e.label.substring(0,14), legX+16, y+10);
+    ctx.fillStyle = '#666';
+    ctx.fillText(pct, legX+16, y+20);
+  });
+}
+
+function isDrawTrendChart() {
+  const canvas = document.getElementById('is-trend-chart');
+  if(!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth || 600;
+  canvas.width = W; canvas.height = 180;
+  ctx.clearRect(0,0,W,180);
+
+  // Get all months with data
+  const months = isGetMonthOptions().slice().reverse();
+  if(months.length < 2) {
+    ctx.fillStyle = 'var(--muted)'; ctx.font='13px sans-serif'; ctx.textAlign='center';
+    ctx.fillText('Cần ít nhất 2 tháng để hiện xu hướng', W/2, 90);
+    return;
+  }
+
+  const dataPoints = months.map(mo => {
+    const thu = D.orders.filter(o=>o.status==='Đã thanh toán'&&getMonthKey(o.time)===mo).reduce((s,o)=>s+(o.total||0),0);
+    const chi = (D.transactions||[]).filter(t=>t.type==='chi'&&getMonthKey(t.time)===mo).reduce((s,t)=>s+(t.amount||0),0);
+    return { mo, thu, chi, profit: thu-chi };
+  });
+
+  const maxVal = Math.max(...dataPoints.map(d=>Math.max(d.thu,d.chi)), 1);
+  const chartH = 130, top=20, padL=40, padR=20;
+  const stepX = (W-padL-padR) / Math.max(dataPoints.length-1, 1);
+
+  // Draw lines
+  const drawLine = (points, color, filled=false) => {
+    ctx.beginPath();
+    points.forEach((p,i) => {
+      const x = padL + i*stepX;
+      const y = top + chartH - (p/maxVal)*chartH;
+      i===0 ? ctx.moveTo(x,y) : ctx.lineTo(x,y);
+    });
+    ctx.strokeStyle = color; ctx.lineWidth = 2;
+    ctx.stroke();
+    // Dots
+    points.forEach((p,i) => {
+      const x = padL + i*stepX;
+      const y = top + chartH - (p/maxVal)*chartH;
+      ctx.beginPath(); ctx.arc(x,y,4,0,Math.PI*2);
+      ctx.fillStyle = color; ctx.fill();
+    });
+  };
+
+  drawLine(dataPoints.map(d=>d.thu), '#2980B9');
+  drawLine(dataPoints.map(d=>d.chi), '#E74C3C');
+  drawLine(dataPoints.map(d=>Math.max(0,d.profit)), '#27AE60');
+
+  // X labels
+  ctx.fillStyle='#666'; ctx.font='10px sans-serif'; ctx.textAlign='center';
+  dataPoints.forEach((d,i) => {
+    const x = padL + i*stepX;
+    const [y,m] = d.mo.split('-');
+    ctx.fillText(`T${+m}`, x, top+chartH+16);
+  });
+
+  // Legend
+  ctx.font='11px sans-serif'; ctx.textAlign='left';
+  [[`■ Doanh thu`,'#2980B9',0],[`■ Chi phí`,'#E74C3C',100],[`■ Lợi nhuận`,'#27AE60',190]].forEach(([t,c,x])=>{
+    ctx.fillStyle=c; ctx.fillText(t, x+5, top+chartH+34);
+  });
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+// TAB CHI PHÍ — EXPENSE MANAGEMENT
+// ══════════════════════════════════════════════════════════════════
+
+const EXP_GROUPS = {
+  'nvl':       { label:'Nguyên vật liệu',    icon:'📦', color:'#E74C3C', type:'variable', cogs:true  },
+  'ship':      { label:'Phí vận chuyển',     icon:'🚚', color:'#E67E22', type:'variable', cogs:true  },
+  'baobì':     { label:'Bao bì đóng gói',    icon:'🛍️', color:'#F39C12', type:'variable', cogs:true  },
+  'luong':     { label:'Lương nhân viên',    icon:'👥', color:'#8E44AD', type:'fixed',    cogs:false },
+  'marketing': { label:'Marketing',          icon:'📣', color:'#2980B9', type:'variable', cogs:false },
+  'thietbi':   { label:'Thiết bị dụng cụ',  icon:'🔧', color:'#16A085', type:'fixed',    cogs:false },
+  'khac':      { label:'Chi phí khác',       icon:'📋', color:'#7F8C8D', type:'variable', cogs:false }
+};
+
+const BUDGET_KEY = 'tdh_expense_budget';
+let _expTab = 'all';
+
+function loadBudget() {
+  try { return JSON.parse(localStorage.getItem(BUDGET_KEY)||'{}'); }
+  catch(e) { return {}; }
+}
+
+function saveBudget() {
+  const budget = {};
+  Object.keys(EXP_GROUPS).forEach(k => {
+    const el = document.getElementById('budget-'+k);
+    if(el && el.value) budget[k] = +el.value;
+  });
+  localStorage.setItem(BUDGET_KEY, JSON.stringify(budget));
+  closeM('modal-expense-budget');
+  notify('✅ Đã lưu ngân sách!');
+  renderExpenses();
+}
+
+function openBudgetModal() {
+  const budget = loadBudget();
+  const html = Object.entries(EXP_GROUPS).map(([k,def]) => `
+    <div class="form-row" style="margin-bottom:8px">
+      <div style="flex:1.5;font-size:13px;display:flex;align-items:center;gap:6px">
+        ${def.icon} ${def.label}
+        <span style="font-size:10px;color:var(--muted)">(${def.type==='fixed'?'Định phí':'Biến phí'})</span>
+      </div>
+      <div class="fg" style="flex:1">
+        <input id="budget-${k}" type="number" placeholder="0 = không giới hạn"
+          value="${budget[k]||''}" style="text-align:right"/>
+      </div>
+    </div>
+  `).join('');
+  document.getElementById('budget-inputs').innerHTML = html;
+  showM('modal-expense-budget');
+}
+
+function expGroupChanged() {
+  const grp = document.getElementById('exp-new-group')?.value;
+  const def = EXP_GROUPS[grp];
+  if(!def) return;
+  // Auto-select cost type
+  const typeEl = document.getElementById('exp-new-type');
+  if(typeEl) typeEl.value = def.type;
+  // Show hint
+  const hint = document.getElementById('exp-new-hint');
+  if(hint) {
+    const catType = def.cogs ? 'COGS (Chi phí hàng bán)' : 'OPEX (Chi phí hoạt động)';
+    hint.innerHTML = `<strong>${def.type==='fixed'?'📌 Định phí':'📈 Biến phí'}</strong> — ${catType}<br>
+      Nhóm này sẽ được phân loại vào <strong>Income Statement → ${def.cogs?'Chi phí hàng bán':'Chi phí hoạt động'}</strong>`;
+  }
+}
+
+function expTab(tab, btn) {
+  _expTab = tab;
+  document.querySelectorAll('[id^="exp-tab-"]').forEach(b => b.className='btn btn-ghost btn-sm');
+  if(btn) btn.className = 'btn btn-sm';
+  renderExpenses();
+}
+
+function getCurrentMonthKey() {
+  const now = new Date();
+  return now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+}
+
+function renderExpenses() {
+  if(!document.getElementById('page-expenses')) return;
+
+  const monthSel = document.getElementById('exp-month-sel');
+  const groupSel = document.getElementById('exp-group-sel');
+  const filterMonth = monthSel?.value || getCurrentMonthKey();
+  const filterGroup = groupSel?.value || '';
+
+  // Populate month options
+  const months = [...new Set((D.transactions||[]).map(t=>getMonthKey(t.time)).filter(Boolean))].sort().reverse();
+  if(monthSel) {
+    const curVal = monthSel.value || getCurrentMonthKey();
+    monthSel.innerHTML = months.map(m => {
+      const [y,mo] = m.split('-');
+      return `<option value="${m}" ${m===curVal?'selected':''}>Tháng ${+mo}/${y}</option>`;
+    }).join('');
+    if(!monthSel.value && months.includes(getCurrentMonthKey())) monthSel.value = getCurrentMonthKey();
+  }
+
+  // Filter transactions
+  let txs = (D.transactions||[]).filter(t => {
+    if(t.type !== 'chi') return false;
+    if(filterMonth && getMonthKey(t.time) !== filterMonth) return false;
+    if(filterGroup && isClassifyTx(t) !== filterGroup) return false;
+    if(_expTab === 'fixed' && t.cost_type !== 'fixed') return false;
+    if(_expTab === 'variable' && t.cost_type === 'fixed') return false;
+    return true;
+  }).sort((a,b) => (b.time||'').localeCompare(a.time||''));
+
+  const total = txs.reduce((s,t)=>s+(t.amount||0), 0);
+  const fixed = txs.filter(t=>t.cost_type==='fixed').reduce((s,t)=>s+(t.amount||0),0);
+  const variable = total - fixed;
+
+  // Budget check
+  const budget = loadBudget();
+  const totalBudget = Object.values(budget).reduce((s,v)=>s+(+v||0), 0);
+  const budgetPct = totalBudget > 0 ? (total/totalBudget*100).toFixed(0)+'%' : '—';
+
+  // Update KPIs
+  const se = (id,v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
+  se('exp-total', fmt(total));
+  se('exp-fixed', fmt(fixed));
+  se('exp-variable', fmt(variable));
+  se('exp-budget-pct', budgetPct);
+  if(totalBudget>0) {
+    const np = document.getElementById('exp-budget-pct');
+    if(np) np.style.color = total > totalBudget ? 'var(--red)' : 'var(--green)';
+  }
+
+  // Budget warnings
+  const warnings = [];
+  Object.entries(budget).forEach(([k,bv]) => {
+    if(!bv) return;
+    const spent = txs.filter(t=>isClassifyTx(t)===k).reduce((s,t)=>s+(t.amount||0),0);
+    const pct = spent/(+bv)*100;
+    if(pct >= 80) {
+      const def = EXP_GROUPS[k];
+      const color = pct >= 100 ? '#FADBD8' : '#FEF9E7';
+      const icon = pct >= 100 ? '🚨' : '⚠️';
+      warnings.push(`<div style="background:${color};border-radius:8px;padding:10px 14px;font-size:13px;display:flex;justify-content:space-between;align-items:center">
+        <span>${icon} <strong>${def?.icon} ${def?.label}</strong>: đã chi ${fmt(spent)} / ${fmt(+bv)} (${pct.toFixed(0)}%)</span>
+        <span style="color:${pct>=100?'var(--red)':'var(--orange)'}">Còn ${fmt(Math.max(0,+bv-spent))}</span>
+      </div>`);
+    }
+  });
+  const warnEl = document.getElementById('exp-budget-warnings');
+  if(warnEl) warnEl.innerHTML = warnings.join('');
+
+  // List
+  const listEl = document.getElementById('exp-list');
+  const countEl = document.getElementById('exp-list-count');
+  if(countEl) countEl.textContent = txs.length + ' khoản';
+
+  if(!txs.length) {
+    if(listEl) listEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Chưa có chi phí nào trong kỳ này</div>';
+  } else {
+    listEl.innerHTML = txs.map(t => {
+      const grp = isClassifyTx(t);
+      const def = EXP_GROUPS[grp] || EXP_GROUPS['khac'];
+      const isFixed = t.cost_type === 'fixed';
+      const hasImg = t.receipt_url ? true : false;
+      return `<div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);cursor:pointer" onclick="showTxDetail('${t.id}')">
+        <div style="width:36px;height:36px;border-radius:50%;background:${def.color}22;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">${def.icon}</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:700;color:var(--text)">${t.category||def.label}</div>
+          <div style="font-size:11px;color:var(--muted)">${t.note||''} · ${t.time||''}</div>
+          <div style="display:flex;gap:6px;margin-top:3px;flex-wrap:wrap">
+            <span style="font-size:10px;background:${def.color}22;color:${def.color};padding:2px 7px;border-radius:10px">${def.icon} ${def.label}</span>
+            <span style="font-size:10px;background:${isFixed?'#8E44AD22':'#E67E2222'};color:${isFixed?'#8E44AD':'#E67E22'};padding:2px 7px;border-radius:10px">${isFixed?'📌 Định phí':'📈 Biến phí'}</span>
+            ${hasImg?'<span style="font-size:10px;color:var(--teal)">🖼 Có ảnh</span>':''}
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-size:15px;font-weight:800;color:var(--red)">-${fmt(t.amount||0)}</div>
+          <button onclick="event.stopPropagation();deleteTransaction('${t.id}')" style="font-size:10px;color:var(--muted);background:none;border:none;cursor:pointer;margin-top:2px">✕ Xóa</button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // Breakdown by group
+  const breakdown = {};
+  txs.forEach(t => {
+    const g = isClassifyTx(t);
+    breakdown[g] = (breakdown[g]||0) + (t.amount||0);
+  });
+  const bEl = document.getElementById('exp-breakdown');
+  if(bEl) {
+    bEl.innerHTML = Object.entries(EXP_GROUPS).map(([k,def]) => {
+      const spent = breakdown[k]||0;
+      const bud = budget[k]||0;
+      const pct = bud > 0 ? Math.min(100,spent/bud*100) : 0;
+      const barColor = bud > 0 && spent > bud ? '#E74C3C' : def.color;
+      return `<div style="padding:10px 14px;border-bottom:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+          <span style="font-size:13px">${def.icon} ${def.label}
+            <span style="font-size:10px;color:var(--muted);margin-left:4px">${def.type==='fixed'?'📌 Định phí':'📈 Biến phí'}</span>
+          </span>
+          <span style="font-size:13px;font-weight:700;color:var(--red)">${fmt(spent)}</span>
+        </div>
+        ${bud > 0 ? `
+          <div style="background:var(--bg2);border-radius:4px;height:6px;overflow:hidden">
+            <div style="background:${barColor};height:100%;width:${pct}%;border-radius:4px;transition:.3s"></div>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:2px">Ngân sách: ${fmt(bud)} · Còn: ${fmt(Math.max(0,bud-spent))}</div>
+        ` : ''}
+      </div>`;
+    }).join('');
+  }
+}
+
+async function saveExpense() {
+  const grp     = document.getElementById('exp-new-group')?.value || 'khac';
+  const ctype   = document.getElementById('exp-new-type')?.value || 'variable';
+  const amount  = parseFloat(document.getElementById('exp-new-amount')?.value)||0;
+  const cat     = document.getElementById('exp-new-cat')?.value?.trim() || EXP_GROUPS[grp]?.label || 'Chi phí';
+  const note    = document.getElementById('exp-new-note')?.value?.trim() || '';
+  if(!amount||amount<=0) { notify('Nhập số tiền!', false); return; }
+
+  // Upload ảnh
+  const receiptUrls = await uploadReceipts('exp-new');
+
+  const tx = {
+    id: 'TX'+Date.now(),
+    type: 'chi',
+    category: cat,
+    amount, note,
+    time: nowDT(),
+    created_at: Date.now(),
+    cost_group: grp,
+    cost_type: ctype,
+    receipt_url: receiptUrls.length ? JSON.stringify(receiptUrls) : ''
+  };
+
+  try {
+    await sbUpsert('transactions', tx);
+    D.transactions.unshift(tx);
+    closeM('modal-add-expense');
+    // Reset form
+    ['exp-new-amount','exp-new-cat','exp-new-note'].forEach(id=>{
+      const el=document.getElementById(id); if(el) el.value='';
+    });
+    clearReceiptInput('exp-new');
+    renderExpenses();
+    renderFinance();
+    notify('✅ Đã thêm chi phí: '+fmt(amount));
+    // Auto sync income statement
+    setTimeout(()=>gsSend({sheet:'ThuChi',rows:gsThuChi(),time:nowDT()}),500);
+    setTimeout(()=>gsSend({sheet:'BaoCaoLaiLo',rows:gsBaoCaoData(),time:nowDT()}),1500);
+    // Check budget warning
+    const budget = loadBudget();
+    const bud = budget[grp];
+    if(bud) {
+      const curMo = getCurrentMonthKey();
+      const spent = (D.transactions||[]).filter(t=>t.type==='chi'&&isClassifyTx(t)===grp&&getMonthKey(t.time)===curMo).reduce((s,t)=>s+(t.amount||0),0);
+      if(spent > bud) notify(`🚨 Vượt ngân sách ${EXP_GROUPS[grp]?.label}! Đã chi ${fmt(spent)}/${fmt(+bud)}`, false);
+      else if(spent/bud >= 0.8) notify(`⚠️ Sắp đạt ngân sách ${EXP_GROUPS[grp]?.label}: ${(spent/bud*100).toFixed(0)}%`);
+    }
+  } catch(e) { notify('Lỗi lưu: '+e.message, false); }
+}
+
+// Add cost_type column to migration
+
+// ══════════════════════════════════════════════════════════════════
+// FINANCE PAGE — SUB TAB SWITCHER
+// ══════════════════════════════════════════════════════════════════
+function finSwitchTab(tab) {
+  // Update main tab buttons
+  ['thu-chi','expenses','reports','costcalc'].forEach(t => {
+    const btn = document.getElementById('fin-mtab-'+t);
+    if(btn) btn.classList.toggle('active', t===tab);
+  });
+
+  // Show/hide panels
+  const tcPanel  = document.getElementById('fin-panel-thu-chi');
+  const expPanel = document.getElementById('fin-panel-expenses');
+  const rpPanel  = document.getElementById('fin-panel-reports');
+  const ccPanel  = document.getElementById('fin-panel-costcalc');
+
+  if(tcPanel)  tcPanel.style.display  = tab==='thu-chi'   ? '' : 'none';
+  if(expPanel) expPanel.style.display = tab==='expenses'  ? '' : 'none';
+  if(rpPanel)  rpPanel.style.display  = tab==='reports'   ? '' : 'none';
+  if(ccPanel)  ccPanel.style.display  = tab==='costcalc'  ? '' : 'none';
+
+  // Lazy-load content into panels
+  if(tab==='expenses') {
+    // Move page-expenses content into fin-panel-expenses
+    const srcPage = document.getElementById('page-expenses');
+    if(srcPage && expPanel && !expPanel.hasChildNodes()) {
+      while(srcPage.firstChild) expPanel.appendChild(srcPage.firstChild);
+    }
+    renderExpenses();
+  }
+  if(tab==='reports') {
+    const srcPage = document.getElementById('page-reports');
+    if(srcPage && rpPanel && !rpPanel.hasChildNodes()) {
+      while(srcPage.firstChild) rpPanel.appendChild(srcPage.firstChild);
+    }
+    renderReports();
+  }
+  if(tab==='costcalc') {
+    const srcPage = document.getElementById('page-costcalc');
+    if(srcPage && ccPanel && !ccPanel.hasChildNodes()) {
+      while(srcPage.firstChild) ccPanel.appendChild(srcPage.firstChild);
+    }
+  }
+  if(tab==='thu-chi') {
+    renderFinance();
+  }
 }
 
 boot();
