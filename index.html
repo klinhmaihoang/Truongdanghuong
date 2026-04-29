@@ -10326,14 +10326,20 @@ async function odSaveEdit() {
     if(sub > 0)   str += ' @' + Math.round(sub); // lưu thành tiền
     items.push(str);
   });
-  if(!items.length){notify('Thêm ít nhất 1 sản phẩm!',false);return;}
+  // Nếu items rỗng (do scroll làm mất input trên mobile) → giữ items cũ
+  const finalItems = items.length ? items : (o.items||'').split(',').map(s=>s.trim()).filter(Boolean);
+  if(!finalItems.length){notify('Thêm ít nhất 1 sản phẩm!',false);return;}
   const disc    = Math.min(100,Math.max(0,parseFloat(document.getElementById('od-edit-discount')?.value)||0));
   const shipFee = Math.max(0, parseFloat(document.getElementById('od-edit-ship-fee')?.value)||0);
-  // Tính total từ thành tiền (od-i-subtotal)
+  // Tính total — nếu items rỗng thì dùng total cũ
   let subtotal=0;
-  document.querySelectorAll('.od-item-row').forEach(row=>{
-    subtotal += parseFloat(row.querySelector('.od-i-subtotal')?.value)||0;
-  });
+  if(items.length) {
+    document.querySelectorAll('.od-item-row').forEach(row=>{
+      subtotal += parseFloat(row.querySelector('.od-i-subtotal')?.value)||0;
+    });
+  } else {
+    subtotal = o.subtotal || o.total || 0;
+  }
   const discAmt = Math.round(subtotal*disc/100);
   const total   = subtotal - discAmt + shipFee;
   const newStatus = document.getElementById('od-edit-status').value;
@@ -10342,7 +10348,7 @@ async function odSaveEdit() {
     customer,
     phone:    document.getElementById('od-edit-phone').value||'',
     address:  document.getElementById('od-edit-address').value||'',
-    items:    items.join(', '),
+    items:    finalItems.join(', '),
     note:     document.getElementById('od-edit-note').value||'',
     payment:  document.getElementById('od-edit-payment')?.value||o.payment||'',
     shipping: document.getElementById('od-edit-shipping')?.value||o.shipping||'',
