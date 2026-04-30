@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.11-20260430">
+<meta name="version" content="v5.12-20260430">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4965,8 +4965,10 @@ function renderRpSales(){
     days[`${d.getDate()}/${d.getMonth()+1}`]=0;
   }
   paid.forEach(o=>{
-    const key=(o.time||'').split(' ')[0];
-    if(days.hasOwnProperty(key))days[key]+=(o.total||0);
+    // time format: '26/4/2026 14:12' → split by ' ' → '26/4/2026' → split by '/' → '26/4'
+    const parts=(o.time||'').split(' ')[0].split('/');
+    const key=parts.length>=2?parts[0]+'/'+parts[1]:'';
+    if(key && days.hasOwnProperty(key))days[key]+=(o.total||0);
   });
   const dayData=Object.entries(days).map(([name,val])=>({name,val,label2:val>0?Math.round(val/1000)+'K':''}));
   document.getElementById('rp-daily-chart').innerHTML=svgBar(dayData,{width:880,height:160,color:'var(--gold)',labelColor:'var(--muted)'});
