@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.12-20260430">
+<meta name="version" content="v5.13-20260430">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -10982,6 +10982,77 @@ async function runMigration() {
   }
 }
 
+// Kiểm tra kho đủ cho 1 đơn hàng
+function checkStockForOrder(o) {
+  const items = (o.items||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const warnings = [];
+  const needed = {}; // mat_id -> total needed
+
+  items.forEach(itemStr => {
+    const {name, qty} = parseItemStr(itemStr);
+    // Tìm product theo tên
+    const prod = D.products.find(p => p.name === name);
+    if(!prod) return;
+    // Tìm recipe
+    const recipeRows = D.recipes.filter(r => r.product_id === prod.id);
+    if(recipeRows.length > 0) {
+      recipeRows.forEach(r => {
+        needed[r.mat_id] = (needed[r.mat_id]||0) + r.mat_use * qty;
+      });
+    } else if(prod.mat_id && prod.mat_use > 0) {
+      needed[prod.mat_id] = (needed[prod.mat_id]||0) + prod.mat_use * qty;
+    }
+  });
+
+  // Kiểm tra từng nguyên liệu
+  Object.entries(needed).forEach(([matId, needQty]) => {
+    const mat = D.inventory.find(i => i.id === matId);
+    if(!mat) { warnings.push(`Không tìm thấy nguyên liệu ID: ${matId}`); return; }
+    if(mat.qty < needQty) {
+      warnings.push(`⚠️ ${mat.name}: cần ${needQty}${mat.unit||''}, tồn kho chỉ còn ${mat.qty}${mat.unit||''}`);
+    }
+  });
+  return warnings;
+}
+
+// Trừ kho cho 1 đơn hàng theo công thức
+async function deductStockForOrder(o) {
+  const items = (o.items||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const logs = [];
+  for(const itemStr of items) {
+    const {name, qty} = parseItemStr(itemStr);
+    const prod = D.products.find(p => p.name === name);
+    if(!prod) continue;
+    const recipeRows = D.recipes.filter(r => r.product_id === prod.id);
+    if(recipeRows.length > 0) {
+      for(const r of recipeRows) {
+        const mat = D.inventory.find(i => i.id === r.mat_id);
+        if(!mat) continue;
+        const useQty = Math.round(r.mat_use * qty * 100) / 100;
+        mat.qty = Math.max(0, Math.round((mat.qty - useQty) * 100) / 100);
+        await sbPatch('inventory', {qty: mat.qty}, `?id=eq.${mat.id}`);
+        const log = {id:uid(), time:nowDT(), name:mat.name, type:'Xuất', qty:useQty, unit:mat.unit||'',
+          note:`Đơn ${o.id} — ${name} x${qty}`, created_at:Date.now()};
+        await sbUpsert('stock_log', log);
+        D.stockLog.unshift(log);
+        logs.push(`-${useQty}${mat.unit||''} ${mat.name}`);
+      }
+    } else if(prod.mat_id && prod.mat_use > 0) {
+      const mat = D.inventory.find(i => i.id === prod.mat_id);
+      if(!mat) continue;
+      const useQty = Math.round(prod.mat_use * qty * 100) / 100;
+      mat.qty = Math.max(0, Math.round((mat.qty - useQty) * 100) / 100);
+      await sbPatch('inventory', {qty: mat.qty}, `?id=eq.${mat.id}`);
+      const log = {id:uid(), time:nowDT(), name:mat.name, type:'Xuất', qty:useQty, unit:mat.unit||'',
+        note:`Đơn ${o.id} — ${name} x${qty}`, created_at:Date.now()};
+      await sbUpsert('stock_log', log);
+      D.stockLog.unshift(log);
+    }
+  }
+  gsSend({sheet:'TonKho', rows:D.inventory, time:nowDT()});
+  return logs;
+}
+
 async function odQuickUpdateStatus(newStatus) {
   if(!newStatus || !OD_current) return;
   const o = OD_current;
@@ -10990,6 +11061,28 @@ async function odQuickUpdateStatus(newStatus) {
     document.getElementById('od-status-select').value = '';
     return;
   }
+
+  // Khi chuyển sang "Đã xác nhận" → kiểm tra và trừ kho
+  if(newStatus === 'Đã xác nhận' && oldStatus !== 'Đã xác nhận') {
+    const warnings = checkStockForOrder(o);
+    if(warnings.length > 0) {
+      const msg = `⚠️ Kho không đủ nguyên liệu:
+
+${warnings.join('\n')}\n\nVẫn xác nhận đơn?`;
+      if(!confirm(msg)) {
+        document.getElementById('od-status-select').value = '';
+        return;
+      }
+    }
+    // Trừ kho
+    try {
+      await deductStockForOrder(o);
+      notify('📦 Đã trừ kho nguyên liệu!');
+    } catch(e) {
+      console.warn('Trừ kho lỗi:', e.message);
+    }
+  }
+
   o.status = newStatus;
   try {
     await sbPatch('orders', {status: newStatus}, `?id=eq.${o.id}`);
