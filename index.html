@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.13-20260430">
+<meta name="version" content="v5.14-20260430">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3231,7 +3231,17 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
         <div style="font-weight:700;color:var(--brown)" id="cf-box1-label">Đợt 1 — 30% học phí</div>
         <span id="cf-paid1-badge" style="display:none" class="tag t-paid">✓ Đã thu</span>
       </div>
-      <div style="font-size:20px;font-weight:800;color:var(--brand);margin-bottom:8px" id="cf-amount1">0₫</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:20px;font-weight:800;color:var(--brand)" id="cf-amount1">0₫</div>
+        <button onclick="editFeeAmount(1)" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--muted)">✏️ Sửa</button>
+      </div>
+      <div id="cf-edit-amount1" style="display:none;margin-bottom:8px">
+        <input id="cf-input-amount1" type="number" placeholder="Nhập số tiền đợt 1..." style="border:1.5px solid var(--brand);border-radius:8px;padding:8px 12px;font-size:14px;width:100%;font-family:inherit"/>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="btn btn-green btn-sm" onclick="saveFeeAmount(1)">💾 Lưu</button>
+          <button class="btn btn-ghost btn-sm" onclick="cancelFeeAmount(1)">Hủy</button>
+        </div>
+      </div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:10px">📌 Cọc trước ngày học 1 tuần</div>
       <div class="btn-group" id="cf-btn1">
         <button class="btn btn-green btn-sm" onclick="markFeePaid(1)">✓ Xác nhận đã thu đợt 1</button>
@@ -3251,7 +3261,17 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
         <div style="font-weight:700;color:var(--brown)">Đợt 2 — 70% còn lại</div>
         <span id="cf-paid2-badge" style="display:none" class="tag t-paid">✓ Đã thu</span>
       </div>
-      <div style="font-size:20px;font-weight:800;color:var(--brand);margin-bottom:8px" id="cf-amount2">0₫</div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+        <div style="font-size:20px;font-weight:800;color:var(--brand)" id="cf-amount2">0₫</div>
+        <button onclick="editFeeAmount(2)" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;font-size:11px;cursor:pointer;color:var(--muted)">✏️ Sửa</button>
+      </div>
+      <div id="cf-edit-amount2" style="display:none;margin-bottom:8px">
+        <input id="cf-input-amount2" type="number" placeholder="Nhập số tiền đợt 2..." style="border:1.5px solid var(--brand);border-radius:8px;padding:8px 12px;font-size:14px;width:100%;font-family:inherit"/>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="btn btn-green btn-sm" onclick="saveFeeAmount(2)">💾 Lưu</button>
+          <button class="btn btn-ghost btn-sm" onclick="cancelFeeAmount(2)">Hủy</button>
+        </div>
+      </div>
       <div class="btn-group" id="cf-btn2">
         <button class="btn btn-green btn-sm" onclick="markFeePaid(2)">✓ Xác nhận đã thu đợt 2</button>
         <button class="btn btn-sm" onclick="genFeeQR(2)">🔄 Tạo QR đợt 2</button>
@@ -6039,7 +6059,10 @@ function collectFee(id){
   const lbl1=document.getElementById('cf-box1-label');
   if(lbl1) lbl1.textContent=isOnline?'💻 Thanh toán toàn bộ (Online)':'Đợt 1 — 30% học phí';
 
-  document.getElementById('cf-amount1').textContent=fmt(isOnline?fee:dep);
+  // Dùng số tiền custom nếu có, nếu không thì dùng 30%/70%
+  const amt1 = isOnline ? fee : (s.paid1_amount || dep);
+  const amt2 = s.paid2_amount || (fee - amt1);
+  document.getElementById('cf-amount1').textContent=fmt(amt1);
   document.getElementById('cf-paid1-badge').style.display=s.paid1?'inline-block':'none';
   document.getElementById('cf-btn1').style.display=s.paid1?'none':'flex';
   document.getElementById('cf-qr1').style.display='none';
@@ -6047,7 +6070,7 @@ function collectFee(id){
   const box2=document.getElementById('cf-box2');
   if(box2) box2.style.display=isOnline?'none':'block';
   if(!isOnline){
-    document.getElementById('cf-amount2').textContent=fmt(rest);
+    document.getElementById('cf-amount2').textContent=fmt(amt2);
     document.getElementById('cf-paid2-badge').style.display=s.paid2?'inline-block':'none';
     document.getElementById('cf-btn2').style.display=s.paid2?'none':'flex';
     document.getElementById('cf-qr2').style.display='none';
@@ -10938,6 +10961,8 @@ async function runMigration() {
     `CREATE TABLE IF NOT EXISTS app_users (username TEXT PRIMARY KEY, pass_hash TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW())`,
     `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS receipt_url TEXT DEFAULT ''`,
     `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS cost_group TEXT DEFAULT ''`,
+    `ALTER TABLE students ADD COLUMN IF NOT EXISTS paid1_amount NUMERIC DEFAULT 0`,
+    `ALTER TABLE students ADD COLUMN IF NOT EXISTS paid2_amount NUMERIC DEFAULT 0`,
     `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS mang TEXT DEFAULT 'retail'`,
     `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS cost_type TEXT DEFAULT ''`,
     `ALTER TABLE app_users ENABLE ROW LEVEL SECURITY`,
@@ -12678,6 +12703,60 @@ async function bulkClassifyExpenses() {
   renderExpenses && renderExpenses();
   renderFinance && renderFinance();
   setTimeout(()=>gsSend({sheet:'BaoCaoLaiLo',rows:gsBaoCaoData(),time:nowDT()}), 1000);
+}
+
+// ══════════════════════════════════════════════════
+// CHỈNH SỬA SỐ TIỀN TỪNG ĐỢT HỌC PHÍ
+// ══════════════════════════════════════════════════
+function editFeeAmount(dot) {
+  const s = CF_current;
+  if(!s) return;
+  const fee = s.fee || 0;
+  const dep = Math.round(fee * 0.3);
+  const cur = dot === 1
+    ? (s.paid1_amount || dep)
+    : (s.paid2_amount || (fee - dep));
+  const input = document.getElementById('cf-input-amount' + dot);
+  if(input) input.value = cur;
+  document.getElementById('cf-edit-amount' + dot).style.display = '';
+}
+
+function cancelFeeAmount(dot) {
+  document.getElementById('cf-edit-amount' + dot).style.display = 'none';
+}
+
+async function saveFeeAmount(dot) {
+  const s = CF_current;
+  if(!s) return;
+  const val = parseFloat(document.getElementById('cf-input-amount' + dot)?.value) || 0;
+  if(val <= 0) { notify('Nhập số tiền hợp lệ!', false); return; }
+
+  const field = dot === 1 ? 'paid1_amount' : 'paid2_amount';
+  const otherField = dot === 1 ? 'paid2_amount' : 'paid1_amount';
+  const otherDot = dot === 1 ? 2 : 1;
+
+  // Cập nhật
+  s[field] = val;
+  // Tự tính đợt còn lại = tổng học phí - đợt này
+  const fee = s.fee || 0;
+  const otherVal = fee - val;
+  if(otherVal > 0) s[otherField] = otherVal;
+
+  try {
+    const updates = { [field]: val };
+    if(otherVal > 0) updates[otherField] = otherVal;
+    await sbPatch('students', updates, '?id=eq.' + s.id);
+
+    // Cập nhật hiển thị
+    document.getElementById('cf-amount' + dot).textContent = fmt(val) + '₫';
+    document.getElementById('cf-amount' + otherDot).textContent = fmt(Math.max(0, otherVal)) + '₫';
+    document.getElementById('cf-edit-amount' + dot).style.display = 'none';
+
+    notify('✅ Đã cập nhật tiền đợt ' + dot + ': ' + fmt(val));
+    renderStudents();
+  } catch(e) {
+    notify('Lỗi lưu: ' + e.message, false);
+  }
 }
 boot();
 </script>
