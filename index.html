@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.14-20260430">
+<meta name="version" content="v5.15-20260501">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -12709,7 +12709,8 @@ async function bulkClassifyExpenses() {
 // CHỈNH SỬA SỐ TIỀN TỪNG ĐỢT HỌC PHÍ
 // ══════════════════════════════════════════════════
 function editFeeAmount(dot) {
-  const s = CF_current;
+  const id = document.getElementById('cf-student-id')?.value;
+  const s = D.students.find(x=>x.id===id);
   if(!s) return;
   const fee = s.fee || 0;
   const dep = Math.round(fee * 0.3);
@@ -12726,7 +12727,8 @@ function cancelFeeAmount(dot) {
 }
 
 async function saveFeeAmount(dot) {
-  const s = CF_current;
+  const id = document.getElementById('cf-student-id')?.value;
+  const s = D.students.find(x=>x.id===id);
   if(!s) return;
   const val = parseFloat(document.getElementById('cf-input-amount' + dot)?.value) || 0;
   if(val <= 0) { notify('Nhập số tiền hợp lệ!', false); return; }
