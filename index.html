@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.17-20260502">
+<meta name="version" content="v5.19-20260502">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -6848,12 +6848,12 @@ function sendDailyReport(){
     msg+='• Doanh thu: '+fmt(todayRev)+'\n';
   }
   if(pending.length){
-    msg+='\n⏳ *ĐƠN CHỜNG THU ('+pending.length+')*\n';
+    msg+='\n⏳ *ĐƠN CHỜ THU ('+pending.length+')*\n';
     pending.slice(0,5).forEach(o=>{msg+='• '+o.id+' — '+o.customer+' — '+fmt(o.total||0)+'\n';});
     if(pending.length>5) msg+='• ...và '+(pending.length-5)+' đơn khác\n';
   }
   if(low.length){
-    msg+='\n⚠️ *KHO SẪP HỬT*\n';
+    msg+='\n⚠️ *KHO SẮP HẾT*\n';
     low.forEach(i=>{msg+='• '+i.name+': còn '+i.qty+' '+i.unit+'\n';});
   }
   msg+='\n━━━━━━━━━━━━━━━━\n';
