@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.16-20260502">
+<meta name="version" content="v5.17-20260502">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -9417,18 +9417,7 @@ async function checkReminders() {
   await checkNvlDebtReminders();
 }
 
-// Patch sendDailyReport để thêm tóm tắt NVL
-const _origSendDailyReport = sendDailyReport;
-function sendDailyReport() {
-  _origSendDailyReport();
-  // Thêm summary NVL vào báo cáo hàng ngày
-  const pendingNvl = D_nvl.filter(o=>o.status==='Chờ thanh toán'||o.status==='Chờ xác nhận').length;
-  const totalDebt  = D_nvl.reduce((s,o)=>Math.max(0,s+(o.total||0)-(o.paid||0)),0);
-  if(pendingNvl>0||totalDebt>0) {
-    tgMsg(`📦 *Tóm tắt NVL hôm nay:*\n\n📋 Đơn chờ xử lý: ${pendingNvl}\n💳 Tổng công nợ: ${Math.round(totalDebt).toLocaleString('vi-VN')}₫\n\n_Trương Dáng Hương Academy_`);
-  }
-}
-
+// NVL summary inline (patch removed to fix recursion)
 // Thêm nút nhắc nợ NVL vào Cài đặt
 setTimeout(()=>{
   const remindBtn = document.querySelector("button[onclick=\"checkReminders()\"]");
