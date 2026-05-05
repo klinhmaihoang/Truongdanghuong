@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.19-20260502">
+<meta name="version" content="v5.20-20260502">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -6106,8 +6106,8 @@ async function markFeePaid(dotNum){
   const s=D.students.find(x=>x.id===id);if(!s)return;
   const isOnline=s.type==='Online';
   const fee=s.fee||0;
-  const dep=isOnline?fee:Math.round(fee*0.3);
-  const rest=isOnline?0:fee-dep;
+  const dep=isOnline?fee:(s.paid1_amount||Math.round(fee*0.3));
+  const rest=isOnline?0:(s.paid2_amount||(fee-Math.round(fee*0.3)));
   const amount=dotNum===1?dep:rest;
   const ts=nowDT();
   const upd=dotNum===1?{paid1:true,paid1_at:ts}:{paid2:true,paid2_at:ts};
@@ -6136,8 +6136,8 @@ async function undoFeePaid(dotNum){
   const s=D.students.find(x=>x.id===id);if(!s)return;
   const isOnline=s.type==='Online';
   const fee=s.fee||0;
-  const dep=isOnline?fee:Math.round(fee*0.3);
-  const rest=isOnline?0:fee-dep;
+  const dep=isOnline?fee:(s.paid1_amount||Math.round(fee*0.3));
+  const rest=isOnline?0:(s.paid2_amount||(fee-Math.round(fee*0.3)));
   const amount=dotNum===1?dep:rest;
   const dotLabel=isOnline?'toàn bộ':`đợt ${dotNum}`;
   confirmAct(
