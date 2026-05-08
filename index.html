@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.21-20260502">
+<meta name="version" content="v5.23-20260508">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3728,7 +3728,10 @@ async function pollUpdates(){
       notify('✅ Đã kết nối lại Supabase!');
     }
     setSyncStatus(true,'Đồng bộ lúc '+nowTime());
-    render();
+    // Chỉ re-render nếu không đang mở modal đơn hàng (tránh overwrite sau khi vừa update)
+    const modalOpen = document.getElementById('modal-order-detail')?.classList.contains('active');
+    if(!modalOpen) render();
+    else { renderDash(); renderOrders(); }
   }catch(e){
     _pollFailCount++;
     if(_pollFailCount===1){
@@ -11101,6 +11104,11 @@ ${warnings.join('\n')}\n\nVẫn xác nhận đơn?`;
   }
 
   o.status = newStatus;
+  // Update trong D.orders array luôn để render đúng ngay
+  const _oi = D.orders.findIndex(x=>x.id===o.id);
+  if(_oi>=0) D.orders[_oi].status = newStatus;
+  // Render ngay trước khi await để UI update nhanh
+  renderOrders(); renderDash(); renderPendingOrders();
   try {
     await sbPatch('orders', {status: newStatus}, `?id=eq.${o.id}`);
     renderPendingOrders();
@@ -11108,6 +11116,9 @@ ${warnings.join('\n')}\n\nVẫn xác nhận đơn?`;
     renderDash();
     // Re-render modal với status mới
     showOrderDetail(o.id);
+    // Reset dropdown
+    const selEl = document.getElementById('od-status-select');
+    if(selEl) selEl.value = '';
     notify(`✅ Đã chuyển: ${oldStatus} → ${newStatus}`);
     // Gửi TG cho tất cả thay đổi trạng thái đơn
     const _stIcons = {'Đã xác nhận':'✅','Đang chuẩn bị':'🧺','Đã book ship':'📦',
