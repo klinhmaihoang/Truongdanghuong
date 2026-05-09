@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.26-20260509">
+<meta name="version" content="v5.27-20260509">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2043,7 +2043,8 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <select id="is-month-sel" onchange="renderIncomeStatement()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px;font-family:inherit;background:var(--bg2)">
         <option value="">Tất cả</option>
       </select>
-      <button class="btn btn-sm" onclick="syncBaoCao()" style="background:linear-gradient(135deg,#1E8449,#27AE60);margin-left:auto">📤 Sync GG Sheets</button>
+      <button class="btn btn-sm" onclick="exportISPDF()" style="background:#E74C3C;color:#fff;margin-left:auto">📄 Xuất PDF</button>
+      <button class="btn btn-sm" onclick="syncBaoCao()" style="background:linear-gradient(135deg,#1E8449,#27AE60)">📤 Sync GG Sheets</button>
     </div>
 
     <!-- KPI Cards -->
@@ -12794,6 +12795,161 @@ async function saveFeeAmount(dot) {
   } catch(e) {
     notify('Lỗi lưu: ' + e.message, false);
   }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// EXPORT PDF — BÁO CÁO LÃI LỖ
+// ══════════════════════════════════════════════════════════════════
+function exportISPDF() {
+  const sel = document.getElementById('is-month-sel');
+  const filterMonth = sel?.value || '';
+  const matchMonth = (t) => !filterMonth || getMonthKey(t) === filterMonth;
+
+  // Gather data
+  const acaOrders = D.orders.filter(o => o.id.startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
+  const retOrders = D.orders.filter(o => !o.id.startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
+  const acaThu = acaOrders.reduce((s,o)=>s+(o.total||0),0);
+  const retThu = retOrders.reduce((s,o)=>s+(o.total||0),0);
+  const totalThu = acaThu + retThu;
+
+  const chiTxs = (D.transactions||[]).filter(t => t.type==='chi' && matchMonth(t.time));
+  const chiByGroup = {};
+  Object.keys(IS_CHI_CATS).forEach(k => chiByGroup[k]=0);
+  chiTxs.forEach(t => { const g=isClassifyTx(t); chiByGroup[g]=(chiByGroup[g]||0)+(t.amount||0); });
+
+  const cogs = chiByGroup['nvl'] + chiByGroup['baobao'] + chiByGroup['ship'];
+  const grossProfit = totalThu - cogs;
+  const grossMargin = totalThu>0?(grossProfit/totalThu*100).toFixed(1):0;
+  const opex = chiByGroup['luong'] + chiByGroup['marketing'] + chiByGroup['thietbi'] + chiByGroup['khac'];
+  const ebit = grossProfit - opex;
+  const netMargin = totalThu>0?(ebit/totalThu*100).toFixed(1):0;
+  const totalChi = cogs + opex;
+  const fixed = chiByGroup['luong'] + chiByGroup['thietbi'];
+  const variable = totalChi - fixed;
+
+  const periodLabel = filterMonth
+    ? (() => { const [y,m]=filterMonth.split('-'); return `Tháng ${+m}/${y}`; })()
+    : 'Tất cả thời gian';
+
+  const fmtN = (n) => {
+    if(!n) return '<span style="color:#999">—</span>';
+    const color = n >= 0 ? '#1A7A1A' : '#CC0000';
+    return `<span style="color:${color}">${n.toLocaleString('vi-VN')}₫</span>`;
+  };
+  const fmtV = (n) => n ? n.toLocaleString('vi-VN')+'₫' : '—';
+  const pct = (n,d) => d>0 ? `<small style="color:#888"> (${(n/d*100).toFixed(1)}%)</small>` : '';
+
+  const row = (label, val, indent=0, bold=false, bg='', color='') => `
+    <tr style="${bg?'background:'+bg:''}">
+      <td style="padding:8px 12px ${indent?'padding-left:'+(12+indent*16)+'px':''}; font-size:13px; ${bold?'font-weight:700':''} ${color?'color:'+color:''}">${label}</td>
+      <td style="text-align:right;padding:8px 14px;font-size:13px;${bold?'font-weight:700':''}">${fmtN(val)}</td>
+      <td style="text-align:right;padding:8px 10px;font-size:11px;color:#888">${totalThu>0?(Math.abs(val)/totalThu*100).toFixed(1)+'%':''}</td>
+    </tr>`;
+  const secHdr = (label, bg='#2C3E50') => `
+    <tr>
+      <td colspan="3" style="background:${bg};color:#fff;font-weight:700;font-size:12px;padding:8px 12px;text-transform:uppercase;letter-spacing:.5px">${label}</td>
+    </tr>`;
+  const spacer = () => `<tr><td colspan="3" style="height:6px;background:#f5f5f5"></td></tr>`;
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Báo cáo Lãi Lỗ — ${periodLabel}</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color:#333; background:#fff; padding:24px; }
+    .header { text-align:center; margin-bottom:24px; border-bottom:3px solid #FF8C00; padding-bottom:16px; }
+    .logo { font-size:22px; font-weight:800; color:#FF8C00; }
+    .subtitle { font-size:13px; color:#666; margin-top:4px; }
+    .period { display:inline-block; background:#FF8C00; color:#fff; padding:4px 16px; border-radius:20px; font-size:12px; font-weight:700; margin-top:8px; }
+    .kpi-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:20px; }
+    .kpi { background:#f8f9fa; border-radius:10px; padding:12px 14px; border-left:4px solid; }
+    .kpi-val { font-size:18px; font-weight:800; }
+    .kpi-label { font-size:11px; color:#666; margin-top:2px; }
+    table { width:100%; border-collapse:collapse; margin-bottom:16px; }
+    th { background:#2C3E50; color:#fff; padding:10px 12px; font-size:12px; text-align:left; }
+    th:last-child, th:nth-child(2) { text-align:right; }
+    tr:hover { background:#fafafa; }
+    .footer { text-align:center; font-size:11px; color:#999; margin-top:20px; padding-top:12px; border-top:1px solid #eee; }
+    @media print { body { padding:12px; } .no-print { display:none; } }
+  </style></head><body>
+
+  <div class="no-print" style="text-align:right;margin-bottom:16px">
+    <button onclick="window.print()" style="background:#E74C3C;color:#fff;border:none;padding:10px 24px;border-radius:8px;font-size:14px;cursor:pointer;font-weight:700">🖨️ In / Lưu PDF</button>
+    <button onclick="window.close()" style="background:#eee;border:none;padding:10px 20px;border-radius:8px;font-size:14px;cursor:pointer;margin-left:8px">✕ Đóng</button>
+  </div>
+
+  <div class="header">
+    <div class="logo">🍵 Trương Dáng Hương Academy</div>
+    <div class="subtitle">Báo cáo Kết quả Kinh doanh</div>
+    <div class="period">${periodLabel}</div>
+    <div style="font-size:11px;color:#999;margin-top:6px">Xuất lúc: ${new Date().toLocaleString('vi-VN')}</div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi" style="border-color:#1A5276">
+      <div class="kpi-val" style="color:#1A5276">${fmtV(totalThu)}</div>
+      <div class="kpi-label">💰 Tổng doanh thu</div>
+    </div>
+    <div class="kpi" style="border-color:#E74C3C">
+      <div class="kpi-val" style="color:#E74C3C">${fmtV(totalChi)}</div>
+      <div class="kpi-label">💸 Tổng chi phí</div>
+    </div>
+    <div class="kpi" style="border-color:${ebit>=0?'#1E8449':'#E74C3C'}">
+      <div class="kpi-val" style="color:${ebit>=0?'#1E8449':'#E74C3C'}">${fmtV(ebit)}</div>
+      <div class="kpi-label">✅ Lãi ròng</div>
+    </div>
+    <div class="kpi" style="border-color:#8E44AD">
+      <div class="kpi-val" style="color:#8E44AD">${netMargin}%</div>
+      <div class="kpi-label">📊 Biên lợi nhuận</div>
+    </div>
+  </div>
+
+  <table>
+    <thead><tr>
+      <th style="width:55%">Khoản mục</th>
+      <th style="width:30%;text-align:right">Số tiền (₫)</th>
+      <th style="width:15%;text-align:right">% DT</th>
+    </tr></thead>
+    <tbody>
+      ${secHdr('1. DOANH THU', '#1A5276')}
+      ${row('🎓 Học phí & khóa dạy (Academy)', acaThu, 1)}
+      ${row('🛍️ Bán sản phẩm trà/cà phê (Retail)', retThu, 1)}
+      ${row('TỔNG DOANH THU', totalThu, 0, true, '#EBF5FB', '#1A5276')}
+      ${spacer()}
+
+      ${secHdr('2. CHI PHÍ NGUYÊN VẬT LIỆU (Biến phí)', '#922B21')}
+      ${row('📦 Nguyên vật liệu trà/cà phê', chiByGroup['nvl'], 1)}
+      ${row('🛍️ Bao bì đóng gói', chiByGroup['baobao'], 1)}
+      ${row('🚚 Phí ship giao hàng', chiByGroup['ship'], 1)}
+      ${row('Tổng NVL', -cogs, 0, true, '#FDEDEC')}
+      ${row('LÃI SAU NVL', grossProfit, 0, true, grossProfit>=0?'#E8F8F5':'#FADBD8', grossProfit>=0?'#1E8449':'#E74C3C')}
+      ${spacer()}
+
+      ${secHdr('3. CHI PHÍ VẬN HÀNH (OPEX)', '#E67E22')}
+      ${row('📣 Marketing & quảng cáo (biến phí)', chiByGroup['marketing'], 1)}
+      ${row('👥 Lương nhân viên (định phí)', chiByGroup['luong'], 1)}
+      ${row('🔧 Thiết bị dụng cụ (định phí)', chiByGroup['thietbi'], 1)}
+      ${row('📋 Chi phí khác', chiByGroup['khac'], 1)}
+      ${row('Tổng OPEX', -opex, 0, true, '#FEF9E7')}
+      ${spacer()}
+
+      ${secHdr('4. TỔNG KẾT', '#1E8449')}
+      ${row('📌 Tổng định phí', -fixed, 1, false, '#F5EEF8', '#8E44AD')}
+      ${row('📈 Tổng biến phí', -variable, 1, false, '#FEF9E7', '#E67E22')}
+      ${row('💸 Tổng chi phí', -totalChi, 0, true, '#FDEDEC', '#E74C3C')}
+      ${spacer()}
+      ${row('🏆 LÃI RÒNG CUỐI CÙNG', ebit, 0, true, ebit>=0?'#D5F5E3':'#FADBD8', ebit>=0?'#1E8449':'#E74C3C')}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Báo cáo được tạo tự động từ hệ thống Trương Dáng Hương Academy<br>
+    Mọi thắc mắc vui lòng liên hệ: 0984830303
+  </div>
+</body></html>`;
+
+  const win = window.open('', '_blank', 'width=800,height=900');
+  win.document.write(html);
+  win.document.close();
 }
 boot();
 </script>
