@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.27-20260509">
+<meta name="version" content="v5.28-20260511">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -1665,6 +1665,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div id="od-status-quick" style="display:flex;align-items:center;gap:8px;margin-bottom:14px;background:var(--bg);border-radius:8px;padding:8px 12px;border:1px solid var(--border)">
       <span style="font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap">Cập nhật:</span>
       <select id="od-status-select"
+        onchange="window._selectedStatus=this.value"
         style="flex:1;border:1.5px solid var(--brand);border-radius:6px;padding:6px 10px;font-size:13px;font-family:inherit;background:#fff;outline:none;font-weight:600;color:var(--brown)">
         <option value="">— Chọn trạng thái mới —</option>
         <option value="Chờ xác nhận">🕐 Chờ xác nhận</option>
@@ -1677,7 +1678,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
         <option value="Đã thanh toán">💰 Đã thanh toán</option>
         <option value="Đã hủy">✕ Đã hủy</option>
       </select>
-      <button class="btn btn-sm" onclick="const sv=document.getElementById('od-status-select').value;if(sv)odQuickUpdateStatus(sv);else notify('Chọn trạng thái trước!',false)" style="flex-shrink:0">✓ Cập nhật</button>
+      <button class="btn btn-sm" onclick="const sv=window._selectedStatus||document.getElementById('od-status-select').value;if(sv){odQuickUpdateStatus(sv);window._selectedStatus=null;}else notify('Chọn trạng thái trước!',false)" style="flex-shrink:0">✓ Cập nhật</button>
     </div>
 
     <!-- VIEW mode -->
