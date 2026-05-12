@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.29-20260512">
+<meta name="version" content="v5.30-20260512">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -5712,7 +5712,9 @@ async function checkout(){
   const discount=Math.min(100,Math.max(0,+document.getElementById('c-discount')?.value||0));
   const shipFee=Math.max(0,+document.getElementById('c-ship-fee')?.value||0);
   const discountAmt=Math.round(subtotal*discount/100);
-  const total=subtotal-discountAmt+shipFee;
+  const vatPct=Math.max(0,+document.getElementById('c-vat')?.value||0);
+  const vatAmt=Math.round((subtotal-discountAmt)*vatPct/100);
+  const total=subtotal-discountAmt+shipFee+vatAmt;
   const id='HĐ'+Date.now().toString().slice(-6);
   const items=cart.map(c=>c.name+(c.qty>1?' x'+c.qty:'')+(c.unit?' ('+c.unit+')':'')).join(', ');
   const address=document.getElementById('c-address')?.value?.trim()||'';
