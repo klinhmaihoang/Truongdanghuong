@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.30-20260512">
+<meta name="version" content="v5.31-20260512">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -10487,8 +10487,9 @@ function odOpenQR() {
 }
 
 function odEnterEdit() {
-  const o = OD_current;
+  const o = getODCurrent();
   if(!o) return;
+  OD_current = o;
   document.getElementById('od-view').style.display = 'none';
   document.getElementById('od-edit').style.display = '';
   document.getElementById('od-action-buttons').style.display = 'none';
@@ -10629,8 +10630,9 @@ function odCalcLive() {
 }
 
 async function odSaveEdit() {
-  const o = OD_current;
+  const o = getODCurrent();
   if(!o) return;
+  OD_current = o;
   // Trên mobile, field có thể bị empty do scroll — fallback về tên cũ
   const customer = (document.getElementById('od-edit-customer').value||'').trim() || o.customer || '';
   if(!customer){notify('Nhập tên khách!',false);return;}
@@ -10713,9 +10715,10 @@ async function odSaveEdit() {
 }
 
 function odCollect() {
-  if(OD_current) {
+  const o = getODCurrent();
+  if(o) {
     closeM('modal-order-detail');
-    collectPending(OD_current.id);
+    collectPending(o.id);
   }
 }
 
@@ -11109,15 +11112,21 @@ async function deductStockForOrder(o) {
   return logs;
 }
 
+
+// Helper: luôn lấy đúng order đang mở trong modal
+function getODCurrent() {
+  if(OD_current) return OD_current;
+  const id = document.getElementById('od-id')?.textContent?.trim();
+  if(id) {
+    OD_current = D.orders.find(x=>x.id===id) || null;
+  }
+  return OD_current;
+}
 async function odQuickUpdateStatus(newStatus) {
   if(!newStatus) return;
-  // Fallback: đọc từ modal nếu OD_current null
-  if(!OD_current) {
-    const modalId = document.getElementById('od-id')?.textContent?.trim();
-    if(modalId) OD_current = D.orders.find(x=>x.id===modalId);
-  }
-  if(!OD_current) { notify('Không tìm thấy đơn hàng!', false); return; }
-  const o = OD_current;
+  const o = getODCurrent();
+  if(!o) { notify('Không tìm thấy đơn hàng!', false); return; }
+  OD_current = o;
   const oldStatus = o.status;
   if(newStatus === oldStatus) {
     document.getElementById('od-status-select').value = '';
