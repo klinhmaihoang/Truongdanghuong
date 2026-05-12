@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.28-20260511">
+<meta name="version" content="v5.29-20260512">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -5742,7 +5742,7 @@ async function checkout(){
   // Lưu đơn chờ
   const phone_val=document.getElementById('c-phone')?.value?.trim()||'';
   const pendingOrder={id,customer:name,phone:phone_val,email:'',items,total,time:nowDT(),note,status:'Chờ xác nhận',
-    address,payment,shipping,discount,ship_fee:shipFee2||0,tracking_code:document.getElementById('c-tracking-code')?.value?.trim()||'',subtotal,tracking_url:'',created_at:Date.now()};
+    address,payment,shipping,discount,ship_fee:shipFee||0,tracking_code:document.getElementById('c-tracking-code')?.value?.trim()||'',subtotal,tracking_url:'',created_at:Date.now()};
   await sbUpsert('orders',pendingOrder);
   D.orders.push(pendingOrder);
   showM('modal-qr');
@@ -11108,7 +11108,13 @@ async function deductStockForOrder(o) {
 }
 
 async function odQuickUpdateStatus(newStatus) {
-  if(!newStatus || !OD_current) return;
+  if(!newStatus) return;
+  // Fallback: đọc từ modal nếu OD_current null
+  if(!OD_current) {
+    const modalId = document.getElementById('od-id')?.textContent?.trim();
+    if(modalId) OD_current = D.orders.find(x=>x.id===modalId);
+  }
+  if(!OD_current) { notify('Không tìm thấy đơn hàng!', false); return; }
   const o = OD_current;
   const oldStatus = o.status;
   if(newStatus === oldStatus) {
