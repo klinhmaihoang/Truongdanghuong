@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.32-20260512">
+<meta name="version" content="v5.33-20260512">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3648,7 +3648,7 @@ async function boot(){
   try{
     // ── NHÓM 1: Data cốt lõi — load ngay, hiển thị UI sớm ──
     const [orders, students, transactions, settings] = await Promise.all([
-      sbGet('orders','?order=created_at.desc&limit=500&deleted_at=is.null'),
+      sbGet('orders','?order=created_at.desc&limit=500&deleted_at=is.null&status=neq.Đã hủy'),
       sbGet('students','?order=created_at.asc'),
       sbGet('transactions','?order=created_at.desc&limit=500'),
       sbGet('settings','?id=eq.main'),
@@ -3725,7 +3725,7 @@ async function pollUpdates(){
       sbGet('students','?order=created_at.asc'),
       sbGet('inventory','?order=created_at.asc'),
       sbGet('products','?order=created_at.asc'),
-      sbGet('orders','?order=created_at.asc'),
+      sbGet('orders','?order=created_at.desc&limit=500&deleted_at=is.null&status=neq.Đã hủy'),
       sbGet('courses','?order=created_at.asc'),
       sbGet('customers','?order=created_at.asc'),
       sbGet('transactions','?order=created_at.desc&limit=500'),
@@ -10233,7 +10233,7 @@ async function backupJSON() {
         sbGet('students','?order=created_at.asc'),
         sbGet('inventory','?order=created_at.asc'),
         sbGet('products','?order=created_at.asc'),
-        sbGet('orders','?order=created_at.desc'),
+        sbGet('orders','?order=created_at.desc&limit=500&deleted_at=is.null&status=neq.Đã hủy'),
         sbGet('stock_log','?order=created_at.desc'),
         sbGet('recipes','?order=created_at.asc'),
         sbGet('courses','?order=created_at.asc'),
