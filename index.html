@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.31-20260512">
+<meta name="version" content="v5.32-20260512">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3546,7 +3546,18 @@ async function sb(method, table, data=null, filter=''){
 }
 const sbGet  = (t,f='')     => sb('GET',t,null,f);
 const sbPost = (t,d)        => sb('POST',t,d);
-const sbDel  = (t,f)        => sb('DELETE',t,null,f);
+const sbDel = async (t,f) => {
+  // Soft delete cho orders — chỉ đánh dấu deleted_at thay vì xóa thật
+  if(t === 'orders') {
+    const idMatch = (f||'').match(/id=eq\.(.+)$/);
+    if(idMatch) {
+      const oid = idMatch[1];
+      console.warn('[SOFT DELETE] orders id='+oid);
+      return sb('PATCH', t, {deleted_at: new Date().toISOString(), status:'Đã hủy'}, f);
+    }
+  }
+  return sb('DELETE', t, null, f);
+};
 
 // sbPatch với graceful fallback cho orders (chỉ patch cột có sẵn nếu lỗi schema)
 const sbPatch = async (t,d,f) => {
@@ -3637,7 +3648,7 @@ async function boot(){
   try{
     // ── NHÓM 1: Data cốt lõi — load ngay, hiển thị UI sớm ──
     const [orders, students, transactions, settings] = await Promise.all([
-      sbGet('orders','?order=created_at.desc&limit=500'),
+      sbGet('orders','?order=created_at.desc&limit=500&deleted_at=is.null'),
       sbGet('students','?order=created_at.asc'),
       sbGet('transactions','?order=created_at.desc&limit=500'),
       sbGet('settings','?id=eq.main'),
@@ -10995,6 +11006,7 @@ async function runMigration() {
     `CREATE TABLE IF NOT EXISTS app_users (username TEXT PRIMARY KEY, pass_hash TEXT NOT NULL, updated_at TIMESTAMPTZ DEFAULT NOW())`,
     `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS receipt_url TEXT DEFAULT ''`,
     `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS cost_group TEXT DEFAULT ''`,
+    `ALTER TABLE orders ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ DEFAULT NULL`,
     `ALTER TABLE students ADD COLUMN IF NOT EXISTS paid1_amount NUMERIC DEFAULT 0`,
     `ALTER TABLE students ADD COLUMN IF NOT EXISTS paid2_amount NUMERIC DEFAULT 0`,
     `ALTER TABLE transactions ADD COLUMN IF NOT EXISTS mang TEXT DEFAULT 'retail'`,
