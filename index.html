@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.34-20260516">
+<meta name="version" content="v5.35-20260516">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2656,11 +2656,11 @@ function sendDailyReport8am() {
       const paid1   = r[col('Đợt 1')]      || '';
       const paid2   = r[col('Đợt 2')]      || '';
       const endDate = r[col('Ngày KT')]    || '';
-      if (status === 'Đang học') { activeCount++; if(s.type==='Online') activeOnline++; else activeOffline++; }
+      if (status === 'Đang học') { activeCount++; if(type==='Online') activeOnline++; else activeOffline++; }
       if (fee &gt; 0 &amp;&amp; paid1 !== 'Đã thu')
-        unpaid1.push(name + ' — ' + fmtMoney(s.paid1_amount||Math.round(fee * 0.3)));
+        unpaid1.push(name + ' — ' + fmtMoney(+r[col('paid1_amount')]||Math.round(fee * 0.3)));
       if (fee &gt; 0 &amp;&amp; paid1 === 'Đã thu' &amp;&amp; paid2 !== 'Đã thu' &amp;&amp; type === 'Offline') {
-        const rest = s.paid2_amount || (fee - Math.round(fee * 0.3));
+        const rest = +r[col('paid2_amount')] || (fee - Math.round(fee * 0.3));
         let suffix = '';
         if (endDate) {
           const ed = new Date(endDate); ed.setHours(0,0,0,0);
