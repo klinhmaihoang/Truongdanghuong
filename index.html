@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.33-20260512">
+<meta name="version" content="v5.34-20260516">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -2642,7 +2642,7 @@ function sendDailyReport8am() {
   const todayStr = Utilities.formatDate(today, 'Asia/Ho_Chi_Minh', 'dd/MM/yyyy');
 
   // ── Học viên ──
-  let activeCount = 0, unpaid1 = [], unpaid2 = [], endingSoon = [];
+  let activeCount = 0, activeOnline = 0, activeOffline = 0, unpaid1 = [], unpaid2 = [], endingSoon = [];
   if (shSt &amp;&amp; shSt.getLastRow() &gt; 1) {
     const rows  = shSt.getDataRange().getValues();
     const heads = rows[0];
@@ -2656,7 +2656,7 @@ function sendDailyReport8am() {
       const paid1   = r[col('Đợt 1')]      || '';
       const paid2   = r[col('Đợt 2')]      || '';
       const endDate = r[col('Ngày KT')]    || '';
-      if (status === 'Đang học') activeCount++;
+      if (status === 'Đang học') { activeCount++; if(s.type==='Online') activeOnline++; else activeOffline++; }
       if (fee &gt; 0 &amp;&amp; paid1 !== 'Đã thu')
         unpaid1.push(name + ' — ' + fmtMoney(s.paid1_amount||Math.round(fee * 0.3)));
       if (fee &gt; 0 &amp;&amp; paid1 === 'Đã thu' &amp;&amp; paid2 !== 'Đã thu' &amp;&amp; type === 'Offline') {
@@ -2702,6 +2702,10 @@ function sendDailyReport8am() {
 
 ';
   msg += '🎓 *HỌC VIÊN ĐANG HỌC: ' + activeCount + ' người*
+';
+  if(activeOffline>0) msg += '• Offline: ' + activeOffline + ' người
+';
+  if(activeOnline>0)  msg += '• Online: '  + activeOnline  + ' người
 ';
   if (unpaid1.length) { msg += '
 💳 *CHƯA THU ĐỢT 1 (' + unpaid1.length + ')*
