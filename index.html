@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.37-20260519">
+<meta name="version" content="v5.38-20260519">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -3088,6 +3088,18 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     </div>
     <div class="form-row">
       <div class="fg">
+        <label>Mục đích sử dụng</label>
+        <select id="im-purpose" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;outline:none;width:100%">
+          <option value="retail">🛍️ Retail — Bán sản phẩm</option>
+          <option value="academy">🎓 Academy — Dạy học</option>
+          <option value="rnd">🔬 R&D — Nghiên cứu phát triển</option>
+          <option value="content">🎬 Quay content</option>
+        </select>
+      </div>
+      <div class="fg"><label>Ghi chú</label><input id="im-note" placeholder="VD: Đặt hàng tháng 4..."/></div>
+    </div>
+    <div class="form-row">
+      <div class="fg">
         <label>Thanh toán NCC</label>
         <select id="im-payment" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;outline:none;width:100%">
           <option value="paid">💵 Trả ngay — tạo phiếu chi</option>
@@ -3095,7 +3107,6 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
           <option value="none">🚫 Không tạo phiếu chi</option>
         </select>
       </div>
-      <div class="fg"><label>Ghi chú</label><input id="im-note" placeholder="VD: Đặt hàng tháng 4..."/></div>
     </div>
     <!-- Tổng tiền preview -->
     <div id="im-total-preview" style="display:none;background:var(--brand-light);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:13px">
@@ -6324,7 +6335,9 @@ async function importStock(){
   const sup     = document.getElementById('im-sup').value.trim()||'—';
   const price   = +document.getElementById('im-price').value||0;
   const payment = document.getElementById('im-payment')?.value||'paid';
-  const note    = document.getElementById('im-note')?.value.trim()||'';
+  const note     = document.getElementById('im-note')?.value.trim()||'';
+  const purpose  = document.getElementById('im-purpose')?.value||'retail';
+  const purposeLabel = {'retail':'🛍️ Retail','academy':'🎓 Academy','rnd':'🔬 R&D','content':'🎬 Quay content'}[purpose]||'Retail';
   if(!qty||qty<=0){notify('Nhập số lượng hợp lệ!',false);return;}
   const mat=D.inventory.find(i=>i.id===id);if(!mat)return;
   const oldQty=mat.qty;
@@ -6332,14 +6345,14 @@ async function importStock(){
   mat.qty=Math.round((mat.qty+qty)*100)/100;
   try{
     await sbPatch('inventory',{qty:mat.qty},`?id=eq.${id}`);
-    const logNote = [sup, price?fmt(price)+'/đv':'', note].filter(Boolean).join(' — ');
+    const logNote = ['['+purposeLabel+']', sup, price?fmt(price)+'/đv':'', note].filter(Boolean).join(' — ');
     const log={id:uid(),time:nowDT(),name:mat.name,type:'Nhập',qty:qty,unit:mat.unit,
       note:logNote,created_at:Date.now()};
     await sbUpsert('stock_log',log);D.stockLog.unshift(log);
 
     // Tự động tạo phiếu chi nếu có giá tiền và chọn trả ngay/ghi nợ
     if(total > 0 && payment !== 'none') {
-      const txCategory = payment==='debt' ? 'Nhập kho (ghi nợ)' : 'Nhập kho NVL';
+      const txCategory = payment==='debt' ? '['+purposeLabel+'] Nhập kho (ghi nợ)' : '['+purposeLabel+'] Nhập kho NVL';
       const txNote = `${mat.name} x${qty}${mat.unit} @${fmt(price)}/đv — NCC: ${sup}${note?' ('+note+')':''}`;
       const tx = {
         id: uid(),
@@ -6365,6 +6378,7 @@ async function importStock(){
     }
     closeM('modal-import');
     ['im-qty','im-sup','im-price','im-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    const purposeSel=document.getElementById('im-purpose');if(purposeSel)purposeSel.value='retail';;
     clearReceiptInput('im');
     document.getElementById('im-total-preview').style.display='none';
     render();
@@ -6373,7 +6387,7 @@ async function importStock(){
     notify(`✅ Đã nhập: +${qty} ${mat.unit} ${mat.name}${total>0?' — '+fmt(total)+(payLabel?' ('+payLabel+')':''):''}`);
 
     if(document.getElementById('at-import').checked)
-      tgMsg(`📦 *Nhập kho!*\n\n📦 ${mat.name}: +${qty} ${mat.unit}\n🏭 NCC: ${sup}\n${total>0?'💰 Tổng tiền: '+fmt(total)+'\n':''}${payment==='paid'?'💵 Đã tạo phiếu chi\n':payment==='debt'?'📋 Ghi nợ — chưa trả\n':''}🔢 Tồn kho: ${mat.qty} ${mat.unit}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+      tgMsg(`📦 *Nhập kho!*\n\n📦 ${mat.name}: +${qty} ${mat.unit}\n🎯 Mục đích: ${purposeLabel}\n🏭 NCC: ${sup}\n${total>0?'💰 Tổng tiền: '+fmt(total)+'\n':''}${payment==='paid'?'💵 Đã tạo phiếu chi\n':payment==='debt'?'📋 Ghi nợ — chưa trả\n':''}🔢 Tồn kho: ${mat.qty} ${mat.unit}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
 
     gsSend({sheet:'LichSuKho',id:log.id,time:nowDT(),name:mat.name,type:'Nhập',qty:qty,unit:mat.unit,note:logNote,mat_id:id,mat_qty:qty});
     gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
