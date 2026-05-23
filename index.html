@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.40-20260523">
+<meta name="version" content="v5.42-20260523">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4227,6 +4227,7 @@ async function saveCustomer() {
     closeM('modal-add-customer');
     renderCustomers();
     notify('✅ Đã lưu khách: '+name);
+    gsSyncAfterChange('customers');
   } catch(e){ notify('Lỗi: '+e.message,false); }
 }
 
@@ -5359,6 +5360,7 @@ async function hardDeleteStudent(id){
       D.students=D.students.filter(x=>x.id!==id);
       renderStudents();renderDash();renderDeletedStudents();
       notify('Đã xóa vĩnh viễn: '+s.name);
+      gsSyncAfterChange('students');
     }
   );
 }
@@ -7345,6 +7347,9 @@ async function deleteTransaction(id){
     D.transactions=D.transactions.filter(x=>x.id!==id);
     renderFinance();
     notify('Đã xóa giao dịch');
+    // Sync lại GG Sheets sau khi xóa
+    setTimeout(()=>gsSend({sheet:'ThuChi',rows:gsThuChi(),time:nowDT()}),500);
+    setTimeout(()=>gsSend({sheet:'BaoCaoLaiLo',rows:gsBaoCaoData(),time:nowDT()}),1500);
   });
 }
 
@@ -12111,6 +12116,7 @@ async function saveTxEdit() {
     await sbPatch('transactions', updates, `?id=eq.${t.id}`);
     Object.assign(t, updates);
     notify('✅ Đã cập nhật phiếu!');
+    gsSyncAfterChange('transactions');
     // Re-show detail
     cancelTxEdit();
     showTxDetail(_currentTxId);
@@ -13075,6 +13081,28 @@ function selectCustomerFromPhone(name, phone, address) {
   if(addrEl && address) addrEl.value = address;
   if(dd) dd.style.display = 'none';
   notify('✅ Đã điền thông tin: ' + name);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// UNIVERSAL GG SHEETS SYNC AFTER DATA CHANGE
+// ══════════════════════════════════════════════════════════════════
+function gsSyncAfterChange(type) {
+  if(!cfg.gsUrl) return;
+  type = type || 'all';
+  if(type==='students' || type==='all')
+    setTimeout(()=>gsSend({sheet:'HocVien', rows:gsStudents(), time:nowDT()}), 500);
+  if(type==='customers' || type==='all')
+    setTimeout(()=>gsSend({sheet:'KhachHang', rows:gsCustomers(), time:nowDT()}), 600);
+  if(type==='transactions' || type==='all') {
+    setTimeout(()=>gsSend({sheet:'ThuChi', rows:gsThuChi(), time:nowDT()}), 700);
+    setTimeout(()=>gsSend({sheet:'BaoCaoLaiLo', rows:gsBaoCaoData(), time:nowDT()}), 1500);
+  }
+  if(type==='inventory' || type==='all') {
+    setTimeout(()=>gsSend({sheet:'TonKho', rows:D.inventory, time:nowDT()}), 800);
+    setTimeout(()=>gsSend({sheet:'TomTatKho', rows:gsTomTatKho(), time:nowDT()}), 900);
+  }
+  if(type==='orders' || type==='all')
+    setTimeout(()=>{ D.orders.slice(0,50).forEach(o=>gsSend({sheet:'DonHang',...o,time:o.time||nowDT()})); }, 1000);
 }
 boot();
 </script>
