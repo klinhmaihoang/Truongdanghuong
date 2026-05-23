@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.38-20260519">
+<meta name="version" content="v5.39-20260519">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -778,7 +778,19 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       </div>
     </div>
     <div class="form-row">
+      <div class="fg">
+        <label>Thuộc mảng</label>
+        <select id="exp-new-mang" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+          <option value="retail">🛍️ Retail</option>
+          <option value="academy">🎓 Academy</option>
+          <option value="rnd">🔬 R&D</option>
+          <option value="content">🎬 Quay content</option>
+          <option value="chung">⚖️ Chung</option>
+        </select>
+      </div>
       <div class="fg"><label>Số tiền (₫)</label><input id="exp-new-amount" type="number" placeholder="500000"/></div>
+    </div>
+    <div class="form-row">
       <div class="fg"><label>Danh mục chi tiết</label><input id="exp-new-cat" placeholder="VD: Mua trà oolong..."/></div>
     </div>
     <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="exp-new-note" placeholder="Ghi chú thêm..."/></div>
@@ -1930,6 +1942,8 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
         <select id="chi-mang" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
           <option value="retail">🛍️ Retail (bán sản phẩm)</option>
           <option value="academy">🎓 Academy (dạy học)</option>
+          <option value="rnd">🔬 R&D (nghiên cứu)</option>
+          <option value="content">🎬 Quay content</option>
           <option value="chung">⚖️ Chung (cả 2)</option>
         </select>
       </div>
