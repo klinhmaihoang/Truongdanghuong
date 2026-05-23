@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.39-20260519">
+<meta name="version" content="v5.40-20260523">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -7250,7 +7250,7 @@ function renderFinance(){
   }
 
   // Gộp và lọc theo tab
-  let allTxs=([...autoFiltered,...manualTxs]||[]).sort((a,b)=>(b.time||'').localeCompare(a.time||''));
+  let allTxs=([...autoFiltered,...manualTxs]||[]).sort((a,b)=>(b.created_at||0)-(a.created_at||0));
   let txs=[...allTxs];
   if(finFilter==='thu') txs=allTxs.filter(t=>t.type==='thu');
   if(finFilter==='chi') txs=allTxs.filter(t=>t.type==='chi');
