@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.58-20260524">
+<meta name="version" content="v5.59-20260524">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -302,6 +302,11 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 
 <!-- DASHBOARD -->
 <div class="page active" id="page-dashboard">
+  <div class="tabs" style="margin-bottom:14px">
+    <div class="tab active" id="dash-tab-overview" onclick="dashTab(this,'overview')">📊 Tổng quan</div>
+    <div class="tab" id="dash-tab-ceo" onclick="dashTab(this,'ceo')">👑 CEO Dashboard</div>
+  </div>
+  <div id="dash-panel-overview">
   <div class="stats">
     <div class="stat"><div class="stat-num" id="s0">0</div><div class="stat-label">Học viên đang học</div></div>
     <div class="stat" style="--accent:var(--teal)"><div class="stat-num" id="s1">0</div><div class="stat-label">Doanh thu (₫)</div></div>
@@ -354,6 +359,19 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 </div>
 
 <!-- HỌC VIÊN -->
+</div><!-- end dash-panel-overview -->
+
+<!-- CEO DASHBOARD PANEL -->
+<div id="dash-panel-ceo" style="display:none">
+  <div id="ceo-dashboard-content">
+    <div style="text-align:center;padding:40px;color:var(--muted)">
+      <div style="font-size:32px;margin-bottom:8px">👑</div>
+      <div style="font-size:14px;font-weight:700">Đang tải CEO Dashboard...</div>
+    </div>
+  </div>
+</div>
+
+</div><!-- end page-dashboard -->
 <div class="page" id="page-students">
   <div class="tabs">
     <div class="tab active" onclick="stTab(this,'all')">Tất cả</div>
@@ -2826,6 +2844,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
           ℹ️ Báo cáo gồm: học viên đang học, đơn chờ thu tiền, kho sắp hết. Cần để tab app mở 8h sáng, hoặc set trigger trong <strong>Google Apps Script</strong> để chạy kể cả khi đóng app.
         </div>
         <button class="btn btn-tg btn-sm" onclick="sendDailyReport()">📊 Gửi báo cáo ngay để test</button>
+        <button class="btn btn-sm" onclick="sendWeeklyFlash()" style="background:#8E44AD;color:#fff">📊 Gửi Weekly Flash</button>
       </div>
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px"><input type="checkbox" id="at-student" checked style="accent-color:var(--gold);width:15px;height:15px"> Báo khi thêm/sửa/xóa học viên</label>
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px"><input type="checkbox" id="at-import" checked style="accent-color:var(--gold);width:15px;height:15px"> Báo khi nhập/xuất kho</label>
@@ -15940,6 +15959,424 @@ async function convertQuoteToOrder(orderId) {
   renderOrders();
   auditLog('update','order',`Chuyển báo giá ${orderId} thành đơn chính thức`);
   notify('✅ Đã chuyển báo giá '+orderId+' thành đơn hàng!');
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CEO DASHBOARD — Full Executive View
+// ══════════════════════════════════════════════════════════════════
+
+function dashTab(el, tab) {
+  document.querySelectorAll('#page-dashboard > .tabs .tab').forEach(t=>t.classList.remove('active'));
+  if(el) el.classList.add('active');
+  document.getElementById('dash-panel-overview').style.display = tab==='overview' ? '' : 'none';
+  document.getElementById('dash-panel-ceo').style.display = tab==='ceo' ? '' : 'none';
+  if(tab==='ceo') renderCEODashboard();
+}
+
+function renderCEODashboard() {
+  const el = document.getElementById('ceo-dashboard-content');
+  if(!el) return;
+
+  const now = new Date();
+  const thisMonth = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
+  const lastMonth = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const lastMonthKey = lastMonth.getFullYear()+'-'+String(lastMonth.getMonth()+1).padStart(2,'0');
+
+  // ── Data calculations ──
+  const orders = D.orders||[];
+  const students = D.students||[];
+  const txs = D.transactions||[];
+  const inv = D.inventory||[];
+
+  // Revenue this month vs last month
+  const paidOrders = o => o.status==='Đã thanh toán';
+  const monthRev = (mk) => orders.filter(o=>paidOrders(o)&&getMonthKey(o.time)===mk).reduce((s,o)=>s+(o.total||0),0);
+  const thisRev = monthRev(thisMonth);
+  const lastRev = monthRev(lastMonthKey);
+  const revGrowth = lastRev>0 ? ((thisRev-lastRev)/lastRev*100).toFixed(1) : 0;
+
+  // Cash flow — revenue vs collected
+  const codPending = orders.filter(o=>(o.payment||'').toLowerCase().includes('cod')&&['Chờ thu tiền','Đang giao','Shipper đang giữ tiền'].includes(o.status));
+  const codPendingAmt = codPending.reduce((s,o)=>s+(o.total||0),0);
+  const cashIn = thisRev - codPendingAmt;
+
+  // Profit
+  const chiThisMonth = txs.filter(t=>t.type==='chi'&&getMonthKey(t.time)===thisMonth).reduce((s,t)=>s+(t.amount||0),0);
+  const netProfit = thisRev - chiThisMonth;
+  const margin = thisRev>0 ? (netProfit/thisRev*100).toFixed(1) : 0;
+
+  // Students
+  const activeStudents = students.filter(s=>s.status==='Đang học');
+  const newStudentsThisMonth = students.filter(s=>getMonthKey(s.start||s.created_at||'')===thisMonth);
+  const newStudentsLastMonth = students.filter(s=>getMonthKey(s.start||s.created_at||'')===lastMonthKey);
+  const churnedStudents = students.filter(s=>['Nghỉ học','Bảo lưu'].includes(s.status)&&getMonthKey(s.updated_at||'')===thisMonth);
+  const churnRate = activeStudents.length>0 ? (churnedStudents.length/activeStudents.length*100).toFixed(1) : 0;
+  const unpaidStudents = students.filter(s=>s.fee>0&&!s.paid2&&!s.paid1);
+  const unpaidAmt = unpaidStudents.reduce((s,st)=>{
+    const dep = st.paid1_amount||Math.round((st.fee||0)*0.3);
+    return s+(st.paid1?0:dep);
+  },0);
+
+  // 6-month revenue trend
+  const months6 = [];
+  for(let i=5;i>=0;i--) {
+    const d = new Date(now.getFullYear(),now.getMonth()-i,1);
+    const mk = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+    const acaRev = orders.filter(o=>paidOrders(o)&&o.id.startsWith('HP')&&getMonthKey(o.time)===mk).reduce((s,o)=>s+(o.total||0),0);
+    const retRev = orders.filter(o=>paidOrders(o)&&!o.id.startsWith('HP')&&getMonthKey(o.time)===mk).reduce((s,o)=>s+(o.total||0),0);
+    months6.push({mk, label:'T'+(d.getMonth()+1), aca:acaRev, ret:retRev, total:acaRev+retRev});
+  }
+  const maxRev6 = Math.max(...months6.map(m=>m.total), 1);
+
+  // Channel mix
+  const acaRev = orders.filter(o=>paidOrders(o)&&o.id.startsWith('HP')).reduce((s,o)=>s+(o.total||0),0);
+  const retRev = orders.filter(o=>paidOrders(o)&&!o.id.startsWith('HP')).reduce((s,o)=>s+(o.total||0),0);
+  const totalRevAll = acaRev + retRev;
+  const acaPct = totalRevAll>0 ? Math.round(acaRev/totalRevAll*100) : 0;
+
+  // Break-even (chi phí cố định ước tính)
+  const fixedCost = txs.filter(t=>t.type==='chi'&&['luong','thietbi'].includes(t.cost_group)).reduce((s,t)=>s+(t.amount||0),0);
+  const breakEven = fixedCost / Math.max(0.01, (margin/100));
+
+  // Sale performance
+  const saleMap = {};
+  orders.filter(o=>paidOrders(o)&&o.sale_name&&getMonthKey(o.time)===thisMonth).forEach(o=>{
+    const n=o.sale_name;
+    if(!saleMap[n]) saleMap[n]={name:n,orders:0,revenue:0};
+    saleMap[n].orders++;
+    saleMap[n].revenue+=o.total||0;
+  });
+  const saleList = Object.values(saleMap).sort((a,b)=>b.revenue-a.revenue);
+  const maxSaleRev = saleList.length>0 ? saleList[0].revenue : 1;
+
+  // Top products by order count this month
+  const prodMap = {};
+  orders.filter(o=>paidOrders(o)&&getMonthKey(o.time)===thisMonth).forEach(o=>{
+    (o.items||'').split(',').forEach(item=>{
+      const name = item.trim().replace(/\s*\(.*?\)\s*/g,'').replace(/\s*x\d+\s*$/i,'').trim();
+      if(!name||name.length<2) return;
+      if(!prodMap[name]) prodMap[name]={name,count:0,revenue:0};
+      prodMap[name].count++;
+      prodMap[name].revenue+=(o.total||0);
+    });
+  });
+  const topProds = Object.values(prodMap).sort((a,b)=>b.revenue-a.revenue).slice(0,4);
+
+  // Customer segments
+  const now_ts = Date.now();
+  const day90 = 90*24*60*60*1000;
+  const day30 = 30*24*60*60*1000;
+  const customers = D.customers||[];
+  const getLastOrder = c => orders.filter(o=>o.phone===c.phone||o.customer===c.name).sort((a,b)=>(b.created_at||0)-(a.created_at||0))[0];
+  const inactive90 = customers.filter(c=>{const lo=getLastOrder(c);return !lo||(now_ts-(lo.created_at||0))>day90;}).length;
+  const atRisk = customers.filter(c=>{const lo=getLastOrder(c);if(!lo)return false;const d=now_ts-(lo.created_at||0);return d>day30&&d<=day90;}).length;
+  const vips = customers.filter(c=>c.tier==='vip'||c.tier==='gold').length;
+
+  // Inventory alerts
+  const lowStock = inv.filter(i=>(i.qty||0)<=(i.min_qty||0)&&(i.min_qty||0)>0);
+  const outStock = inv.filter(i=>(i.qty||0)===0);
+
+  // Weekly flash numbers
+  const weekAgo = now_ts - 7*24*60*60*1000;
+  const weekOrders = orders.filter(o=>paidOrders(o)&&(o.created_at||0)>weekAgo);
+  const weekRev = weekOrders.reduce((s,o)=>s+(o.total||0),0);
+
+  const kpiColor = (val, goodThreshold, badThreshold, reverse=false) => {
+    if(!reverse) return val >= goodThreshold ? '#1E8449' : val >= badThreshold ? '#E67E22' : '#E74C3C';
+    return val <= goodThreshold ? '#1E8449' : val <= badThreshold ? '#E67E22' : '#E74C3C';
+  };
+
+  el.innerHTML = `
+    <!-- Header -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid var(--border)">
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:.05em">Executive View</div>
+        <div style="font-size:18px;font-weight:800;color:var(--brand)">CEO Dashboard — ${now.toLocaleDateString('vi-VN',{month:'long',year:'numeric'})}</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:11px;background:var(--bg2);padding:4px 10px;border-radius:20px;color:var(--muted)">Cập nhật: ${nowDT()}</span>
+        <button onclick="renderCEODashboard()" class="btn btn-ghost btn-sm">🔄</button>
+        <button onclick="ceoDashboardPDF()" class="btn btn-sm" style="background:#E74C3C;color:#fff;font-size:11px">📄 PDF</button>
+      </div>
+    </div>
+
+    <!-- 5 KPI chính -->
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">5 số quan trọng nhất</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px">
+      ${[
+        {label:'Doanh thu tháng', val:fmt(thisRev), sub: revGrowth>=0?`<span style="color:#1E8449">↑ ${revGrowth}%</span> vs tháng trước`:`<span style="color:#E74C3C">↓ ${Math.abs(revGrowth)}%</span> vs tháng trước`, accent:'#1A5276'},
+        {label:'Cash thực về', val:fmt(cashIn), sub:codPendingAmt>0?`<span style="color:#E67E22">⏳ ${fmt(codPendingAmt)} chờ COD</span>`:'✅ Không nợ COD', accent:'#0F6E56'},
+        {label:'Lãi ròng', val:fmt(netProfit), sub:`Biên <span style="color:${kpiColor(+margin,25,15)}">${margin}%</span>`, accent: +margin>=20?'#1E8449':'#E74C3C'},
+        {label:'Học viên mới', val:newStudentsThisMonth.length, sub:newStudentsThisMonth.length>=newStudentsLastMonth.length?`<span style="color:#1E8449">↑ Tốt hơn T${lastMonth.getMonth()+1}</span>`:`<span style="color:#E74C3C">↓ Ít hơn T${lastMonth.getMonth()+1}</span>`, accent:'#8E44AD'},
+        {label:'Churn rate', val:churnRate+'%', sub:churnedStudents.length>0?`<span style="color:#E74C3C">${churnedStudents.length} học viên nghỉ</span>`:'✅ Không có nghỉ', accent:+churnRate>10?'#E74C3C':'#1E8449'},
+      ].map(k=>`
+        <div style="background:var(--bg2);border-radius:10px;padding:12px 14px;border-left:4px solid ${k.accent}">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:4px">${k.label}</div>
+          <div style="font-size:20px;font-weight:800;color:var(--brown)">${k.val}</div>
+          <div style="font-size:11px;margin-top:4px">${k.sub}</div>
+        </div>`).join('')}
+    </div>
+
+    <!-- Row 2: Trend + Channel + Break-even -->
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:16px">
+      <!-- 6-month trend -->
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><span class="card-title">📈 Doanh thu 6 tháng — Academy vs Retail</span></div>
+        <div style="padding:0 16px 16px;display:flex;align-items:flex-end;gap:6px;height:120px">
+          ${months6.map((m,i)=>{
+            const acaH = maxRev6>0 ? Math.round(m.aca/maxRev6*80) : 0;
+            const retH = maxRev6>0 ? Math.round(m.ret/maxRev6*80) : 0;
+            const isCurrent = i===5;
+            return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+              <div style="font-size:9px;color:var(--muted);margin-bottom:2px">${fmt(m.total/1000000).replace(',','.')}M</div>
+              <div style="width:100%;display:flex;flex-direction:column;gap:1px;${isCurrent?'filter:drop-shadow(0 2px 4px rgba(0,0,0,.15))':''}">
+                <div style="background:#0F6E56;height:${acaH}px;border-radius:3px 3px 0 0;${isCurrent?'background:#1E8449':''}"></div>
+                <div style="background:#9FE1CB;height:${retH}px;${isCurrent?'background:#5DCAA5':''}"></div>
+              </div>
+              <span style="font-size:10px;color:${isCurrent?'var(--brand)':'var(--muted)'};font-weight:${isCurrent?700:400}">${m.label}${isCurrent?' ▲':''}</span>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="display:flex;gap:16px;padding:0 16px 12px">
+          <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;background:#0F6E56;border-radius:2px"></div><span style="font-size:11px;color:var(--muted)">Academy</span></div>
+          <div style="display:flex;align-items:center;gap:5px"><div style="width:10px;height:10px;background:#9FE1CB;border-radius:2px"></div><span style="font-size:11px;color:var(--muted)">Retail</span></div>
+          <div style="margin-left:auto;font-size:11px;color:var(--muted)">Tổng 6T: ${fmt(months6.reduce((s,m)=>s+m.total,0))}</div>
+        </div>
+      </div>
+
+      <!-- Channel + Break-even -->
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><span class="card-title">🎯 Revenue mix</span></div>
+        <div style="padding:0 16px 12px">
+          <div style="margin-bottom:12px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+              <span style="font-size:12px;color:var(--muted)">🎓 Academy</span>
+              <span style="font-size:12px;font-weight:700">${acaPct}%</span>
+            </div>
+            <div style="background:var(--bg2);border-radius:4px;height:8px"><div style="background:#0F6E56;width:${acaPct}%;height:100%;border-radius:4px"></div></div>
+          </div>
+          <div style="margin-bottom:16px">
+            <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+              <span style="font-size:12px;color:var(--muted)">🛍️ Retail</span>
+              <span style="font-size:12px;font-weight:700">${100-acaPct}%</span>
+            </div>
+            <div style="background:var(--bg2);border-radius:4px;height:8px"><div style="background:#9FE1CB;width:${100-acaPct}%;height:100%;border-radius:4px"></div></div>
+          </div>
+          <div style="border-top:1px solid var(--border);padding-top:10px">
+            <div style="font-size:11px;color:var(--muted)">Break-even tháng này</div>
+            <div style="font-size:15px;font-weight:800;color:var(--brand);margin-top:2px">
+              ${fmt(Math.round(breakEven))}
+              ${thisRev>=breakEven?`<span style="font-size:11px;color:#1E8449;font-weight:400">✅ Đã vượt</span>`:`<span style="font-size:11px;color:#E74C3C;font-weight:400">⚠️ Chưa đạt</span>`}
+            </div>
+            <div style="font-size:10px;color:var(--muted);margin-top:2px">Còn thiếu: ${thisRev>=breakEven?'0':fmt(Math.round(breakEven-thisRev))}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 3: Alerts + Funnel + Products -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px">
+
+      <!-- CEO Alerts -->
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><span class="card-title">🔔 Cần xử lý ngay</span></div>
+        <div style="padding:0 16px 12px;display:flex;flex-direction:column;gap:6px">
+          ${unpaidStudents.length>0?`
+          <div style="display:flex;gap:8px;padding:8px 10px;background:#FEF9E7;border-radius:8px;border-left:3px solid #E67E22">
+            <span style="font-size:16px">💳</span>
+            <div><div style="font-size:12px;font-weight:700;color:#7d4f00">${unpaidStudents.length} học viên chưa cọc</div>
+            <div style="font-size:11px;color:#a0660e">${fmt(unpaidAmt)} đang treo</div></div>
+          </div>`:''}
+          ${codPending.length>0?`
+          <div style="display:flex;gap:8px;padding:8px 10px;background:#EBF5FB;border-radius:8px;border-left:3px solid #2980B9">
+            <span style="font-size:16px">🚚</span>
+            <div><div style="font-size:12px;font-weight:700;color:#1A5276">${codPending.length} đơn COD chờ thu</div>
+            <div style="font-size:11px;color:#2471a3">${fmt(codPendingAmt)} chưa về</div></div>
+          </div>`:''}
+          ${outStock.length>0?`
+          <div style="display:flex;gap:8px;padding:8px 10px;background:#FDEDEC;border-radius:8px;border-left:3px solid #E74C3C">
+            <span style="font-size:16px">📦</span>
+            <div><div style="font-size:12px;font-weight:700;color:#922B21">${outStock.length} NVL hết hàng</div>
+            <div style="font-size:11px;color:#cb4335">${outStock.map(i=>i.name).join(', ')}</div></div>
+          </div>`:''}
+          ${lowStock.filter(i=>i.qty>0).length>0?`
+          <div style="display:flex;gap:8px;padding:8px 10px;background:#FEF9E7;border-radius:8px;border-left:3px solid #F39C12">
+            <span style="font-size:16px">⚠️</span>
+            <div><div style="font-size:12px;font-weight:700;color:#7d5a00">${lowStock.filter(i=>i.qty>0).length} NVL sắp hết</div>
+            <div style="font-size:11px;color:#9a7d0a">${lowStock.filter(i=>i.qty>0).slice(0,2).map(i=>i.name).join(', ')}</div></div>
+          </div>`:''}
+          ${atRisk>0?`
+          <div style="display:flex;gap:8px;padding:8px 10px;background:#F5EEF8;border-radius:8px;border-left:3px solid #8E44AD">
+            <span style="font-size:16px">😴</span>
+            <div><div style="font-size:12px;font-weight:700;color:#6c3483">${atRisk} khách hàng sắp nguội</div>
+            <div style="font-size:11px;color:#7d3c98">Chưa mua 30–90 ngày</div></div>
+          </div>`:''}
+          ${unpaidStudents.length===0&&codPending.length===0&&outStock.length===0&&atRisk===0?`
+          <div style="text-align:center;padding:20px;color:var(--muted)">✅ Không có vấn đề nào</div>`:''}
+        </div>
+      </div>
+
+      <!-- Conversion funnel (simplified from CRM) -->
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><span class="card-title">🎯 Pipeline học viên</span></div>
+        <div style="padding:0 16px 12px">
+          ${[
+            {label:'Chưa học', count: students.filter(s=>s.status==='Chưa học').length, color:'#AFA9EC', dark:'#3C3489'},
+            {label:'Đang học', count: activeStudents.length, color:'#5DCAA5', dark:'#085041'},
+            {label:'Hoàn thành', count: students.filter(s=>s.status==='Hoàn thành').length, color:'#1D9E75', dark:'#04342C'},
+            {label:'Bảo lưu', count: students.filter(s=>s.status==='Bảo lưu').length, color:'#EF9F27', dark:'#412402'},
+            {label:'Nghỉ học', count: students.filter(s=>s.status==='Nghỉ học').length, color:'#F09595', dark:'#501313'},
+          ].map(s=>{
+            const pct = students.length>0 ? Math.round(s.count/students.length*100) : 0;
+            return `<div style="margin-bottom:8px">
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                <span style="font-size:12px;color:var(--muted)">${s.label}</span>
+                <span style="font-size:12px;font-weight:700">${s.count} <span style="font-weight:400;color:var(--muted)">(${pct}%)</span></span>
+              </div>
+              <div style="background:var(--bg2);border-radius:4px;height:6px">
+                <div style="background:${s.color};width:${pct}%;height:100%;border-radius:4px"></div>
+              </div>
+            </div>`;
+          }).join('')}
+          <div style="border-top:1px solid var(--border);padding-top:8px;margin-top:4px">
+            <div style="font-size:11px;color:var(--muted)">Tổng học viên: <strong>${students.length}</strong> · Completion rate: <strong style="color:${kpiColor(students.filter(s=>s.status==='Hoàn thành').length/Math.max(students.length,1)*100,50,30)}">${students.length>0?Math.round(students.filter(s=>s.status==='Hoàn thành').length/students.length*100):0}%</strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top products -->
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><span class="card-title">🏆 Top sản phẩm tháng này</span></div>
+        <div style="padding:0 16px 12px">
+          ${topProds.length>0 ? topProds.map((p,i)=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:8px">
+              <span style="font-size:16px;width:24px;text-align:center">${['🥇','🥈','🥉','4️⃣'][i]||'  '}</span>
+              <div>
+                <div style="font-size:12px;font-weight:700">${p.name.length>20?p.name.substring(0,20)+'...':p.name}</div>
+                <div style="font-size:10px;color:var(--muted)">${p.count} đơn</div>
+              </div>
+            </div>
+            <div style="font-size:12px;font-weight:700;color:var(--green)">${fmt(p.revenue)}</div>
+          </div>`).join('') : '<div style="text-align:center;padding:20px;color:var(--muted)">Chưa có đơn tháng này</div>'}
+          <div style="margin-top:8px;font-size:11px;color:var(--muted)">
+            Insight: ${acaPct>50?'Academy chiếm '+acaPct+'% — cần đẩy Retail':'Retail đang mạnh — cơ hội upsell Academy'}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Row 4: Team + Customer health -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+
+      <!-- Team performance -->
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><span class="card-title">💼 Hiệu suất Sale tháng này</span></div>
+        <div style="padding:0 16px 12px">
+          ${saleList.length>0 ? saleList.map((s,i)=>`
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <div style="width:32px;height:32px;border-radius:50%;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;color:var(--brand)">${s.name.charAt(0)}</div>
+            <div style="flex:1">
+              <div style="display:flex;justify-content:space-between;margin-bottom:3px">
+                <span style="font-size:12px;font-weight:700">${s.name}</span>
+                <span style="font-size:12px;font-weight:700;color:var(--green)">${fmt(s.revenue)}</span>
+              </div>
+              <div style="background:var(--bg2);border-radius:3px;height:5px">
+                <div style="background:${['#1A5276','#1D9E75','#EF9F27','#AFA9EC'][i]||'#888'};width:${Math.round(s.revenue/maxSaleRev*100)}%;height:100%;border-radius:3px"></div>
+              </div>
+              <div style="font-size:10px;color:var(--muted);margin-top:1px">${s.orders} đơn</div>
+            </div>
+          </div>`).join('') : `
+          <div style="text-align:center;padding:20px;color:var(--muted)">
+            <div>Chưa có data sale</div>
+            <div style="font-size:11px;margin-top:4px">Đơn hàng cần có <code>sale_name</code> để theo dõi</div>
+          </div>`}
+        </div>
+      </div>
+
+      <!-- Customer health -->
+      <div class="card" style="margin-bottom:0">
+        <div class="card-head"><span class="card-title">👥 Sức khỏe khách hàng</span></div>
+        <div style="padding:0 16px 12px">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+            ${[
+              {label:'VIP / Gold', val:vips, color:'#E67E22', bg:'#FEF9E7'},
+              {label:'Sắp nguội', val:atRisk, color:'#E74C3C', bg:'#FDEDEC'},
+              {label:'Không hoạt động', val:inactive90, color:'#888', bg:'var(--bg2)'},
+              {label:'Tổng khách', val:customers.length, color:'#1A5276', bg:'#EBF5FB'},
+            ].map(s=>`
+            <div style="background:${s.bg};border-radius:8px;padding:10px;text-align:center">
+              <div style="font-size:22px;font-weight:800;color:${s.color}">${s.val}</div>
+              <div style="font-size:11px;color:var(--muted);margin-top:2px">${s.label}</div>
+            </div>`).join('')}
+          </div>
+          <div style="background:var(--bg2);border-radius:8px;padding:10px">
+            <div style="font-size:11px;color:var(--muted)">LTV top khách × CAC</div>
+            <div style="font-size:15px;font-weight:800;margin-top:2px;color:var(--brand)">
+              ${customers.length>0?fmt(Math.round(orders.filter(paidOrders).reduce((s,o)=>s+(o.total||0),0)/customers.length)):0}
+              <span style="font-size:11px;font-weight:400;color:var(--muted)"> avg LTV / khách</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Weekly Flash -->
+    <div class="card" style="background:linear-gradient(135deg,#1A5276,#2980B9);color:#fff;margin-bottom:0">
+      <div style="padding:14px 16px">
+        <div style="font-size:12px;font-weight:700;opacity:.8;margin-bottom:10px;text-transform:uppercase;letter-spacing:.05em">📊 Weekly Flash — 7 ngày qua</div>
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+          <div><div style="font-size:20px;font-weight:800">${fmt(weekRev)}</div><div style="font-size:11px;opacity:.8">Doanh thu tuần</div></div>
+          <div><div style="font-size:20px;font-weight:800">${weekOrders.length}</div><div style="font-size:11px;opacity:.8">Đơn hàng</div></div>
+          <div><div style="font-size:20px;font-weight:800">${activeStudents.length}</div><div style="font-size:11px;opacity:.8">Học viên đang học</div></div>
+          <div><div style="font-size:20px;font-weight:800">${outStock.length+lowStock.filter(i=>i.qty>0).length}</div><div style="font-size:11px;opacity:.8">NVL cần nhập</div></div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// ── CEO Dashboard PDF Export ──
+function ceoDashboardPDF() {
+  const content = document.getElementById('ceo-dashboard-content')?.innerHTML||'';
+  const win = window.open('','_blank','width=900,height=900');
+  win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>CEO Dashboard — Trương Dáng Hương</title>
+  <style>
+    body{font-family:Arial,sans-serif;padding:24px;background:#fff;color:#333}
+    .no-print{display:none}
+    @media print{.no-print{display:none}}
+    *{box-sizing:border-box}
+  </style></head>
+  <body>
+  <div class="no-print" style="margin-bottom:16px">
+    <button onclick="window.print()" style="background:#1A5276;color:#fff;border:none;padding:10px 24px;border-radius:8px;cursor:pointer;font-size:14px">🖨️ In / Lưu PDF</button>
+    <button onclick="window.close()" style="border:none;padding:10px 20px;border-radius:8px;cursor:pointer;margin-left:8px">✕ Đóng</button>
+  </div>
+  <h2 style="color:#FF8C00">🍵 Trương Dáng Hương Academy — CEO Dashboard</h2>
+  ${content}
+  </body></html>`);
+  win.document.close();
+}
+
+// ── Auto-render khi chuyển sang tab CEO ──
+function sendWeeklyFlash() {
+  const orders = D.orders||[];
+  const now = Date.now();
+  const weekAgo = now - 7*24*60*60*1000;
+  const weekOrders = orders.filter(o=>o.status==='Đã thanh toán'&&(o.created_at||0)>weekAgo);
+  const weekRev = weekOrders.reduce((s,o)=>s+(o.total||0),0);
+  const activeStudents = (D.students||[]).filter(s=>s.status==='Đang học').length;
+  const inv = D.inventory||[];
+  const alerts = inv.filter(i=>(i.qty||0)<=(i.min_qty||0)).length;
+  const msg = `📊 *WEEKLY FLASH — ${new Date().toLocaleDateString('vi-VN')}*\n\n`+
+    `💰 Doanh thu tuần: ${fmt(weekRev)}\n`+
+    `📦 Đơn hàng: ${weekOrders.length}\n`+
+    `🎓 Học viên đang học: ${activeStudents}\n`+
+    `⚠️ NVL cần nhập: ${alerts}\n\n`+
+    `_Trương Dáng Hương Academy_`;
+  tgMsg(msg);
+  notify('✅ Đã gửi Weekly Flash qua Telegram!');
 }
 
 boot();
