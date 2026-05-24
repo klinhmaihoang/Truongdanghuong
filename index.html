@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.47-20260524">
+<meta name="version" content="v5.48-20260524">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -10632,36 +10632,16 @@ async function doLogin() {
     setTimeout(()=>{btnEl.style.transform='none';},100);},100);
     return;
   }
-  const currentPass = await _authGetPass(u);
-  // Nếu chưa đổi MK lần nào → so plain text. Đã đổi → so hash SHA-256
-  const isDefaultStored = !_pwCache[u];
-  let passMatch = false;
-  if(isDefaultStored) {
-    passMatch = (p === userObj.pass); // chưa đổi: so plain
-  } else {
-    passMatch = (await _hashPw(p) === currentPass); // đã đổi: so hash
-  }
-  const found = passMatch ? userObj : null;
-  if (!found) {
-    errEl.textContent = 'Tên đăng nhập hoặc mật khẩu không đúng!';
-    errEl.style.display = 'block';
-    document.getElementById('auth-pass').value = '';
-    document.getElementById('auth-pass').focus();
-    // Shake animation
-    btnEl.style.transform='translateX(-4px)';
-    setTimeout(()=>{btnEl.style.transform='translateX(4px)';
-    setTimeout(()=>{btnEl.style.transform='none';},100);},100);
-    return;
-  }
-
-  // Xử lý sale user từ Supabase
-  if(!found && saleUser) {
+  // Xử lý sale/warehouse/accountant user từ Supabase
+  if(!userObj && saleUser) {
     const hashInput = await _hashPw(p);
     if(hashInput !== saleUser.pass_hash) {
       errEl.textContent = 'Tên đăng nhập hoặc mật khẩu không đúng!';
       errEl.style.display = 'block';
       document.getElementById('auth-pass').value = '';
       document.getElementById('auth-pass').focus();
+      btnEl.style.transform='translateX(-4px)';
+      setTimeout(()=>{btnEl.style.transform='translateX(4px)';setTimeout(()=>{btnEl.style.transform='none';},100);},100);
       return;
     }
     AUTH_CURRENT = { user: saleUser.username||saleUser.email, role: saleUser.role||'sale',
@@ -10671,7 +10651,36 @@ async function doLogin() {
     if(document.getElementById('auth-remember')?.checked) _rememberDevice();
     _authUpdateTopbar();
     _authApplyRole();
+    auditLog('login','system',`Đăng nhập: ${AUTH_CURRENT.name} (${AUTH_CURRENT.role})`);
     notify('✅ Xin chào ' + AUTH_CURRENT.name + '!');
+    return;
+  }
+
+  // Đăng nhập user mặc định (admin/staff) — kiểm tra mật khẩu
+  if(!userObj) {
+    errEl.textContent = 'Tên đăng nhập hoặc mật khẩu không đúng!';
+    errEl.style.display = 'block';
+    document.getElementById('auth-pass').value = '';
+    document.getElementById('auth-pass').focus();
+    btnEl.style.transform='translateX(-4px)';
+    setTimeout(()=>{btnEl.style.transform='translateX(4px)';setTimeout(()=>{btnEl.style.transform='none';},100);},100);
+    return;
+  }
+  const currentPass = await _authGetPass(u);
+  const isDefaultStored = !_pwCache[u];
+  let passMatch = false;
+  if(isDefaultStored) {
+    passMatch = (p === userObj.pass);
+  } else {
+    passMatch = (await _hashPw(p) === currentPass);
+  }
+  if(!passMatch) {
+    errEl.textContent = 'Tên đăng nhập hoặc mật khẩu không đúng!';
+    errEl.style.display = 'block';
+    document.getElementById('auth-pass').value = '';
+    document.getElementById('auth-pass').focus();
+    btnEl.style.transform='translateX(-4px)';
+    setTimeout(()=>{btnEl.style.transform='translateX(4px)';setTimeout(()=>{btnEl.style.transform='none';},100);},100);
     return;
   }
 
@@ -15405,7 +15414,7 @@ async function checkRealTimeUpdates() {
     if(latestOrders) _lastOrderCount = latestOrders.length;
 
     // Check approval queue
-    const pending = await sbGet('approval_queue','?status=eq.Chờ duyệt&order=created_at.desc&limit=5');
+    const pending = await sbGet('approval_queue','?status=eq.Chờ+duyệt&order=created_at.desc&limit=5').catch(()=>null);
     if(pending && AUTH_CURRENT?.role==='admin') {
       const newApprovals = pending.filter(a => !D.approvalQueue?.find(x=>x.id===a.id));
       newApprovals.forEach(a => {
