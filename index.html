@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.55-20260524">
+<meta name="version" content="v5.56-20260524">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -11592,13 +11592,17 @@ function odQuickStatus(id, newStatus) {
 // KHO + HÀNG HÓA TAB
 // ═══════════════════════════════════════════════════════════════
 function invTab(tab, el) {
-  const stock    = document.getElementById('inv-panel-stock');
-  const products = document.getElementById('inv-panel-products');
-  if(stock)    stock.style.display    = tab==='stock'    ? '' : 'none';
-  if(products) products.style.display = tab==='products' ? '' : 'none';
+  // All inventory sub-panels
+  ['stock','products','warehouse','suppliers','po'].forEach(t => {
+    const p = document.getElementById('inv-panel-'+t);
+    if(p) p.style.display = t===tab ? '' : 'none';
+  });
   document.querySelectorAll('#page-inventory > .tabs .tab').forEach(t=>t.classList.remove('active'));
   if(el) el.classList.add('active');
-  if(tab==='products') renderProductList();
+  if(tab==='products')  renderProductList();
+  if(tab==='warehouse') renderWarehouseDashboard();
+  if(tab==='suppliers') renderSuppliers();
+  if(tab==='po')        renderPurchaseOrders();
 }
 
 // ═══════════════════════════════════════════════════════════════
