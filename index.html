@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.48-20260524">
+<meta name="version" content="v5.49-20260524">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -10708,6 +10708,18 @@ function doLogout() {
   AUTH_CURRENT = null;
   sessionStorage.removeItem('tdh_auth');
   localStorage.removeItem(typeof REMEMBER_KEY!=='undefined'?REMEMBER_KEY:'tdh_remember_device');
+  // Reset tất cả nav buttons về hiện
+  document.querySelectorAll('.nav button, .bottom-nav-btn').forEach(btn=>btn.style.display='');
+  // Ẩn lại các card admin
+  ['card-user-mgmt','card-approval-queue','card-sql-migration'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.style.display='none';
+  });
+  // Xóa badge
+  const badge = document.getElementById('auth-topbar-badge');
+  if(badge) badge.remove();
+  // Xóa sale BO section
+  const saleBO = document.getElementById('sale-bo-section');
+  if(saleBO) saleBO.remove();
   document.getElementById('auth-overlay').style.display = 'flex';
   document.getElementById('auth-user').value = '';
   document.getElementById('auth-pass').value = '';
@@ -10717,8 +10729,9 @@ function doLogout() {
 
 function _authUpdateTopbar() {
   if (!AUTH_CURRENT) return;
-  // Thêm badge user + nút logout vào topbar nếu chưa có
-  if (document.getElementById('auth-topbar-badge')) return;
+  // Xóa badge cũ nếu có
+  const oldBadge = document.getElementById('auth-topbar-badge');
+  if(oldBadge) oldBadge.remove();
   const topbar = document.querySelector('.topbar');
   if (!topbar) return;
   const badge = document.createElement('div');
@@ -10741,7 +10754,7 @@ function _authApplyRole() {
   const roleConfig = {
     'admin':      { hideTabs: [] },
     'staff':      { hideTabs: ['finance','telegram'] },
-    'sale':       { hideTabs: ['finance','inventory','telegram','customers'] },
+    'sale':       { hideTabs: ['finance','telegram','customers'] },
     'warehouse':  { hideTabs: ['finance','telegram','customers','students'] },
     'accountant': { hideTabs: ['pos','inventory','telegram'] },
   };
@@ -10762,12 +10775,13 @@ function _authApplyRole() {
       .forEach(btn => btn.style.display='none');
   });
 
-  // Sale BO: chỉ thấy dashboard + bán hàng
+  // Sale BO: dashboard + bán hàng + kho (chỉ để tạo PO)
   if(role === 'sale') {
     setTimeout(()=>{
       document.querySelectorAll('.nav button, .bottom-nav-btn').forEach(btn => {
         const oc = btn.getAttribute('onclick')||'';
-        if(!oc.includes("go('pos'") && !oc.includes("go('dashboard'")) btn.style.display='none';
+        const allowed = oc.includes("go('pos'") || oc.includes("go('dashboard'") || oc.includes("go('inventory'");
+        if(!allowed) btn.style.display='none';
       });
       go('dashboard');
       setTimeout(renderSaleBO, 500);
