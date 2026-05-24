@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.59-20260524">
+<meta name="version" content="v5.60-20260524">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -10532,10 +10532,10 @@ window.addEventListener('load', () => {
 // AUTH MODULE
 // ═══════════════════════════════════════════════════════════════
 const AUTH_USERS = [
-  // Mật khẩu lưu dạng SHA-256 hash
+  // Mật khẩu lưu dạng SHA-256 hash (+ salt 'tdh_salt_2024')
   // admin: tdh2024! | nhanvien: staff123
-  { user: 'admin',    pass_hash: 'ba086949aa342f4a3b723d926a36305eb1867839cbc601e4bd7e19360158191b',  role: 'admin',  email: '', name: 'Admin' },
-  { user: 'nhanvien', pass_hash: '10176e7b7b24d317acfcf8d2064cfd2f24e154f7b5a96603077d5ef813d6a6b6',  role: 'staff',  email: '', name: 'Nhân viên' },
+  { user: 'admin',    pass_hash: '42dccda17cda442a28c50d51041bc1d310938b66d2a585d648c8932eff18fa68',  role: 'admin',  email: '', name: 'Admin' },
+  { user: 'nhanvien', pass_hash: '016d0b98803687aba424ad10c9c85aae61d9c472d8642abb81859b98c0c67cb1',  role: 'staff',  email: '', name: 'Nhân viên' },
 ];
 // Sale users được quản lý qua Supabase (bảng app_users với email + role)
 let AUTH_CURRENT = null; // {user, role, email, name, id}
