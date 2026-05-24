@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.57-20260524">
+<meta name="version" content="v5.58-20260524">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -10653,7 +10653,9 @@ async function changePassword() {
   // Lưu mật khẩu mới
   await _authSavePass(AUTH_CURRENT.user, newPw);
   // Cập nhật session
-  sessionStorage.setItem('tdh_auth', JSON.stringify({...AUTH_CURRENT, ts: Date.now()}));
+  const _sess=JSON.stringify({...AUTH_CURRENT, ts: Date.now()});
+  sessionStorage.setItem('tdh_auth', _sess);
+  localStorage.setItem('tdh_auth_session', _sess);
 
   chpwClear();
   notify(`✅ Đổi mật khẩu thành công! Lần đăng nhập sau dùng mật khẩu mới.`);
@@ -10706,7 +10708,9 @@ async function doLogin() {
     }
     AUTH_CURRENT = { user: saleUser.username||saleUser.email, role: saleUser.role||'sale',
                      email: saleUser.email, name: saleUser.name||saleUser.username, id: saleUser.id };
-    sessionStorage.setItem('tdh_auth', JSON.stringify({...AUTH_CURRENT, ts: Date.now()}));
+    const _sess=JSON.stringify({...AUTH_CURRENT, ts: Date.now()});
+  sessionStorage.setItem('tdh_auth', _sess);
+  localStorage.setItem('tdh_auth_session', _sess);
     document.getElementById('auth-overlay').style.display = 'none';
     if(document.getElementById('auth-remember')?.checked) _rememberDevice();
     _authUpdateTopbar();
@@ -10748,7 +10752,9 @@ async function doLogin() {
 
   // Đăng nhập thành công (user mặc định)
   AUTH_CURRENT = { user: userObj.user, role: userObj.role, name: userObj.name||userObj.user, email: userObj.email||'' };
-  sessionStorage.setItem('tdh_auth', JSON.stringify({...AUTH_CURRENT, ts: Date.now()}));
+  const _sess=JSON.stringify({...AUTH_CURRENT, ts: Date.now()});
+  sessionStorage.setItem('tdh_auth', _sess);
+  localStorage.setItem('tdh_auth_session', _sess);
   document.getElementById('auth-overlay').style.display = 'none';
   if(document.getElementById('auth-remember')?.checked) _rememberDevice();
   _authUpdateTopbar();
@@ -10765,6 +10771,7 @@ function toggleAuthPass() {
 function doLogout() {
   AUTH_CURRENT = null;
   sessionStorage.removeItem('tdh_auth');
+  localStorage.removeItem('tdh_auth_session');
   localStorage.removeItem(typeof REMEMBER_KEY!=='undefined'?REMEMBER_KEY:'tdh_remember_device');
   // Reset tất cả nav buttons về hiện
   document.querySelectorAll('.nav button, .bottom-nav-btn').forEach(btn=>btn.style.display='');
@@ -10860,18 +10867,24 @@ function _authApplyRole() {
 // Kiểm tra session cũ khi load
 function _authCheckSession() {
   try {
-    const raw = sessionStorage.getItem('tdh_auth');
+    // Đọc từ localStorage (persist qua refresh) hoặc sessionStorage
+    const raw = localStorage.getItem('tdh_auth_session') || sessionStorage.getItem('tdh_auth');
     if (!raw) return false;
     const sess = JSON.parse(raw);
-    // Session hết hạn sau 8 giờ
-    if (Date.now() - sess.ts > 8*60*60*1000) {
-      sessionStorage.removeItem('tdh_auth'); return false;
+    // Session hết hạn sau 24 giờ
+    if (Date.now() - sess.ts > 24*60*60*1000) {
+      localStorage.removeItem('tdh_auth_session');
+      sessionStorage.removeItem('tdh_auth');
+      return false;
     }
+    // Check trong AUTH_USERS (admin/staff)
     const found = AUTH_USERS.find(a => a.user===sess.user && a.role===sess.role);
-    if (!found) return false;
-    AUTH_CURRENT = { user: sess.user, role: sess.role };
+    // Check trong AUTH_SALE_USERS (sale/warehouse/accountant)
+    const saleFound = AUTH_SALE_USERS.find(a => (a.username===sess.user||a.email===sess.user) && a.role===sess.role);
+    if (!found && !saleFound && !sess.id) return false;
+    AUTH_CURRENT = { ...sess };
     document.getElementById('auth-overlay').style.display = 'none';
-    setTimeout(()=>{_authUpdateTopbar(); _authApplyRole();}, 500);
+    setTimeout(()=>{ _authUpdateTopbar(); _authApplyRole(); }, 500);
     return true;
   } catch(e) { return false; }
 }
