@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.49-20260524">
+<meta name="version" content="v5.51-20260524">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -10685,18 +10685,14 @@ async function doLogin() {
   }
 
   // Đăng nhập thành công (user mặc định)
-  AUTH_CURRENT = { user: found.user, role: found.role, name: found.name||found.user, email: found.email||'' };
-  // Lưu session (8 giờ)
+  AUTH_CURRENT = { user: userObj.user, role: userObj.role, name: userObj.name||userObj.user, email: userObj.email||'' };
   sessionStorage.setItem('tdh_auth', JSON.stringify({...AUTH_CURRENT, ts: Date.now()}));
   document.getElementById('auth-overlay').style.display = 'none';
-  // Ghi nhớ thiết bị nếu checkbox được chọn
   if(document.getElementById('auth-remember')?.checked) _rememberDevice();
-  // Hiện tên user trên topbar
   _authUpdateTopbar();
-  // Áp dụng phân quyền
   _authApplyRole();
-  auditLog('login','system',`Đăng nhập: ${found.name||found.user} (${found.role})`);
-  notify('✅ Xin chào ' + (found.name||found.user) + '!');
+  auditLog('login','system',`Đăng nhập: ${AUTH_CURRENT.name} (${AUTH_CURRENT.role})`);
+  notify('✅ Xin chào ' + AUTH_CURRENT.name + '!');
 }
 
 function toggleAuthPass() {
@@ -15418,7 +15414,7 @@ let _lastApprovalCount = 0;
 async function checkRealTimeUpdates() {
   try {
     // Check new orders
-    const latestOrders = await sbGet('orders','?order=created_at.desc&limit=5&deleted_at=is.null&status=neq.Đã hủy');
+    const latestOrders = await sbGet('orders','?order=created_at.desc&limit=5&deleted_at=is.null&status=neq.Đã hủy').catch(()=>null);
     if(latestOrders && _lastOrderCount > 0 && latestOrders.length > 0) {
       const newOnes = latestOrders.filter(o => o.created_at > _lastCheckTime);
       newOnes.forEach(o => {
@@ -15428,9 +15424,10 @@ async function checkRealTimeUpdates() {
     if(latestOrders) _lastOrderCount = latestOrders.length;
 
     // Check approval queue
-    const pending = await sbGet('approval_queue','?status=eq.Chờ+duyệt&order=created_at.desc&limit=5').catch(()=>null);
+    const pending = await sbGet('approval_queue','?order=created_at.desc&limit=5').catch(()=>null);
     if(pending && AUTH_CURRENT?.role==='admin') {
-      const newApprovals = pending.filter(a => !D.approvalQueue?.find(x=>x.id===a.id));
+      const pendingFiltered = pending.filter(p=>p.status==='Chờ duyệt');
+      const newApprovals = pendingFiltered.filter(a => !D.approvalQueue?.find(x=>x.id===a.id));
       newApprovals.forEach(a => {
         showInAppNotification(`🔔 Yêu cầu hoàn đơn: ${a.order_id} — ${a.requested_by}`, 'approval');
         if(!D.approvalQueue) D.approvalQueue=[];
