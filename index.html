@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.51-20260524">
+<meta name="version" content="v5.54-20260524">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4075,7 +4075,7 @@ const sbUpsert = async (t,d)=> {
         return true;
       }
     }
-    console.error('Supabase upsert loi:', t, res.status, err);
+    if(t !== 'audit_log') console.error('Supabase upsert loi:', t, res.status, err);
     throw new Error(msg);
   }
   return true;
@@ -10751,7 +10751,7 @@ function _authApplyRole() {
     'admin':      { hideTabs: [] },
     'staff':      { hideTabs: ['finance','telegram'] },
     'sale':       { hideTabs: ['finance','telegram','customers'] },
-    'warehouse':  { hideTabs: ['finance','telegram','customers','students'] },
+    'warehouse':  { hideTabs: ['finance','telegram','customers','students','crm'] },
     'accountant': { hideTabs: ['pos','inventory','telegram'] },
   };
 
@@ -10776,7 +10776,7 @@ function _authApplyRole() {
     setTimeout(()=>{
       document.querySelectorAll('.nav button, .bottom-nav-btn').forEach(btn => {
         const oc = btn.getAttribute('onclick')||'';
-        const allowed = oc.includes("go('pos'") || oc.includes("go('dashboard'") || oc.includes("go('inventory'");
+        const allowed = oc.includes("go('pos'") || oc.includes("go('dashboard'") || oc.includes("go('crm'") || oc.includes("go('customers'") || oc.includes("go('inventory'");
         if(!allowed) btn.style.display='none';
       });
       go('dashboard');
