@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.61-20260524">
+<meta name="version" content="v5.62-20260524">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -642,27 +642,239 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 
 <!-- Modal tạo PO -->
 <div class="overlay" id="modal-add-po">
-  <div class="modal" style="max-width:500px">
-    <div class="modal-title">📋 Tạo đơn đặt hàng (PO)</div>
-    <div class="form-row">
-      <div class="fg"><label>Nhà cung cấp *</label>
-        <select id="po-supplier" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%"></select>
+  <div class="modal" style="max-width:900px;width:95vw;max-height:90vh;overflow-y:auto;padding:0">
+
+    <!-- Sticky header -->
+    <div style="position:sticky;top:0;background:#fff;z-index:10;padding:16px 20px;border-bottom:1.5px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:2px">Purchase Order</div>
+        <div style="font-size:16px;font-weight:800;color:var(--brand)" id="po-header-number">PO mới</div>
       </div>
-      <div class="fg"><label>Ngày đặt</label><input id="po-date" type="date"/></div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span id="po-status-badge" style="font-size:11px;background:#FEF9E7;color:#E67E22;padding:4px 10px;border-radius:20px;font-weight:700">Draft</span>
+        <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-po')">✕ Đóng</button>
+        <button class="btn btn-sm" onclick="poSave('draft')" style="background:#fff;border:1.5px solid var(--border)">💾 Lưu nháp</button>
+        <button class="btn btn-sm" onclick="poSave('submit')" style="background:var(--brand);color:#fff">📤 Submit duyệt</button>
+      </div>
     </div>
-    <div class="fg" style="margin-bottom:12px"><label>Hàng hóa *</label>
-      <textarea id="po-items" rows="3" placeholder="Trà oolong 10kg, Bột sữa 5kg..." style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;resize:vertical"></textarea>
-    </div>
-    <div class="form-row">
-      <div class="fg"><label>Tổng tiền (₫)</label><input id="po-total" type="number" placeholder="0"/></div>
-      <div class="fg"><label>Ghi chú</label><input id="po-note" placeholder="Ghi chú..."/></div>
-    </div>
-    <div class="btn-group">
-      <button class="btn btn-sm" onclick="poSave()">📋 Tạo PO</button>
-      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-po')">Hủy</button>
-    </div>
-  </div>
-</div>
+
+    <div style="padding:20px">
+
+      <!-- S1: Thông tin PO -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+          <div style="width:22px;height:22px;border-radius:50%;background:#EBF5FB;color:#1A5276;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">1</div>
+          <span style="font-size:13px;font-weight:700;color:var(--brown)">Thông tin PO</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div class="fg"><label>PO Number</label>
+            <input id="po-number" readonly style="background:var(--bg2);color:var(--muted);font-style:italic" placeholder="Auto generate..."/>
+          </div>
+          <div class="fg"><label>Trạng thái</label>
+            <select id="po-status" onchange="poUpdateStatusBadge()" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+              <option value="draft">Draft</option>
+              <option value="waiting">Waiting Approval</option>
+              <option value="approved">Approved</option>
+              <option value="ordered">Ordered</option>
+              <option value="receiving">Receiving</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+          <div class="fg"><label>Ngày đặt hàng</label>
+            <input id="po-order-date" type="date"/>
+          </div>
+          <div class="fg"><label>Ngày giao dự kiến</label>
+            <input id="po-delivery-date" type="date"/>
+          </div>
+          <div class="fg"><label>Người mua (Buyer)</label>
+            <input id="po-buyer" readonly style="background:var(--bg2);color:var(--muted);font-style:italic"/>
+          </div>
+          <div class="fg"><label>Kho nhận hàng</label>
+            <select id="po-warehouse" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+              <option value="main">Kho chính — Đà Lạt</option>
+              <option value="hcm">Kho HCM</option>
+              <option value="other">Kho khác</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- S2: Nhà cung cấp -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+          <div style="width:22px;height:22px;border-radius:50%;background:#EBF5FB;color:#1A5276;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">2</div>
+          <span style="font-size:13px;font-weight:700;color:var(--brown)">Nhà cung cấp</span>
+          <span style="font-size:11px;color:#1A5276;margin-left:auto">⚡ Chọn NCC → tự điền</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+          <div class="fg" style="grid-column:1/3"><label>Nhà cung cấp *</label>
+            <select id="po-supplier" onchange="poFillSupplier(this.value)" style="border:1.5px solid var(--brand);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+              <option value="">— Chọn nhà cung cấp —</option>
+            </select>
+          </div>
+          <div class="fg"><label>Đánh giá NCC</label>
+            <input id="po-sup-rating" readonly style="background:var(--bg2);color:var(--muted);font-style:italic" placeholder="—"/>
+          </div>
+          <div class="fg"><label>Người liên hệ</label>
+            <input id="po-sup-contact" placeholder="Tên người liên hệ"/>
+          </div>
+          <div class="fg"><label>Điện thoại</label>
+            <input id="po-sup-phone" type="tel" placeholder="090xxxxxxx"/>
+          </div>
+          <div class="fg"><label>Email</label>
+            <input id="po-sup-email" type="email" placeholder="ncc@email.com"/>
+          </div>
+          <div class="fg"><label>Điều khoản thanh toán</label>
+            <select id="po-payment-term" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+              <option value="immediate">Thanh toán ngay</option>
+              <option value="net7">Net 7 ngày</option>
+              <option value="net15">Net 15 ngày</option>
+              <option value="net30">Net 30 ngày</option>
+              <option value="cod">COD</option>
+            </select>
+          </div>
+          <div class="fg"><label>Mã số thuế</label>
+            <input id="po-sup-tax" placeholder="0123456789"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- S3: Danh sách hàng hóa -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+          <div style="width:22px;height:22px;border-radius:50%;background:#EBF5FB;color:#1A5276;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">3</div>
+          <span style="font-size:13px;font-weight:700;color:var(--brown)">Danh sách hàng hóa</span>
+          <div style="margin-left:auto;display:flex;gap:6px">
+            <button class="btn btn-sm" onclick="poAddLineFromInventory()" style="font-size:11px">🔍 Chọn từ kho</button>
+            <button class="btn btn-green btn-sm" onclick="poAddLine()" style="font-size:11px">+ Thêm dòng</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto">
+          <table id="po-line-table" style="width:100%;border-collapse:collapse;min-width:700px">
+            <thead>
+              <tr style="background:var(--bg2);font-size:11px;color:var(--muted)">
+                <th style="padding:6px 8px;text-align:left;width:80px">SKU</th>
+                <th style="padding:6px 8px;text-align:left">Sản phẩm *</th>
+                <th style="padding:6px 8px;text-align:right;width:70px">SL *</th>
+                <th style="padding:6px 8px;text-align:center;width:60px">ĐVT</th>
+                <th style="padding:6px 8px;text-align:right;width:110px">Đơn giá *</th>
+                <th style="padding:6px 8px;text-align:right;width:65px">CK%</th>
+                <th style="padding:6px 8px;text-align:center;width:65px">VAT%</th>
+                <th style="padding:6px 8px;text-align:right;width:110px">Thành tiền</th>
+                <th style="padding:6px 8px;width:56px"></th>
+              </tr>
+            </thead>
+            <tbody id="po-line-tbody"></tbody>
+          </table>
+        </div>
+        <div id="po-empty-lines" style="text-align:center;padding:24px;color:var(--muted);font-size:13px">
+          Chưa có hàng hóa — bấm <strong>+ Thêm dòng</strong> hoặc <strong>🔍 Chọn từ kho</strong>
+        </div>
+      </div>
+
+      <!-- S4: Thanh toán -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+          <div style="width:22px;height:22px;border-radius:50%;background:#EBF5FB;color:#1A5276;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">4</div>
+          <span style="font-size:13px;font-weight:700;color:var(--brown)">Thanh toán</span>
+          <span style="font-size:11px;color:#1A5276;margin-left:auto">🔄 Tự động tính từ bảng hàng hóa</span>
+        </div>
+        <div style="display:flex;justify-content:flex-end">
+          <div style="width:320px">
+            <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
+              <span style="font-size:13px;color:var(--muted)">Subtotal</span>
+              <span style="font-size:13px;font-weight:700" id="po-subtotal">0₫</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
+              <span style="font-size:13px;color:var(--muted)">Chiết khấu tổng (%)</span>
+              <div style="display:flex;align-items:center;gap:6px">
+                <input id="po-discount-pct" type="number" min="0" max="100" value="0" oninput="poCalcTotals()" style="width:55px;text-align:right;padding:4px 8px;font-size:12px"/>
+                <span style="font-size:12px;color:var(--muted)" id="po-discount-amt">—</span>
+              </div>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border)">
+              <span style="font-size:13px;color:var(--muted)">VAT (từ từng dòng)</span>
+              <span style="font-size:13px;color:var(--muted);font-style:italic" id="po-vat-total">0₫</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border)">
+              <span style="font-size:13px;color:var(--muted)">Phí vận chuyển</span>
+              <input id="po-ship-fee" type="number" min="0" value="0" oninput="poCalcTotals()" style="width:100px;text-align:right;padding:4px 8px;font-size:12px"/>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;background:#EAFAF1;border-radius:8px;margin-top:6px">
+              <span style="font-size:14px;font-weight:800;color:#1E8449">Grand Total</span>
+              <span style="font-size:20px;font-weight:800;color:#1E8449" id="po-grand-total">0₫</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- S5: Approval Flow -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+          <div style="width:22px;height:22px;border-radius:50%;background:#EBF5FB;color:#1A5276;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">5</div>
+          <span style="font-size:13px;font-weight:700;color:var(--brown)">Luồng phê duyệt</span>
+        </div>
+        <div style="display:flex;align-items:center;gap:0" id="po-approval-flow">
+          <!-- Rendered by JS -->
+        </div>
+      </div>
+
+      <!-- S6+S7: Giao nhận + Ghi chú -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+            <div style="width:22px;height:22px;border-radius:50%;background:#EBF5FB;color:#1A5276;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">6</div>
+            <span style="font-size:13px;font-weight:700;color:var(--brown)">Giao nhận</span>
+          </div>
+          <div class="fg"><label>Địa chỉ giao hàng</label><input id="po-del-address" placeholder="123 Nguyễn Huệ, Đà Lạt..."/></div>
+          <div class="fg"><label>Người nhận</label><input id="po-receiver" placeholder="Tên người nhận + chức vụ"/></div>
+          <div class="fg"><label>Mã vận đơn</label><input id="po-tracking" placeholder="GHN-123456789"/></div>
+          <div class="fg"><label>Trạng thái nhận hàng</label>
+            <select id="po-receiving-status" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+              <option value="pending">⏳ Chờ giao</option>
+              <option value="in_transit">🚚 Đang giao</option>
+              <option value="received">✅ Đã nhận đủ</option>
+              <option value="partial">⚠️ Nhận một phần</option>
+            </select>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+            <div style="width:22px;height:22px;border-radius:50%;background:#EBF5FB;color:#1A5276;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">7</div>
+            <span style="font-size:13px;font-weight:700;color:var(--brown)">Ghi chú & Đính kèm</span>
+          </div>
+          <div class="fg"><label>Ghi chú nội bộ</label>
+            <textarea id="po-internal-note" rows="2" placeholder="Ghi chú nội bộ — NCC không thấy..." style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;resize:vertical"></textarea>
+          </div>
+          <div class="fg"><label>Ghi chú cho NCC</label>
+            <textarea id="po-supplier-note" rows="2" placeholder="Yêu cầu đặc biệt gửi NCC..." style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;resize:vertical"></textarea>
+          </div>
+          <div class="fg"><label>Đính kèm</label>
+            <div style="border:1.5px dashed var(--border);border-radius:8px;padding:12px;text-align:center;cursor:pointer;color:var(--muted);font-size:12px" onclick="document.getElementById('po-file-input').click()">
+              📎 Kéo thả hoặc bấm để upload (PDF, JPG, PNG)
+            </div>
+            <input id="po-file-input" type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" multiple/>
+            <div id="po-attachments" style="margin-top:6px"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- S8: Audit Trail -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+          <div style="width:22px;height:22px;border-radius:50%;background:#EBF5FB;color:#1A5276;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center">8</div>
+          <span style="font-size:13px;font-weight:700;color:var(--brown)">Audit Trail</span>
+        </div>
+        <div id="po-audit-trail">
+          <div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Lưu PO để xem lịch sử thay đổi</div>
+        </div>
+      </div>
+
+    </div><!-- end padding -->
+  </div><!-- end modal -->
+</div><!-- end overlay -->
+
 
 <div class="page" id="page-inventory">
 
@@ -686,7 +898,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 
   <div id="inv-panel-po" style="display:none">
     <div class="card"><div class="card-head"><span class="card-title">📋 Đơn đặt hàng (PO)</span>
-      <button class="btn btn-sm" onclick="document.getElementById('po-supplier').innerHTML=(D.suppliers||[]).map(s=>`<option value='${s.id}'>${s.name}</option>`).join('');showM('modal-add-po')">+ Tạo PO</button>
+      <button class="btn btn-sm" onclick="openPOModal()">+ Tạo PO</button>
     </div><div id="po-list"></div></div>
   </div>
 
@@ -15243,125 +15455,368 @@ function supplierContact(id) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-// PHASE 2B: PURCHASE ORDER (PO)
+// PO MODULE — Enterprise Purchase Order
 // ══════════════════════════════════════════════════════════════════
-if(!D.purchaseOrders) D.purchaseOrders = [];
 
-function renderPurchaseOrders() {
-  const el = document.getElementById('po-list');
-  if(!el) return;
-  const pos = D.purchaseOrders || [];
-  if(!pos.length) {
-    el.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Chưa có đơn đặt hàng nào</div>';
-    return;
-  }
-  const statusColor = {
-    'Chờ xác nhận':'#E67E22','Đã xác nhận':'#3498DB',
-    'Đang giao':'#8E44AD','Đã nhận hàng':'#1E8449','Đã hủy':'#E74C3C'
-  };
-  el.innerHTML = pos.slice().reverse().map(po => {
-    const sup = D.suppliers.find(s=>s.id===po.supplier_id);
-    return `
-    <div style="padding:12px 16px;border-bottom:1px solid var(--border)">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start">
-        <div>
-          <div style="font-weight:700;font-size:13px;color:var(--brand)">${po.id}</div>
-          <div style="font-weight:700">${sup?.name||po.supplier_name||'—'}</div>
-          <div style="font-size:11px;color:var(--muted)">${po.items_summary||''} · ${po.date||''}</div>
-          ${po.note?`<div style="font-size:11px;color:var(--muted)">${po.note}</div>`:''}
-        </div>
-        <div style="text-align:right">
-          <div style="font-weight:800;font-size:14px;color:var(--green)">${fmt(po.total||0)}</div>
-          <div style="font-size:11px;font-weight:700;color:${statusColor[po.status]||'#888'}">${po.status}</div>
-          <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">
-            ${po.status==='Chờ xác nhận'?`<button onclick="poConfirm('${po.id}')" class="btn btn-sm" style="font-size:10px;background:#3498DB;color:#fff">✅ Xác nhận</button>`:''}
-            ${po.status==='Đã xác nhận'||po.status==='Đang giao'?`<button onclick="poReceive('${po.id}')" class="btn btn-green btn-sm" style="font-size:10px">📦 Nhận hàng</button>`:''}
-            ${['Chờ xác nhận','Đã xác nhận'].includes(po.status)?`<button onclick="poCancel('${po.id}')" style="background:none;border:1px solid var(--red);border-radius:6px;padding:3px 8px;font-size:10px;color:var(--red);cursor:pointer">Hủy</button>`:''}
-          </div>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
+let _poLines = [];       // [{id, sku, product_id, product_name, qty, unit, unit_price, discount, vat_rate}]
+let _poEditId = null;    // null = new PO, string = editing existing
 
-async function supplierCreatePO(supplierId) {
-  const sup = D.suppliers.find(s=>s.id===supplierId);
-  if(!sup) return;
-  // Fill supplier in PO modal
-  const sel = document.getElementById('po-supplier');
-  if(sel) {
-    sel.innerHTML = D.suppliers.map(s=>`<option value="${s.id}" ${s.id===supplierId?'selected':''}>${s.name}</option>`).join('');
-    sel.value = supplierId;
+// ── Open PO modal (new or edit) ──
+function openPOModal(poId) {
+  _poEditId = poId || null;
+  _poLines = [];
+
+  // Generate PO number
+  const num = 'PO-' + new Date().getFullYear() + '-' + String((D.purchaseOrders||[]).length + 1).padStart(4,'0');
+  const el = id => document.getElementById(id);
+
+  el('po-number').value = _poEditId ? _poEditId : num;
+  el('po-header-number').textContent = _poEditId ? _poEditId : num;
+  el('po-status').value = 'draft';
+  el('po-order-date').value = new Date().toISOString().split('T')[0];
+  el('po-delivery-date').value = '';
+  el('po-buyer').value = AUTH_CURRENT?.name || AUTH_CURRENT?.user || 'Admin';
+  el('po-warehouse').value = 'main';
+
+  // Fill suppliers
+  const supSel = el('po-supplier');
+  supSel.innerHTML = '<option value="">— Chọn nhà cung cấp —</option>' +
+    (D.suppliers||[]).map(s=>`<option value="${s.id}">${s.name}</option>`).join('');
+
+  // Clear supplier fields
+  ['po-sup-rating','po-sup-contact','po-sup-phone','po-sup-email','po-sup-tax'].forEach(f=>{
+    const e=el(f); if(e) e.value='';
+  });
+  el('po-payment-term').value = 'immediate';
+  el('po-discount-pct').value = 0;
+  el('po-ship-fee').value = 0;
+  el('po-internal-note').value = '';
+  el('po-supplier-note').value = '';
+  el('po-del-address').value = '';
+  el('po-receiver').value = '';
+  el('po-tracking').value = '';
+  el('po-receiving-status').value = 'pending';
+
+  // Load existing PO data if editing
+  if(_poEditId) {
+    const po = (D.purchaseOrders||[]).find(p=>p.id===_poEditId);
+    if(po) {
+      el('po-status').value = po.status || 'draft';
+      el('po-order-date').value = po.date || '';
+      el('po-delivery-date').value = po.delivery_date || '';
+      el('po-supplier').value = po.supplier_id || '';
+      el('po-discount-pct').value = po.discount_pct || 0;
+      el('po-ship-fee').value = po.ship_fee || 0;
+      el('po-internal-note').value = po.internal_note || '';
+      el('po-supplier-note').value = po.supplier_note || '';
+      el('po-del-address').value = po.delivery_address || '';
+      el('po-receiver').value = po.receiver || '';
+      el('po-tracking').value = po.tracking_code || '';
+      el('po-receiving-status').value = po.receiving_status || 'pending';
+      _poLines = po.line_items ? JSON.parse(typeof po.line_items==='string'?po.line_items:JSON.stringify(po.line_items)) : [];
+      poFillSupplier(po.supplier_id, true);
+    }
+    poRenderAuditTrail(_poEditId);
+  } else {
+    document.getElementById('po-audit-trail').innerHTML = '<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Lưu PO để xem lịch sử thay đổi</div>';
   }
+
+  poUpdateStatusBadge();
+  poRenderLines();
+  poCalcTotals();
+  poRenderApprovalFlow();
   showM('modal-add-po');
 }
 
-async function poSave() {
-  const supId = document.getElementById('po-supplier')?.value;
-  const sup = D.suppliers.find(s=>s.id===supId);
-  const items = document.getElementById('po-items')?.value?.trim();
-  const total = +document.getElementById('po-total')?.value||0;
-  const date = document.getElementById('po-date')?.value;
-  if(!supId||!items) { notify('Chọn NCC và nhập hàng hóa!', false); return; }
+// ── Status badge color ──
+function poUpdateStatusBadge() {
+  const status = document.getElementById('po-status')?.value || 'draft';
+  const badge = document.getElementById('po-status-badge');
+  if(!badge) return;
+  const cfg = {
+    draft:      {bg:'#F5F5F5',  color:'#666',    label:'Draft'},
+    waiting:    {bg:'#FEF9E7',  color:'#E67E22', label:'Waiting Approval'},
+    approved:   {bg:'#EBF5FB',  color:'#1A5276', label:'Approved'},
+    ordered:    {bg:'#F5EEF8',  color:'#8E44AD', label:'Ordered'},
+    receiving:  {bg:'#E8F8F5',  color:'#0F6E56', label:'Receiving'},
+    completed:  {bg:'#EAFAF1',  color:'#1E8449', label:'Completed'},
+    cancelled:  {bg:'#FDEDEC',  color:'#E74C3C', label:'Cancelled'},
+  };
+  const c = cfg[status] || cfg.draft;
+  badge.style.background = c.bg;
+  badge.style.color = c.color;
+  badge.textContent = c.label;
+}
+
+// ── Auto-fill supplier ──
+function poFillSupplier(supId, silent) {
+  if(!supId) return;
+  const sup = (D.suppliers||[]).find(s=>s.id===supId);
+  if(!sup) return;
+  const el = id => document.getElementById(id);
+  if(sup.phone)   el('po-sup-phone').value = sup.phone;
+  if(sup.address) el('po-del-address').value = sup.address;
+  if(sup.payment_terms) el('po-payment-term').value = sup.payment_terms;
+  el('po-sup-rating').value = '★★★★☆  4.0/5';
+  if(!silent) notify('✅ Đã điền thông tin NCC: ' + sup.name);
+}
+
+// ── Line items ──
+function poRenderLines() {
+  const tbody = document.getElementById('po-line-tbody');
+  const empty = document.getElementById('po-empty-lines');
+  if(!tbody) return;
+
+  if(!_poLines.length) {
+    tbody.innerHTML = '';
+    if(empty) empty.style.display = '';
+    poCalcTotals();
+    return;
+  }
+  if(empty) empty.style.display = 'none';
+
+  tbody.innerHTML = _poLines.map((line, i) => `
+    <tr style="border-bottom:0.5px solid var(--border)" id="po-line-${i}">
+      <td style="padding:4px"><input value="${line.sku||''}" oninput="_poLines[${i}].sku=this.value"
+        style="width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px" placeholder="SKU"/></td>
+      <td style="padding:4px"><input value="${line.product_name||''}" oninput="_poLines[${i}].product_name=this.value"
+        style="width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px" placeholder="Tên sản phẩm *" required/></td>
+      <td style="padding:4px"><input type="number" min="0" value="${line.qty||0}" oninput="_poLines[${i}].qty=+this.value;poCalcTotals()"
+        style="width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px;text-align:right"/></td>
+      <td style="padding:4px"><input value="${line.unit||''}" oninput="_poLines[${i}].unit=this.value"
+        style="width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px;text-align:center" placeholder="kg"/></td>
+      <td style="padding:4px"><input type="number" min="0" value="${line.unit_price||0}" oninput="_poLines[${i}].unit_price=+this.value;poCalcTotals()"
+        style="width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px;text-align:right"/></td>
+      <td style="padding:4px"><input type="number" min="0" max="100" value="${line.discount||0}" oninput="_poLines[${i}].discount=+this.value;poCalcTotals()"
+        style="width:100%;padding:5px 7px;border:1px solid var(--border);border-radius:6px;font-size:12px;text-align:right"/></td>
+      <td style="padding:4px">
+        <select onchange="_poLines[${i}].vat_rate=+this.value;poCalcTotals()"
+          style="width:100%;padding:5px 4px;border:1px solid var(--border);border-radius:6px;font-size:11px">
+          <option value="0" ${(line.vat_rate||0)===0?'selected':''}>0%</option>
+          <option value="5" ${(line.vat_rate||0)===5?'selected':''}>5%</option>
+          <option value="10" ${(line.vat_rate||0)===10?'selected':''}>10%</option>
+        </select>
+      </td>
+      <td style="padding:4px;text-align:right;font-weight:700;font-size:12px;color:var(--green)" id="po-line-total-${i}">
+        ${fmt(poLineTotal(line))}
+      </td>
+      <td style="padding:4px">
+        <div style="display:flex;gap:2px">
+          <button onclick="poDuplicateLine(${i})" title="Duplicate"
+            style="width:26px;height:26px;padding:0;font-size:11px;background:none;border:1px solid var(--border);border-radius:5px;cursor:pointer">⧉</button>
+          <button onclick="poDeleteLine(${i})"
+            style="width:26px;height:26px;padding:0;font-size:11px;background:none;border:1px solid var(--red);border-radius:5px;cursor:pointer;color:var(--red)">✕</button>
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+function poLineTotal(line) {
+  const base = (line.qty||0) * (line.unit_price||0);
+  const afterDisc = base * (1 - (line.discount||0)/100);
+  return Math.round(afterDisc * (1 + (line.vat_rate||0)/100));
+}
+
+function poCalcTotals() {
+  // Update each line total display
+  _poLines.forEach((line,i) => {
+    const el = document.getElementById('po-line-total-'+i);
+    if(el) el.textContent = fmt(poLineTotal(line));
+  });
+
+  const subtotal = _poLines.reduce((s,l) => s + (l.qty||0)*(l.unit_price||0)*(1-(l.discount||0)/100), 0);
+  const vatTotal = _poLines.reduce((s,l) => {
+    const base = (l.qty||0)*(l.unit_price||0)*(1-(l.discount||0)/100);
+    return s + base*(l.vat_rate||0)/100;
+  }, 0);
+  const discPct = +document.getElementById('po-discount-pct')?.value || 0;
+  const discAmt = Math.round(subtotal * discPct / 100);
+  const shipFee = +document.getElementById('po-ship-fee')?.value || 0;
+  const grandTotal = Math.round(subtotal - discAmt + vatTotal + shipFee);
+
+  const se = (id, v) => { const el=document.getElementById(id); if(el) el.textContent=v; };
+  se('po-subtotal', fmt(Math.round(subtotal)) + '₫');
+  se('po-discount-amt', discAmt > 0 ? '-' + fmt(discAmt) + '₫' : '—');
+  se('po-vat-total', fmt(Math.round(vatTotal)) + '₫');
+  se('po-grand-total', fmt(grandTotal) + '₫');
+}
+
+function poAddLine() {
+  _poLines.push({id:'line_'+Date.now(), sku:'', product_name:'', qty:1, unit:'', unit_price:0, discount:0, vat_rate:10});
+  poRenderLines();
+  // Focus vào ô tên sản phẩm của dòng mới
+  setTimeout(() => {
+    const rows = document.querySelectorAll('#po-line-tbody tr');
+    if(rows.length) rows[rows.length-1].querySelector('input:nth-child(1)')?.focus();
+  }, 50);
+}
+
+function poAddLineFromInventory() {
+  // Show inventory picker
+  const inv = D.inventory||[];
+  if(!inv.length) { notify('Kho chưa có nguyên liệu nào!', false); return; }
+
+  const picked = inv.filter(i=>i.qty>0);
+  const html = `
+    <div style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center" id="inv-picker-overlay" onclick="if(event.target.id==='inv-picker-overlay')this.remove()">
+      <div style="background:#fff;border-radius:12px;padding:16px;width:500px;max-height:70vh;overflow-y:auto">
+        <div style="font-weight:800;font-size:14px;margin-bottom:12px">🔍 Chọn từ kho</div>
+        ${picked.map(i=>`
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);cursor:pointer"
+            onclick="poAddFromInventoryItem('${i.id}','${i.name.replace(/'/g,"\\'")}','${i.unit||''}',${i.price||0});document.getElementById('inv-picker-overlay').remove()">
+            <div>
+              <div style="font-size:13px;font-weight:700">${i.name}</div>
+              <div style="font-size:11px;color:var(--muted)">Còn: ${i.qty} ${i.unit||''} · Giá: ${fmt(i.price||0)}₫</div>
+            </div>
+            <button class="btn btn-sm" style="font-size:11px">+ Chọn</button>
+          </div>`).join('')}
+      </div>
+    </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function poAddFromInventoryItem(id, name, unit, price) {
+  _poLines.push({id:'line_'+Date.now(), sku:id.substring(0,8), product_id:id, product_name:name, qty:1, unit, unit_price:price, discount:0, vat_rate:10});
+  poRenderLines();
+  poCalcTotals();
+}
+
+function poDuplicateLine(i) {
+  const copy = {..._poLines[i], id:'line_'+Date.now()};
+  _poLines.splice(i+1, 0, copy);
+  poRenderLines();
+  poCalcTotals();
+}
+
+function poDeleteLine(i) {
+  _poLines.splice(i, 1);
+  poRenderLines();
+  poCalcTotals();
+}
+
+// ── Approval flow render ──
+function poRenderApprovalFlow() {
+  const el = document.getElementById('po-approval-flow');
+  if(!el) return;
+  const steps = [
+    {label:'Creator', name: AUTH_CURRENT?.name||'Admin', status:'done'},
+    {label:'Manager', name:'Chờ duyệt', status:'waiting'},
+    {label:'Finance', name:'Chưa đến', status:'pending'},
+    {label:'Final', name:'Chưa đến', status:'pending'},
+  ];
+  const cfg = {
+    done:    {bg:'#EAFAF1', color:'#1E8449', icon:'✓'},
+    waiting: {bg:'#FEF9E7', color:'#E67E22', icon:'⏳'},
+    pending: {bg:'var(--bg2)', color:'var(--muted)', icon:'—'},
+  };
+  el.innerHTML = steps.map((s,i)=>`
+    <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1">
+      <div style="width:32px;height:32px;border-radius:50%;background:${cfg[s.status].bg};color:${cfg[s.status].color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700">
+        ${cfg[s.status].icon}
+      </div>
+      <span style="font-size:11px;font-weight:700;color:var(--brown)">${s.label}</span>
+      <span style="font-size:10px;color:${cfg[s.status].color}">${s.name}</span>
+    </div>
+    ${i<steps.length-1?'<div style="flex:1;height:1px;background:var(--border);margin-top:16px"></div>':''}`).join('');
+}
+
+// ── Audit trail ──
+function poRenderAuditTrail(poId) {
+  const el = document.getElementById('po-audit-trail');
+  if(!el) return;
+  const logs = (D.auditLog||[]).filter(l=>l.detail&&l.detail.includes(poId)).slice(0,10);
+  if(!logs.length) {
+    el.innerHTML = '<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Chưa có lịch sử</div>';
+    return;
+  }
+  el.innerHTML = logs.map(l=>`
+    <div style="display:flex;gap:10px;padding:6px 0;border-bottom:0.5px solid var(--border)">
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:var(--brand);flex-shrink:0">${(l.user||'?').charAt(0)}</div>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:700">${l.user} — ${l.action}</div>
+        <div style="font-size:11px;color:var(--muted)">${l.detail}</div>
+      </div>
+      <span style="font-size:10px;color:var(--muted);white-space:nowrap">${l.time}</span>
+    </div>`).join('');
+}
+
+// ── Save PO ──
+async function poSave(submitMode) {
+  const el = id => document.getElementById(id);
+  const supId = el('po-supplier')?.value;
+  if(!supId) { notify('Chọn nhà cung cấp trước!', false); return; }
+  if(!_poLines.length) { notify('Thêm ít nhất 1 dòng hàng hóa!', false); return; }
+  const invalidLine = _poLines.find(l=>!l.product_name||l.qty<=0||l.unit_price<0);
+  if(invalidLine) { notify('Kiểm tra lại: tên SP, số lượng > 0!', false); return; }
+
+  const sup = (D.suppliers||[]).find(s=>s.id===supId);
+  const discPct = +el('po-discount-pct')?.value || 0;
+  const shipFee = +el('po-ship-fee')?.value || 0;
+  const subtotal = _poLines.reduce((s,l)=>s+(l.qty||0)*(l.unit_price||0)*(1-(l.discount||0)/100),0);
+  const vatTotal = _poLines.reduce((s,l)=>{const b=(l.qty||0)*(l.unit_price||0)*(1-(l.discount||0)/100);return s+b*(l.vat_rate||0)/100;},0);
+  const discAmt = Math.round(subtotal*discPct/100);
+  const grandTotal = Math.round(subtotal - discAmt + vatTotal + shipFee);
+
+  const status = submitMode==='submit' ? 'waiting' : (el('po-status')?.value || 'draft');
 
   const po = {
-    id: 'PO'+Date.now(),
+    id: _poEditId || el('po-number')?.value || ('PO-'+Date.now()),
+    status,
+    date: el('po-order-date')?.value || new Date().toISOString().split('T')[0],
+    delivery_date: el('po-delivery-date')?.value || '',
+    buyer: el('po-buyer')?.value || '',
+    warehouse: el('po-warehouse')?.value || 'main',
     supplier_id: supId,
-    supplier_name: sup?.name||'',
-    items_summary: items,
-    total, date: date||nowDT().split(' ')[0],
-    note: document.getElementById('po-note')?.value||'',
-    status: 'Chờ xác nhận',
+    supplier_name: sup?.name || '',
+    supplier_phone: el('po-sup-phone')?.value || '',
+    supplier_email: el('po-sup-email')?.value || '',
+    payment_terms: el('po-payment-term')?.value || 'immediate',
+    items_summary: _poLines.map(l=>`${l.product_name} ×${l.qty}`).join(', '),
+    line_items: JSON.stringify(_poLines),
+    subtotal: Math.round(subtotal),
+    discount_pct: discPct,
+    discount_amt: discAmt,
+    vat_amt: Math.round(vatTotal),
+    ship_fee: shipFee,
+    total: grandTotal,
+    delivery_address: el('po-del-address')?.value || '',
+    receiver: el('po-receiver')?.value || '',
+    tracking_code: el('po-tracking')?.value || '',
+    receiving_status: el('po-receiving-status')?.value || 'pending',
+    internal_note: el('po-internal-note')?.value || '',
+    supplier_note: el('po-supplier-note')?.value || '',
     created_at: new Date().toISOString(),
-    created_by: AUTH_CURRENT?.name||''
+    created_by: AUTH_CURRENT?.name || ''
   };
-  await sbUpsert('purchase_orders', po);
-  D.purchaseOrders.push(po);
-  closeM('modal-add-po');
-  renderPurchaseOrders();
-  tgMsg(`📋 *Đơn đặt hàng mới!*\n\n🏭 NCC: ${sup?.name}\n📦 Hàng: ${items}\n💰 Tổng: ${fmt(total)}\n📅 ${po.date}\n\n_Trương Dáng Hương Academy_`);
-  notify('✅ Đã tạo PO: '+po.id);
-  auditLog('create','purchase_order',`Tạo PO ${po.id} — ${sup?.name} — ${fmt(total)}`);
-}
 
-async function poConfirm(id) {
-  const po = D.purchaseOrders.find(x=>x.id===id);
-  if(!po) return;
-  po.status = 'Đã xác nhận';
-  await sbPatch('purchase_orders',{status:'Đã xác nhận'},'?id=eq.'+id);
-  renderPurchaseOrders();
-  notify('✅ PO đã xác nhận: '+id);
-}
+  try {
+    await sbUpsert('purchase_orders', po);
+    if(_poEditId) {
+      const idx = D.purchaseOrders.findIndex(p=>p.id===_poEditId);
+      if(idx>=0) D.purchaseOrders[idx] = po; else D.purchaseOrders.push(po);
+    } else {
+      D.purchaseOrders.push(po);
+    }
 
-async function poReceive(id) {
-  const po = D.purchaseOrders.find(x=>x.id===id);
-  if(!po) return;
-  po.status = 'Đã nhận hàng';
-  await sbPatch('purchase_orders',{status:'Đã nhận hàng',received_at:nowDT()},'?id=eq.'+id);
-  // Auto tạo phiếu chi nếu có tổng tiền
-  if(po.total>0) {
-    const tx = {
-      id:'TX'+Date.now(), type:'chi',
-      category:'Nhập hàng NCC — '+po.supplier_name,
-      amount:po.total, note:'PO: '+po.id,
-      time:nowDT(), created_at:Date.now(), mang:'retail', _auto:false
-    };
-    await sbUpsert('transactions', tx);
-    D.transactions.unshift(tx);
-    gsSyncAfterChange('transactions');
+    if(submitMode==='submit') {
+      tgMsg(`📋 *PO mới cần duyệt!*\n\n🆔 ${po.id}\n🏭 NCC: ${po.supplier_name}\n📦 Hàng: ${po.items_summary}\n💰 Grand Total: ${fmt(grandTotal)}₫\n📅 Giao: ${po.delivery_date||'—'}\n👤 Tạo bởi: ${po.created_by}\n\n⏳ Vui lòng phê duyệt\n_Trương Dáng Hương Academy_`);
+    }
+
+    auditLog(_poEditId?'update':'create','purchase_order',`${_poEditId?'Cập nhật':'Tạo'} PO ${po.id} — ${po.supplier_name} — ${fmt(grandTotal)}₫`);
+    closeM('modal-add-po');
+    renderPurchaseOrders();
+    renderWarehouseDashboard();
+    notify(`✅ Đã lưu PO: ${po.id}${submitMode==='submit'?' — Đã gửi duyệt':''}`);
+  } catch(e) {
+    notify('Lỗi lưu PO: ' + e.message, false);
   }
-  renderPurchaseOrders();
-  auditLog('update','purchase_order',`Nhận hàng PO ${id} — ${fmt(po.total)}`);
-  notify('✅ Đã nhận hàng PO: '+id+(po.total>0?' — Đã tạo phiếu chi':''));
 }
 
-async function poCancel(id) {
-  if(!confirm('Hủy PO này?')) return;
-  await sbPatch('purchase_orders',{status:'Đã hủy'},'?id=eq.'+id);
-  D.purchaseOrders.find(x=>x.id===id).status='Đã hủy';
-  renderPurchaseOrders();
-  notify('Đã hủy PO: '+id);
+// ── Open PO detail (view/edit) ──
+function poOpenDetail(poId) {
+  openPOModal(poId);
 }
+
 
 // ══════════════════════════════════════════════════════════════════
 // PHASE 2C: WAREHOUSE DASHBOARD
@@ -15452,9 +15907,14 @@ function wh_createPOForLow() {
   const lowStock = (D.inventory||[]).filter(i=>(i.qty||0)<=(i.min_qty||0));
   if(!lowStock.length) { notify('Không có NVL nào cần nhập!'); return; }
   const summary = lowStock.map(i=>`${i.name}: cần ${Math.max(0,(i.min_qty||0)*2-i.qty)} ${i.unit}`).join(', ');
-  const el = document.getElementById('po-items');
-  if(el) el.value = summary;
-  showM('modal-add-po');
+  openPOModal();
+  setTimeout(()=>{
+    const note = document.getElementById('po-internal-note');
+    if(note) note.value = 'Auto từ cảnh báo kho: ' + summary;
+    // Pre-add lines từ low stock
+    const lowStock = (D.inventory||[]).filter(i=>(i.qty||0)<=(i.min_qty||0));
+    lowStock.forEach(i => poAddFromInventoryItem(i.id, i.name, i.unit||'', i.price||0));
+  }, 300);
 }
 
 // ══════════════════════════════════════════════════════════════════
