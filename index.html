@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.60-20260524">
+<meta name="version" content="v5.61-20260524">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -7696,10 +7696,17 @@ function buildAutoTxs(filterMonth){
 
 function getMonthKey(timeStr){
   if(!timeStr) return '';
-  // DD/M/YYYY hoặc DD/MM/YYYY — tháng 1 hoặc 2 chữ số
-  const m1=(timeStr||'').match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  // Nếu là số (timestamp ms) → chuyển sang Date
+  if(typeof timeStr === 'number' || (typeof timeStr === 'string' && /^\d{10,}$/.test(timeStr))) {
+    const d = new Date(+timeStr);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
+  }
+  const s = String(timeStr);
+  // DD/M/YYYY hoặc DD/MM/YYYY
+  const m1 = s.match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);
   if(m1) return m1[3]+'-'+String(+m1[2]).padStart(2,'0');
-  const m2=(timeStr||'').match(/(\d{4})-(\d{2})/);
+  // YYYY-MM
+  const m2 = s.match(/(\d{4})-(\d{2})/);
   if(m2) return m2[1]+'-'+m2[2];
   return '';
 }
