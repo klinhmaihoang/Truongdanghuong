@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.56-20260524">
+<meta name="version" content="v5.57-20260524">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4223,9 +4223,15 @@ async function boot(){
         D.purchaseOrders = purchaseOrders||[];
         D.approvalQueue = approvalQueue||[];
         updateApprovalBadge();
-        // CRM from Supabase
-        try { D.crmTasks = JSON.parse(crmTasksRaw?.[0]?.data||'[]'); } catch(e) { D.crmTasks=[]; }
-        try { D.crmStages = JSON.parse(crmStagesRaw?.[0]?.data||'{}'); } catch(e) { D.crmStages={}; }
+        // CRM from Supabase — fallback to localStorage
+        try {
+          const rawTasks = crmTasksRaw?.[0]?.data;
+          D.crmTasks = rawTasks ? (typeof rawTasks==='string'?JSON.parse(rawTasks):rawTasks) : JSON.parse(localStorage.getItem('tdh_crm_tasks')||'[]');
+        } catch(e) { D.crmTasks=[]; }
+        try {
+          const rawStages = crmStagesRaw?.[0]?.data;
+          D.crmStages = rawStages ? (typeof rawStages==='string'?JSON.parse(rawStages):rawStages) : JSON.parse(localStorage.getItem('tdh_crm_stages')||'{}');
+        } catch(e) { D.crmStages={}; }
         // Journal from Supabase
         D.journalEntries = (journalRaw||[]).map(r=>({...r, entries: typeof r.entries==='string'?JSON.parse(r.entries||'[]'):r.entries||[]}));
         // Salary records
@@ -13888,16 +13894,41 @@ const CRM_STAGES = [
 if(!D.crmTasks) D.crmTasks = [];
 if(!D.crmStages) D.crmStages = {};
 
-function loadCRMTasks() { return D.crmTasks||[]; }
+function loadCRMTasks() {
+  if(D.crmTasks && D.crmTasks.length) return D.crmTasks;
+  try { const ls = localStorage.getItem('tdh_crm_tasks'); if(ls) return JSON.parse(ls); } catch(e) {}
+  return [];
+}
 async function saveCRMTasks(tasks) {
   D.crmTasks = tasks;
-  // Sync to Supabase
-  try { await sbUpsert('crm_tasks', {id:'crm_tasks_main', user_id: AUTH_CURRENT?.id||'admin', data: JSON.stringify(tasks), updated_at: new Date().toISOString()}); } catch(e) {}
+  try { localStorage.setItem('tdh_crm_tasks', JSON.stringify(tasks)); } catch(e) {}
+  try {
+    await sbUpsert('crm_tasks', {
+      id: 'crm_tasks_main',
+      user_id: AUTH_CURRENT?.id || AUTH_CURRENT?.user || 'admin',
+      data: tasks,
+      updated_at: new Date().toISOString()
+    });
+  } catch(e) { console.warn('CRM tasks Supabase sync failed:', e.message); }
 }
-function loadCRMStages() { return D.crmStages||{}; }
+function loadCRMStages() {
+  if(D.crmStages && Object.keys(D.crmStages).length) return D.crmStages;
+  try { const ls = localStorage.getItem('tdh_crm_stages'); if(ls) return JSON.parse(ls); } catch(e) {}
+  return {};
+}
 async function saveCRMStages(stages) {
   D.crmStages = stages;
-  try { await sbUpsert('crm_stages', {id:'crm_stages_main', user_id: AUTH_CURRENT?.id||'admin', data: JSON.stringify(stages), updated_at: new Date().toISOString()}); } catch(e) {}
+  // Fallback localStorage luôn (instant)
+  try { localStorage.setItem('tdh_crm_stages', JSON.stringify(stages)); } catch(e) {}
+  // Sync Supabase
+  try {
+    await sbUpsert('crm_stages', {
+      id: 'crm_stages_main',
+      user_id: AUTH_CURRENT?.id || AUTH_CURRENT?.user || 'admin',
+      data: stages,
+      updated_at: new Date().toISOString()
+    });
+  } catch(e) { console.warn('CRM stages Supabase sync failed:', e.message); }
 }
 
 let _crmTab = 'pipeline';
