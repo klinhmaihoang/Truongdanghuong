@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.63-20260525">
+<meta name="version" content="v5.65-20260525">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -250,7 +250,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <button class="active" onclick="go('dashboard',this)">🏠 Tổng quan</button>
     <button onclick="go('students',this)">🎓 Học viên</button>
     <button onclick="go('pos',this)">🛒 Bán hàng</button>
-    <button onclick="go('inventory',this)">📦 Kho<span id="po-nav-badge" style="display:none;background:#E74C3C;color:#fff;border-radius:20px;padding:1px 6px;font-size:9px;margin-left:4px;font-weight:700;vertical-align:middle">0</span></button>
+    <button onclick="go('inventory',this)">📦 Kho</button>
     <button onclick="go('customers',this)">👥 Khách hàng</button>
     <button onclick="go('crm',this)">🎯 CRM</button>
     <button onclick="go('hr',this)">👥 Nhân sự</button>
@@ -273,7 +273,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <span class="bn-icon">🛒</span>Bán hàng
   </button>
   <button class="bottom-nav-btn" onclick="go('inventory',this);syncBottomNav(this)">
-    <span class="bn-icon">📦</span>Kho<span id="po-nav-badge-mobile" style="display:none;background:#E74C3C;color:#fff;border-radius:20px;padding:0px 4px;font-size:8px;margin-left:2px;font-weight:700;vertical-align:middle">●</span>
+    <span class="bn-icon">📦</span>Kho
   </button>
   <button class="bottom-nav-btn" onclick="go('customers',this);syncBottomNav(this)">
     <span class="bn-icon">👥</span>Khách hàng
@@ -883,7 +883,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="tab active" id="inv-tab-stock" onclick="invTab('stock',this)">📦 Kho nguyên liệu</div>
     <div class="tab" id="inv-tab-warehouse" onclick="invTab('warehouse',this);renderWarehouseDashboard()">🏠 Dashboard</div>
     <div class="tab" id="inv-tab-suppliers" onclick="invTab('suppliers',this);renderSuppliers()">🏭 NCC</div>
-    <div class="tab" id="inv-tab-po" onclick="invTab('po',this);renderPurchaseOrders()">📋 PO<span id="po-tab-badge" style="display:none;background:#E74C3C;color:#fff;border-radius:20px;padding:1px 6px;font-size:9px;margin-left:4px;font-weight:700">0</span></div>
+    <div class="tab" id="inv-tab-po" onclick="invTab('po',this);renderPurchaseOrders()">📋 PO</div>
     <div class="tab" id="inv-tab-products" onclick="invTab('products',this)">🛍 Hàng hóa</div>
   </div>
 
@@ -1289,9 +1289,19 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="stat" style="--accent:var(--green)"><div class="stat-num" id="crm-vip">0</div><div class="stat-label">⭐ VIP/Gold</div></div>
   </div>
 
+  <!-- SO KPI row -->
+  <div class="stats" style="grid-template-columns:repeat(4,1fr);margin-bottom:16px">
+    <div class="stat" style="--accent:#8E44AD"><div class="stat-num" id="so-kpi-pipeline">0₫</div><div class="stat-label">💬 Pipeline value</div></div>
+    <div class="stat" style="--accent:var(--green)"><div class="stat-num" id="so-kpi-won">0₫</div><div class="stat-label">🏆 Doanh thu SO</div></div>
+    <div class="stat" style="--accent:#E67E22"><div class="stat-num" id="so-kpi-open">0</div><div class="stat-label">📋 SO đang xử lý</div></div>
+    <div class="stat" style="--accent:var(--red)"><div class="stat-num" id="so-kpi-overdue">0</div><div class="stat-label">⏰ SO quá hạn</div></div>
+  </div>
+
   <!-- Tabs -->
   <div class="tabs" style="margin-bottom:12px">
     <div class="tab active" onclick="crmTab(this,'pipeline')">📋 Pipeline</div>
+    <div class="tab" onclick="crmTab(this,'quotations')">💬 Báo giá<span id="qt-tab-badge" style="display:none;background:#8E44AD;color:#fff;border-radius:20px;padding:1px 6px;font-size:9px;margin-left:4px;font-weight:700">0</span></div>
+    <div class="tab" onclick="crmTab(this,'so')">📦 Sales Orders<span id="so-tab-badge" style="display:none;background:var(--red);color:#fff;border-radius:20px;padding:1px 6px;font-size:9px;margin-left:4px;font-weight:700">0</span></div>
     <div class="tab" onclick="crmTab(this,'tasks')">✅ Công việc</div>
     <div class="tab" onclick="crmTab(this,'segments')">🎯 Phân khúc</div>
     <div class="tab" onclick="crmTab(this,'history')">📅 Lịch sử</div>
@@ -1300,6 +1310,28 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   <!-- Pipeline -->
   <div id="crm-panel-pipeline">
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px" id="crm-pipeline-board"></div>
+  </div>
+
+  <!-- Quotations panel -->
+  <div id="crm-panel-quotations" style="display:none">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">💬 Danh sách báo giá</span>
+        <button class="btn btn-sm" onclick="soOpenQuotationModal()">+ Tạo báo giá</button>
+      </div>
+      <div id="qt-list"></div>
+    </div>
+  </div>
+
+  <!-- Sales Orders panel -->
+  <div id="crm-panel-so" style="display:none">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">📦 Sales Orders</span>
+        <button class="btn btn-sm" onclick="soOpenSOModal()" style="background:#1A5276;color:#fff">+ Tạo SO</button>
+      </div>
+      <div id="so-list"></div>
+    </div>
   </div>
 
   <!-- Tasks -->
@@ -1324,6 +1356,261 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
   </div>
 </div>
+<!-- ══ MODAL TẠO/SỬA BÁO GIÁ ══ -->
+<div class="overlay" id="modal-quotation">
+  <div class="modal" style="max-width:680px;width:95vw;max-height:92vh;overflow-y:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Báo giá</div>
+        <div style="font-size:16px;font-weight:800;color:#8E44AD" id="qt-modal-id">QT mới</div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <span id="qt-status-badge" style="font-size:11px;background:#F5EEF8;color:#8E44AD;padding:4px 10px;border-radius:20px;font-weight:700">Draft</span>
+        <button class="btn btn-ghost btn-sm" onclick="closeM('modal-quotation')">✕</button>
+        <button class="btn btn-sm" onclick="soSaveQuotation('draft')" style="background:#fff;border:1.5px solid var(--border)">💾 Lưu nháp</button>
+        <button class="btn btn-sm" onclick="soSaveQuotation('sent')" style="background:#8E44AD;color:#fff">📤 Gửi khách</button>
+      </div>
+    </div>
+
+    <!-- Customer + Owner -->
+    <div class="form-row" style="margin-bottom:12px">
+      <div class="fg"><label>Khách hàng *</label>
+        <select id="qt-customer" onchange="soFillCustomerInfo('qt')" style="border:1.5px solid #8E44AD;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+          <option value="">— Chọn khách hàng —</option>
+        </select>
+      </div>
+      <div class="fg"><label>Sale phụ trách</label>
+        <input id="qt-owner" placeholder="Tên sale..." style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box"/>
+      </div>
+    </div>
+    <div class="form-row" style="margin-bottom:12px">
+      <div class="fg"><label>Hiệu lực đến</label>
+        <input id="qt-expires" type="date" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box"/>
+      </div>
+      <div class="fg"><label>Trạng thái</label>
+        <select id="qt-status" onchange="document.getElementById('qt-status-badge').textContent=this.options[this.selectedIndex].text" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+          <option value="draft">Draft</option>
+          <option value="sent">Đã gửi</option>
+          <option value="accepted">Chốt ✅</option>
+          <option value="rejected">Từ chối</option>
+          <option value="expired">Hết hạn</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Line items -->
+    <div style="font-size:12px;font-weight:700;color:var(--brown);margin-bottom:6px">Danh sách hàng hóa / dịch vụ</div>
+    <div style="overflow-x:auto;margin-bottom:8px">
+      <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:500px">
+        <thead><tr style="background:var(--bg2)">
+          <th style="padding:6px 8px;text-align:left">Tên sản phẩm / dịch vụ *</th>
+          <th style="padding:6px 8px;text-align:right;width:60px">SL</th>
+          <th style="padding:6px 8px;text-align:center;width:50px">ĐVT</th>
+          <th style="padding:6px 8px;text-align:right;width:100px">Đơn giá</th>
+          <th style="padding:6px 8px;text-align:right;width:60px">CK%</th>
+          <th style="padding:6px 8px;text-align:right;width:90px">Thành tiền</th>
+          <th style="padding:6px 8px;width:28px"></th>
+        </tr></thead>
+        <tbody id="qt-line-tbody"></tbody>
+      </table>
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="soAddQtLine()" style="margin-bottom:14px">+ Thêm dòng</button>
+
+    <!-- Totals -->
+    <div style="display:flex;justify-content:flex-end;margin-bottom:14px">
+      <div style="width:300px">
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">
+          <span style="color:var(--muted)">Subtotal</span><span id="qt-subtotal" style="font-weight:700">0₫</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">
+          <span style="color:var(--muted)">Chiết khấu (%)</span>
+          <input type="number" id="qt-discount-pct" min="0" max="100" value="0" oninput="soCalcQtTotals()" style="width:60px;text-align:right;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px"/>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:8px 10px;background:#F5EEF8;border-radius:8px;margin-top:6px">
+          <span style="font-size:14px;font-weight:800;color:#8E44AD">Tổng báo giá</span>
+          <span style="font-size:20px;font-weight:800;color:#8E44AD" id="qt-total">0₫</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notes -->
+    <div class="form-row">
+      <div class="fg"><label>Ghi chú nội bộ</label><textarea id="qt-internal-note" rows="2" placeholder="Ghi chú nội bộ..." style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;resize:vertical;box-sizing:border-box"></textarea></div>
+      <div class="fg"><label>Ghi chú cho khách</label><textarea id="qt-note" rows="2" placeholder="Điều khoản, yêu cầu đặc biệt..." style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;resize:vertical;box-sizing:border-box"></textarea></div>
+    </div>
+
+    <!-- Convert to SO button (visible when accepted) -->
+    <div id="qt-convert-wrap" style="display:none;margin-top:14px;padding:12px;background:#EAFAF1;border-radius:8px;text-align:center">
+      <span style="font-size:13px;font-weight:700;color:#1E8449;margin-right:12px">✅ Khách đã chốt!</span>
+      <button class="btn btn-sm" onclick="soConvertToSO(_qtEditId)" style="background:#1E8449;color:#fff">📦 Tạo Sales Order</button>
+    </div>
+    <input type="hidden" id="qt-edit-id" value=""/>
+  </div>
+</div>
+
+<!-- ══ MODAL TẠO/SỬA SALES ORDER ══ -->
+<div class="overlay" id="modal-so">
+  <div class="modal" style="max-width:780px;width:95vw;max-height:92vh;overflow-y:auto;padding:0">
+    <!-- Sticky header -->
+    <div style="position:sticky;top:0;background:#fff;z-index:10;padding:16px 20px;border-bottom:1.5px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+      <div>
+        <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.5px">Sales Order</div>
+        <div style="font-size:16px;font-weight:800;color:#1A5276" id="so-modal-number">SO mới</div>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <span id="so-status-badge" style="font-size:11px;background:#EBF5FB;color:#1A5276;padding:4px 10px;border-radius:20px;font-weight:700">Draft</span>
+        <button class="btn btn-ghost btn-sm" onclick="closeM('modal-so')">✕ Đóng</button>
+        <button class="btn btn-sm" onclick="soSaveSO('draft')" style="background:#fff;border:1.5px solid var(--border)">💾 Lưu nháp</button>
+        <button class="btn btn-sm" onclick="soSaveSO('pending_approval')" style="background:#1A5276;color:#fff">📤 Gửi duyệt</button>
+      </div>
+    </div>
+
+    <div style="padding:20px">
+      <!-- S1: Header info -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">① Thông tin đơn hàng</div>
+        <div class="form-row">
+          <div class="fg"><label>SO Number</label><input id="so-number" readonly style="background:var(--bg2);color:var(--muted);font-style:italic;border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box"/></div>
+          <div class="fg"><label>Ngày đặt hàng</label><input id="so-date" type="date" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box"/></div>
+          <div class="fg"><label>Trạng thái</label>
+            <select id="so-status" onchange="soUpdateStatusBadge()" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+              <option value="draft">Draft</option>
+              <option value="pending_approval">Chờ duyệt</option>
+              <option value="approved">Đã duyệt</option>
+              <option value="in_progress">Đang thực hiện</option>
+              <option value="delivered">Đã giao</option>
+              <option value="completed">Hoàn tất</option>
+              <option value="cancelled">Hủy</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="fg"><label>Sale phụ trách</label><input id="so-owner" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box"/></div>
+          <div class="fg"><label>Chi nhánh</label>
+            <select id="so-branch" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+              <option value="main">Đà Lạt (chính)</option>
+              <option value="hcm">HCM</option>
+              <option value="other">Khác</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- S2: Customer -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">② Khách hàng</div>
+        <div class="form-row">
+          <div class="fg" style="grid-column:1/3"><label>Khách hàng *</label>
+            <select id="so-customer" onchange="soFillCustomerInfo('so')" style="border:1.5px solid #1A5276;border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+              <option value="">— Chọn khách hàng —</option>
+            </select>
+          </div>
+          <div class="fg"><label>Người liên hệ</label><input id="so-contact" placeholder="Tên, chức vụ..." style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box"/></div>
+        </div>
+        <div class="form-row">
+          <div class="fg"><label>Địa chỉ thanh toán</label><input id="so-billing-address" placeholder="Địa chỉ thanh toán..." style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box"/></div>
+          <div class="fg"><label>Địa chỉ giao hàng</label><input id="so-delivery-address" placeholder="Địa chỉ giao..." style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box"/></div>
+        </div>
+        <div class="form-row">
+          <div class="fg"><label>Điều khoản thanh toán</label>
+            <select id="so-payment-terms" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+              <option value="immediate">Thanh toán ngay</option>
+              <option value="net7">Net 7 ngày</option>
+              <option value="net15">Net 15 ngày</option>
+              <option value="net30">Net 30 ngày</option>
+              <option value="deposit50">Đặt cọc 50%</option>
+            </select>
+          </div>
+          <div class="fg"><label>Mã số thuế</label><input id="so-tax-code" placeholder="0123456789" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box"/></div>
+        </div>
+      </div>
+
+      <!-- S3: Line items -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+          <span style="font-size:13px;font-weight:700;color:var(--brown)">③ Danh sách hàng hóa</span>
+          <button class="btn btn-green btn-sm" onclick="soAddSOLine()">+ Thêm dòng</button>
+        </div>
+        <div style="overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">
+            <thead><tr style="background:var(--bg2)">
+              <th style="padding:6px 8px;text-align:left">Hàng hóa / Dịch vụ *</th>
+              <th style="padding:6px 8px;text-align:right;width:60px">SL</th>
+              <th style="padding:6px 8px;text-align:center;width:50px">ĐVT</th>
+              <th style="padding:6px 8px;text-align:right;width:100px">Đơn giá</th>
+              <th style="padding:6px 8px;text-align:right;width:55px">CK%</th>
+              <th style="padding:6px 8px;text-align:right;width:55px">Thuế%</th>
+              <th style="padding:6px 8px;text-align:right;width:95px">Thành tiền</th>
+              <th style="padding:6px 8px;width:28px"></th>
+            </tr></thead>
+            <tbody id="so-line-tbody"></tbody>
+          </table>
+        </div>
+        <div id="so-empty-lines" style="text-align:center;padding:20px;color:var(--muted);font-size:12px">Chưa có hàng hóa — bấm <strong>+ Thêm dòng</strong></div>
+      </div>
+
+      <!-- S4: Payment summary -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">④ Thanh toán</div>
+        <div style="display:flex;justify-content:flex-end">
+          <div style="width:320px">
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="color:var(--muted)">Subtotal</span><span id="so-subtotal" style="font-weight:700">0₫</span></div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px">
+              <span style="color:var(--muted)">Chiết khấu (%)</span>
+              <input type="number" id="so-discount-pct" min="0" max="100" value="0" oninput="soCalcSOTotals()" style="width:60px;text-align:right;padding:3px 6px;border:1px solid var(--border);border-radius:4px;font-size:12px"/>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="color:var(--muted)">Thuế (từ từng dòng)</span><span id="so-tax-total" style="color:var(--muted)">0₫</span></div>
+            <div style="display:flex;justify-content:space-between;padding:8px 10px;background:#EBF5FB;border-radius:8px;margin-top:6px">
+              <span style="font-size:14px;font-weight:800;color:#1A5276">Tổng đơn hàng</span>
+              <span style="font-size:20px;font-weight:800;color:#1A5276" id="so-grand-total">0₫</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;font-size:13px">
+              <span style="color:var(--muted)">Đặt cọc (₫)</span>
+              <input type="number" id="so-deposit" min="0" value="0" oninput="soCalcSOTotals()" style="width:120px;text-align:right;padding:4px 8px;border:1px solid var(--border);border-radius:4px;font-size:12px"/>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:6px 10px;background:#EAFAF1;border-radius:8px">
+              <span style="font-size:13px;color:#1E8449;font-weight:700">Còn lại</span>
+              <span style="font-size:16px;font-weight:800;color:#1E8449" id="so-remaining">0₫</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- S5: Execution -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
+          <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">⑤ Thực hiện</div>
+          <div class="fg" style="margin-bottom:8px"><label>Team phụ trách</label><input id="so-team" placeholder="VD: Nhóm sản xuất A..." style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box"/></div>
+          <div class="form-row">
+            <div class="fg"><label>Ngày bắt đầu</label><input id="so-start-date" type="date" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box"/></div>
+            <div class="fg"><label>Deadline</label><input id="so-due-date" type="date" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;box-sizing:border-box"/></div>
+          </div>
+          <div class="fg"><label>Tiến độ (<span id="so-progress-label">0</span>%)</label>
+            <input type="range" id="so-progress" min="0" max="100" value="0" oninput="document.getElementById('so-progress-label').textContent=this.value" style="width:100%"/>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
+          <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">⑥ Ghi chú</div>
+          <div class="fg" style="margin-bottom:8px"><label>Ghi chú nội bộ</label><textarea id="so-internal-note" rows="3" placeholder="Ghi chú nội bộ..." style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;width:100%;resize:vertical;box-sizing:border-box"></textarea></div>
+        </div>
+      </div>
+
+      <!-- Activities timeline -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:16px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border)">
+          <span style="font-size:13px;font-weight:700;color:var(--brown)">⑦ Timeline hoạt động</span>
+          <button class="btn btn-ghost btn-sm" onclick="soAddActivity()" style="font-size:11px">+ Ghi chú</button>
+        </div>
+        <div id="so-activity-list" style="max-height:200px;overflow-y:auto">
+          <div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Chưa có hoạt động nào</div>
+        </div>
+      </div>
+    </div><!-- end padding -->
+    <input type="hidden" id="so-edit-id" value=""/>
+    <input type="hidden" id="so-quotation-id" value=""/>
+  </div>
+</div>
+
 <div class="page" id="page-expenses">
 
   <!-- HEADER -->
@@ -4353,7 +4640,7 @@ const sbUpsert = async (t,d)=> {
 // ══════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════
-let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[],transactions:[]};
+let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[],transactions:[],quotations:[],salesOrders:[],soActivities:[]};
 let cfg = {tgToken:'',tgChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',accPhone:'0984830303',gsUrl:'https://script.google.com/macros/s/AKfycbxA0oXtRRa-l_pA-H8HbnmvvUHp9Aw7xNVV_Xfz3ixXT_QDJ4q1E795XIF-4ntDnMrq/exec'};
 let cart=[], invoice=null, selectedStudentId=null, stFilter='all', tgLog=[];
 
@@ -4424,7 +4711,7 @@ async function boot(){
     // ── NHÓM 2: Data phụ — load ngầm sau khi UI đã hiện ──
     setTimeout(async()=>{
       try{
-        const [inventory,products,courses,customers,stockLog,recipes,employees,attendance,production,suppliers,purchaseOrders,approvalQueue,crmTasksRaw,crmStagesRaw,journalRaw,salaryRaw] = await Promise.all([
+        const [inventory,products,courses,customers,stockLog,recipes,employees,attendance,production,suppliers,purchaseOrders,approvalQueue,crmTasksRaw,crmStagesRaw,journalRaw,salaryRaw,quotationsRaw,salesOrdersRaw,soActivitiesRaw] = await Promise.all([
           sbGet('inventory','?order=created_at.asc'),
           sbGet('products','?order=created_at.asc'),
           sbGet('courses','?order=created_at.asc'),
@@ -4441,6 +4728,9 @@ async function boot(){
           sbGet('salary_records','?order=month.desc&limit=200').catch(()=>[]),
           sbGet('attendance','?order=month.asc').catch(()=>[]),
           sbGet('production_orders','?order=created_at.desc&limit=100').catch(()=>[]),
+          sbGet('quotations','?order=created_at.desc&limit=100').catch(()=>[]),
+          sbGet('sales_orders','?order=created_at.desc&limit=100').catch(()=>[]),
+          sbGet('so_activities','?order=created_at.desc&limit=200').catch(()=>[]),
         ]);
 
         D.inventory = inventory&&inventory.length ? inventory : DEFAULTS.inventory;
@@ -4454,9 +4744,9 @@ async function boot(){
         D.purchaseOrders = purchaseOrders||[];
         D.approvalQueue = approvalQueue||[];
         updateApprovalBadge();
-        updatePOBadge();
-        // Deep-link: nếu URL có ?po= thì navigate sau khi data đã sẵn
-        poHandleDeepLink();
+        D.quotations   = quotationsRaw||[];
+        D.salesOrders  = salesOrdersRaw||[];
+        D.soActivities = soActivitiesRaw||[];
         // CRM from Supabase — fallback to localStorage
         try {
           const rawTasks = crmTasksRaw?.[0]?.data;
@@ -14191,10 +14481,12 @@ function crmTab(el, tab) {
   _crmTab = tab;
   document.querySelectorAll('#page-crm .tab').forEach(t=>t.classList.remove('active'));
   if(el) el.classList.add('active');
-  ['pipeline','tasks','segments','history'].forEach(t => {
+  ['pipeline','quotations','so','tasks','segments','history'].forEach(t => {
     const p = document.getElementById('crm-panel-'+t);
     if(p) p.style.display = t===tab?'':'none';
   });
+  if(tab==='quotations') soRenderQuotations();
+  if(tab==='so') soRenderSOs();
   renderCRM();
 }
 
@@ -14233,6 +14525,25 @@ function renderCRM() {
   if(_crmTab==='tasks') renderCRMTasks();
   if(_crmTab==='segments') renderCRMSegments(customers, orders, inactive, needCare, vips);
   if(_crmTab==='history') renderCRMHistory();
+
+  // SO KPIs
+  const qts = D.quotations||[];
+  const sos = D.salesOrders||[];
+  const today = new Date().toISOString().slice(0,10);
+  const pipelineVal = qts.filter(q=>q.status==='sent').reduce((s,q)=>s+(q.total||0),0);
+  const wonRev = sos.filter(s=>s.status==='completed').reduce((s,o)=>s+(o.total||0),0);
+  const openSOs = sos.filter(s=>!['completed','cancelled'].includes(s.status)).length;
+  const overdue = sos.filter(s=>s.due_date&&s.due_date<today&&!['completed','cancelled'].includes(s.status)).length;
+  const _se2=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  _se2('so-kpi-pipeline', fmt(pipelineVal));
+  _se2('so-kpi-won', fmt(wonRev));
+  _se2('so-kpi-open', openSOs);
+  _se2('so-kpi-overdue', overdue);
+  // Badges
+  const qtPending = qts.filter(q=>q.status==='draft').length;
+  const soPending = sos.filter(s=>s.status==='pending_approval').length;
+  const qtB=document.getElementById('qt-tab-badge');if(qtB){qtB.textContent=qtPending;qtB.style.display=qtPending>0?'inline':'none';}
+  const soB=document.getElementById('so-tab-badge');if(soB){soB.textContent=soPending;soB.style.display=soPending>0?'inline':'none';}
 }
 
 function renderCRMPipeline(customers, orders) {
@@ -14267,10 +14578,15 @@ function renderCRMPipeline(customers, orders) {
 
 function crmMoveStage(customerId, newStage) {
   const stages = loadCRMStages();
+  const prevStage = stages[customerId];
   stages[customerId] = newStage;
   saveCRMStages(stages);
   notify('✅ Đã chuyển sang: '+CRM_STAGES.find(s=>s.id===newStage)?.label);
   renderCRMPipeline(D.customers||[], D.orders||[]);
+  // Auto-create SO khi chuyển sang Won
+  if(newStage==='won' && prevStage!=='won') {
+    soAutoCreateFromWon(customerId);
+  }
 }
 
 function crmShowCustomer(id) {
@@ -14445,8 +14761,602 @@ function crmSendBulk() {
   tgMsg(`📢 *TIN NHẮN HÀNG LOẠT*\n\n${msg}\n\n🕐 ${nowDT()}\n_Trương Dáng Hương Academy_`);
   notify('✅ Đã gửi tin nhắn hàng loạt qua Telegram!');
 }
+
 // ══════════════════════════════════════════════════════════════════
-// MODULE NHÂN SỰ (HR)
+// MODULE SALES ORDER (SO) + QUOTATION
+// ══════════════════════════════════════════════════════════════════
+
+// ── Helpers ──
+let _qtEditId = null;
+let _qtLines  = [];
+let _soEditId = null;
+let _soLines  = [];
+
+function soGenNumber(prefix, list) {
+  const year = new Date().getFullYear();
+  const next = String((list||[]).length + 1).padStart(4,'0');
+  return `${prefix}-${year}-${next}`;
+}
+
+function soFillCustomerSelects() {
+  const opts = '<option value="">— Chọn khách hàng —</option>' +
+    (D.customers||[]).map(c=>`<option value="${c.id}">${c.name}${c.phone?' — '+c.phone:''}</option>`).join('');
+  ['qt-customer','so-customer'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.innerHTML=opts;
+  });
+}
+
+function soFillCustomerInfo(prefix) {
+  const selId = prefix==='qt'?'qt-customer':'so-customer';
+  const custId = document.getElementById(selId)?.value;
+  if(!custId) return;
+  const c = (D.customers||[]).find(x=>x.id===custId);
+  if(!c) return;
+  if(prefix==='so') {
+    const addr = document.getElementById('so-billing-address');
+    if(addr && !addr.value) addr.value = c.address||'';
+    const del = document.getElementById('so-delivery-address');
+    if(del && !del.value) del.value = c.address||'';
+  }
+}
+
+function soUpdateStatusBadge() {
+  const status = document.getElementById('so-status')?.value||'draft';
+  const badge  = document.getElementById('so-status-badge');
+  if(!badge) return;
+  const map = {
+    draft:'Draft', pending_approval:'⏳ Chờ duyệt', approved:'✅ Đã duyệt',
+    in_progress:'🔄 Đang thực hiện', delivered:'🚚 Đã giao',
+    completed:'✅ Hoàn tất', cancelled:'🚫 Hủy'
+  };
+  const bgMap = {
+    draft:'#f0f0f0', pending_approval:'#FEF9E7', approved:'#EAFAF1',
+    in_progress:'#EBF5FB', delivered:'#FEF5E7', completed:'#EAFAF1', cancelled:'#f0f0f0'
+  };
+  const clrMap = {
+    draft:'#888', pending_approval:'#E67E22', approved:'#1E8449',
+    in_progress:'#1A5276', delivered:'#D35400', completed:'#1E8449', cancelled:'#888'
+  };
+  badge.textContent = map[status]||status;
+  badge.style.background = bgMap[status]||'#f0f0f0';
+  badge.style.color = clrMap[status]||'#888';
+}
+
+// ─────────────────────────────────────────────────────────────────
+// QUOTATION FUNCTIONS
+// ─────────────────────────────────────────────────────────────────
+
+function soRenderQuotations() {
+  const el = document.getElementById('qt-list');
+  if(!el) return;
+  const qts = D.quotations||[];
+  const stCfg = {
+    draft:    {label:'Draft',      bg:'#f0f0f0',  color:'#888'},
+    sent:     {label:'📤 Đã gửi', bg:'#EBF5FB',  color:'#1A5276'},
+    accepted: {label:'✅ Chốt',   bg:'#EAFAF1',  color:'#1E8449'},
+    rejected: {label:'❌ Từ chối',bg:'#FDEDEC',  color:'#E74C3C'},
+    expired:  {label:'⏰ Hết hạn',bg:'#f0f0f0',  color:'#888'},
+  };
+  if(!qts.length) {
+    el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Chưa có báo giá — bấm <strong>+ Tạo báo giá</strong></div>';
+    return;
+  }
+  el.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="background:var(--bg2)">
+      <th style="padding:8px 10px;text-align:left">Mã BG</th>
+      <th style="padding:8px 10px;text-align:left">Khách hàng</th>
+      <th style="padding:8px 10px;text-align:right">Giá trị</th>
+      <th style="padding:8px 10px;text-align:center">Trạng thái</th>
+      <th style="padding:8px 10px;text-align:center">Hết hạn</th>
+      <th style="padding:8px 10px;text-align:center">Sale</th>
+      <th style="padding:8px 10px;text-align:center">Thao tác</th>
+    </tr></thead>
+    <tbody>
+      ${qts.map(q=>{
+        const st=stCfg[q.status]||{label:q.status,bg:'#f0f0f0',color:'#888'};
+        const hasSO=(D.salesOrders||[]).some(s=>s.quotation_id===q.id);
+        return `<tr style="border-bottom:1px solid var(--border)">
+          <td style="padding:8px 10px;font-weight:700;color:#8E44AD">${q.id}</td>
+          <td style="padding:8px 10px">${q.customer_name||'—'}</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:700">${fmt(q.total||0)}</td>
+          <td style="padding:8px 10px;text-align:center"><span style="background:${st.bg};color:${st.color};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700">${st.label}</span></td>
+          <td style="padding:8px 10px;text-align:center;color:var(--muted);font-size:11px">${q.expires_at?new Date(q.expires_at).toLocaleDateString('vi-VN'):'—'}</td>
+          <td style="padding:8px 10px;text-align:center;font-size:11px">${q.owner||'—'}</td>
+          <td style="padding:8px 10px;text-align:center">
+            <div style="display:flex;gap:4px;justify-content:center">
+              <button onclick="soOpenQuotationModal('${q.id}')" class="btn btn-ghost btn-sm" style="font-size:11px">✏️</button>
+              ${q.status==='accepted'&&!hasSO?`<button onclick="soConvertToSO('${q.id}')" class="btn btn-sm" style="background:#1E8449;color:#fff;padding:4px 8px;font-size:11px">→ SO</button>`:''}
+              ${hasSO?`<span style="font-size:10px;color:#1E8449;font-weight:700">SO ✓</span>`:''}
+            </div>
+          </td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table></div>`;
+}
+
+function soOpenQuotationModal(qtId) {
+  soFillCustomerSelects();
+  _qtEditId = qtId||null;
+  _qtLines  = [];
+  const numEl = document.getElementById('qt-modal-id');
+
+  if(_qtEditId) {
+    const qt = (D.quotations||[]).find(q=>q.id===_qtEditId);
+    if(!qt) return;
+    if(numEl) numEl.textContent = qt.id;
+    document.getElementById('qt-edit-id').value = qt.id;
+    document.getElementById('qt-customer').value  = qt.customer_id||'';
+    document.getElementById('qt-owner').value     = qt.owner||'';
+    document.getElementById('qt-status').value    = qt.status||'draft';
+    document.getElementById('qt-discount-pct').value = qt.discount_pct||0;
+    document.getElementById('qt-internal-note').value = qt.internal_note||'';
+    document.getElementById('qt-note').value      = qt.note||'';
+    if(qt.expires_at) document.getElementById('qt-expires').value = new Date(qt.expires_at).toISOString().slice(0,10);
+    try { _qtLines = JSON.parse(typeof qt.items_json==='string'?qt.items_json:JSON.stringify(qt.items_json||'[]')); } catch(e){_qtLines=[];}
+    const wrap = document.getElementById('qt-convert-wrap');
+    if(wrap) wrap.style.display = qt.status==='accepted'?'':'none';
+  } else {
+    if(numEl) numEl.textContent = soGenNumber('QT', D.quotations);
+    document.getElementById('qt-edit-id').value = '';
+    ['qt-customer','qt-owner','qt-internal-note','qt-note','qt-expires'].forEach(id=>{
+      const el=document.getElementById(id);if(el)el.value='';
+    });
+    document.getElementById('qt-status').value = 'draft';
+    document.getElementById('qt-discount-pct').value = '0';
+    const wrap = document.getElementById('qt-convert-wrap');
+    if(wrap) wrap.style.display='none';
+  }
+  soRenderQtLines();
+  soCalcQtTotals();
+  showM('modal-quotation');
+}
+
+function soAddQtLine() {
+  _qtLines.push({id:'ql_'+Date.now(), name:'', qty:1, unit:'', unit_price:0, discount:0});
+  soRenderQtLines();
+}
+
+function soRemoveQtLine(idx) {
+  _qtLines.splice(idx,1);
+  soRenderQtLines();
+  soCalcQtTotals();
+}
+
+function soRenderQtLines() {
+  const tbody = document.getElementById('qt-line-tbody');
+  if(!tbody) return;
+  tbody.innerHTML = _qtLines.map((l,i)=>`
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:4px 6px"><input value="${l.name||''}" oninput="_qtLines[${i}].name=this.value" placeholder="Tên sản phẩm / dịch vụ..." style="width:100%;border:1px solid var(--border);border-radius:4px;padding:5px 7px;font-size:12px;font-family:inherit;box-sizing:border-box"/></td>
+      <td style="padding:4px 6px"><input type="number" value="${l.qty}" min="0" oninput="_qtLines[${i}].qty=+this.value;soCalcQtTotals()" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:5px 4px;font-size:12px;text-align:right"/></td>
+      <td style="padding:4px 6px"><input value="${l.unit||''}" oninput="_qtLines[${i}].unit=this.value" placeholder="cái" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:5px 4px;font-size:12px;text-align:center"/></td>
+      <td style="padding:4px 6px"><input type="number" value="${l.unit_price}" min="0" oninput="_qtLines[${i}].unit_price=+this.value;soCalcQtTotals()" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:5px 4px;font-size:12px;text-align:right"/></td>
+      <td style="padding:4px 6px"><input type="number" value="${l.discount||0}" min="0" max="100" oninput="_qtLines[${i}].discount=+this.value;soCalcQtTotals()" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:5px 4px;font-size:12px;text-align:right"/></td>
+      <td style="padding:4px 6px;text-align:right;font-weight:700;font-size:12px" id="qt-line-total-${i}">${fmt(l.qty*(l.unit_price||0)*(1-(l.discount||0)/100))}</td>
+      <td style="padding:4px 4px;text-align:center"><button onclick="soRemoveQtLine(${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px">✕</button></td>
+    </tr>`).join('');
+}
+
+function soCalcQtTotals() {
+  const subtotal = _qtLines.reduce((s,l)=>s+l.qty*(l.unit_price||0)*(1-(l.discount||0)/100),0);
+  const discPct  = +(document.getElementById('qt-discount-pct')?.value)||0;
+  const total    = Math.round(subtotal*(1-discPct/100));
+  const setEl=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  setEl('qt-subtotal', fmt(Math.round(subtotal)));
+  setEl('qt-total',    fmt(total));
+  _qtLines.forEach((_,i)=>{
+    const l=_qtLines[i];
+    const el=document.getElementById('qt-line-total-'+i);
+    if(el) el.textContent=fmt(Math.round(l.qty*(l.unit_price||0)*(1-(l.discount||0)/100)));
+  });
+}
+
+async function soSaveQuotation(submitStatus) {
+  const custId   = document.getElementById('qt-customer')?.value;
+  const editIdEl = document.getElementById('qt-edit-id')?.value;
+  if(!custId) { notify('Chọn khách hàng trước!',false); return; }
+  if(!_qtLines.length) { notify('Thêm ít nhất 1 dòng hàng hóa!',false); return; }
+  const cust     = (D.customers||[]).find(c=>c.id===custId);
+  const discPct  = +(document.getElementById('qt-discount-pct')?.value)||0;
+  const subtotal = _qtLines.reduce((s,l)=>s+l.qty*(l.unit_price||0)*(1-(l.discount||0)/100),0);
+  const total    = Math.round(subtotal*(1-discPct/100));
+  const expiresVal = document.getElementById('qt-expires')?.value;
+  const qt = {
+    id: editIdEl || soGenNumber('QT', D.quotations),
+    customer_id:   custId,
+    customer_name: cust?.name||'',
+    owner:         document.getElementById('qt-owner')?.value||AUTH_CURRENT?.name||'',
+    status:        submitStatus==='sent'?'sent':(document.getElementById('qt-status')?.value||'draft'),
+    discount_pct:  discPct,
+    subtotal:      Math.round(subtotal),
+    total,
+    items_json:    JSON.stringify(_qtLines),
+    internal_note: document.getElementById('qt-internal-note')?.value||'',
+    note:          document.getElementById('qt-note')?.value||'',
+    expires_at:    expiresVal ? new Date(expiresVal).getTime() : null,
+    created_at:    editIdEl ? ((D.quotations||[]).find(q=>q.id===editIdEl)?.created_at||Date.now()) : Date.now(),
+    updated_at:    Date.now()
+  };
+  try {
+    await sbUpsert('quotations', qt);
+    const idx = D.quotations.findIndex(q=>q.id===qt.id);
+    if(idx>=0) D.quotations[idx]=qt; else D.quotations.push(qt);
+    if(submitStatus==='sent') {
+      tgMsg(`💬 *Báo giá mới gửi khách*\n\n🆔 ${qt.id}\n👤 Khách: ${qt.customer_name}\n💰 Tổng: ${fmt(total)}₫\n📅 HH: ${expiresVal||'—'}\n👤 Sale: ${qt.owner}\n\n_Trương Dáng Hương Academy_`);
+    }
+    auditLog(editIdEl?'update':'create','quotation',`${editIdEl?'Cập nhật':'Tạo'} BG ${qt.id} — ${qt.customer_name} — ${fmt(total)}₫`);
+    closeM('modal-quotation');
+    soRenderQuotations();
+    renderCRM();
+    notify(`✅ Đã ${submitStatus==='sent'?'gửi':'lưu'} báo giá ${qt.id}`);
+  } catch(e){ notify('Lỗi lưu báo giá: '+e.message,false); }
+}
+
+// ─────────────────────────────────────────────────────────────────
+// SALES ORDER FUNCTIONS
+// ─────────────────────────────────────────────────────────────────
+
+function soRenderSOs() {
+  const el = document.getElementById('so-list');
+  if(!el) return;
+  const sos = D.salesOrders||[];
+  const today = new Date().toISOString().slice(0,10);
+  const stCfg = {
+    draft:            {label:'Draft',            bg:'#f0f0f0',color:'#888'},
+    pending_approval: {label:'⏳ Chờ duyệt',    bg:'#FEF9E7',color:'#E67E22'},
+    approved:         {label:'✅ Đã duyệt',     bg:'#EAFAF1',color:'#1E8449'},
+    in_progress:      {label:'🔄 Đang thực hiện',bg:'#EBF5FB',color:'#1A5276'},
+    delivered:        {label:'🚚 Đã giao',      bg:'#FEF5E7',color:'#D35400'},
+    completed:        {label:'✅ Hoàn tất',     bg:'#EAFAF1',color:'#1E8449'},
+    cancelled:        {label:'🚫 Hủy',          bg:'#f0f0f0',color:'#888'},
+  };
+  if(!sos.length) {
+    el.innerHTML='<div style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Chưa có Sales Order — khi khách chốt báo giá sẽ tự tạo SO</div>';
+    return;
+  }
+  el.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px">
+    <thead><tr style="background:var(--bg2)">
+      <th style="padding:8px 10px;text-align:left">SO Number</th>
+      <th style="padding:8px 10px;text-align:left">Khách hàng</th>
+      <th style="padding:8px 10px;text-align:right">Giá trị</th>
+      <th style="padding:8px 10px;text-align:center">Trạng thái</th>
+      <th style="padding:8px 10px;text-align:center">Thanh toán</th>
+      <th style="padding:8px 10px;text-align:center">Deadline</th>
+      <th style="padding:8px 10px;text-align:center">Tiến độ</th>
+      <th style="padding:8px 10px;text-align:center">Thao tác</th>
+    </tr></thead>
+    <tbody>
+      ${sos.map(so=>{
+        const st=stCfg[so.status]||{label:so.status,bg:'#f0f0f0',color:'#888'};
+        const overdue=so.due_date&&so.due_date<today&&!['completed','cancelled'].includes(so.status);
+        const ptColor=so.payment_status==='paid'?'#1E8449':so.payment_status==='partial'?'#E67E22':'#888';
+        const ptLabel=so.payment_status==='paid'?'💰 Đã TT':so.payment_status==='partial'?'⚠️ Một phần':'❌ Chưa TT';
+        const role=AUTH_CURRENT?.role||'';
+        const canApprove=role==='admin'&&so.status==='pending_approval';
+        return `<tr style="border-bottom:1px solid var(--border);${overdue?'background:#FFF5F5;':'' }">
+          <td style="padding:8px 10px;font-weight:700;color:#1A5276">${so.so_number||so.id}${overdue?'<span style="font-size:9px;background:#E74C3C;color:#fff;border-radius:4px;padding:1px 4px;margin-left:4px">Quá hạn</span>':''}</td>
+          <td style="padding:8px 10px">${so.customer_name||'—'}</td>
+          <td style="padding:8px 10px;text-align:right;font-weight:700">${fmt(so.total||0)}</td>
+          <td style="padding:8px 10px;text-align:center"><span style="background:${st.bg};color:${st.color};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap">${st.label}</span></td>
+          <td style="padding:8px 10px;text-align:center;font-size:11px;font-weight:600;color:${ptColor}">${ptLabel}</td>
+          <td style="padding:8px 10px;text-align:center;color:${overdue?'#E74C3C':'var(--muted)'};font-size:11px">${so.due_date||'—'}</td>
+          <td style="padding:8px 10px;text-align:center">
+            <div style="background:var(--bg2);border-radius:4px;height:6px;width:60px;margin:0 auto">
+              <div style="background:#1A5276;width:${so.progress_pct||0}%;height:100%;border-radius:4px"></div>
+            </div>
+            <div style="font-size:10px;color:var(--muted);text-align:center">${so.progress_pct||0}%</div>
+          </td>
+          <td style="padding:8px 10px;text-align:center">
+            <div style="display:flex;gap:4px;justify-content:center">
+              <button onclick="soOpenSOModal('${so.id}')" class="btn btn-ghost btn-sm" style="font-size:11px">✏️ Xem</button>
+              ${canApprove?`<button onclick="soApproveAction('${so.id}','approve')" class="btn btn-sm" style="background:#27ae60;color:#fff;padding:4px 8px;font-size:11px">✅ Duyệt</button>
+              <button onclick="soApproveAction('${so.id}','reject')" class="btn btn-sm" style="background:#c0392b;color:#fff;padding:4px 8px;font-size:11px">❌</button>`:''}
+            </div>
+          </td>
+        </tr>`;
+      }).join('')}
+    </tbody>
+  </table></div>`;
+}
+
+function soOpenSOModal(soId) {
+  soFillCustomerSelects();
+  _soEditId = soId||null;
+  _soLines  = [];
+  const numEl = document.getElementById('so-modal-number');
+
+  if(_soEditId) {
+    const so = (D.salesOrders||[]).find(s=>s.id===_soEditId);
+    if(!so) return;
+    if(numEl) numEl.textContent = so.so_number||so.id;
+    document.getElementById('so-edit-id').value       = so.id;
+    document.getElementById('so-quotation-id').value  = so.quotation_id||'';
+    document.getElementById('so-number').value        = so.so_number||so.id;
+    document.getElementById('so-date').value          = so.date||'';
+    document.getElementById('so-status').value        = so.status||'draft';
+    document.getElementById('so-owner').value         = so.owner||'';
+    document.getElementById('so-branch').value        = so.branch||'main';
+    document.getElementById('so-customer').value      = so.customer_id||'';
+    document.getElementById('so-contact').value       = so.contact||'';
+    document.getElementById('so-billing-address').value  = so.billing_address||'';
+    document.getElementById('so-delivery-address').value = so.delivery_address||'';
+    document.getElementById('so-payment-terms').value = so.payment_terms||'immediate';
+    document.getElementById('so-tax-code').value      = so.tax_code||'';
+    document.getElementById('so-discount-pct').value  = so.discount_pct||0;
+    document.getElementById('so-deposit').value       = so.deposit||0;
+    document.getElementById('so-team').value          = so.assigned_team||'';
+    document.getElementById('so-start-date').value    = so.start_date||'';
+    document.getElementById('so-due-date').value      = so.due_date||'';
+    document.getElementById('so-progress').value      = so.progress_pct||0;
+    document.getElementById('so-progress-label').textContent = so.progress_pct||0;
+    document.getElementById('so-internal-note').value = so.internal_note||'';
+    try { _soLines = JSON.parse(typeof so.items_json==='string'?so.items_json:JSON.stringify(so.items_json||'[]')); } catch(e){_soLines=[];}
+    soRenderActivityList(so.id);
+  } else {
+    if(numEl) numEl.textContent = soGenNumber('SO', D.salesOrders);
+    document.getElementById('so-edit-id').value = '';
+    document.getElementById('so-quotation-id').value = '';
+    document.getElementById('so-number').value = soGenNumber('SO', D.salesOrders);
+    document.getElementById('so-date').value = new Date().toISOString().slice(0,10);
+    document.getElementById('so-status').value = 'draft';
+    document.getElementById('so-owner').value = AUTH_CURRENT?.name||'';
+    ['so-contact','so-billing-address','so-delivery-address','so-tax-code','so-team','so-start-date','so-due-date','so-internal-note'].forEach(id=>{
+      const el=document.getElementById(id);if(el)el.value='';
+    });
+    document.getElementById('so-branch').value='main';
+    document.getElementById('so-payment-terms').value='immediate';
+    document.getElementById('so-discount-pct').value='0';
+    document.getElementById('so-deposit').value='0';
+    document.getElementById('so-progress').value='0';
+    document.getElementById('so-progress-label').textContent='0';
+    const actEl=document.getElementById('so-activity-list');
+    if(actEl) actEl.innerHTML='<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Chưa có hoạt động</div>';
+  }
+  soRenderSOLines();
+  soCalcSOTotals();
+  soUpdateStatusBadge();
+  showM('modal-so');
+}
+
+function soAddSOLine() {
+  _soLines.push({id:'sl_'+Date.now(), name:'', qty:1, unit:'', unit_price:0, discount:0, tax_rate:0});
+  soRenderSOLines();
+  document.getElementById('so-empty-lines').style.display='none';
+}
+
+function soRemoveSOLine(idx) {
+  _soLines.splice(idx,1);
+  soRenderSOLines();
+  soCalcSOTotals();
+  if(!_soLines.length) document.getElementById('so-empty-lines').style.display='';
+}
+
+function soRenderSOLines() {
+  const tbody=document.getElementById('so-line-tbody');
+  if(!tbody) return;
+  tbody.innerHTML=_soLines.map((l,i)=>`
+    <tr style="border-bottom:1px solid var(--border)">
+      <td style="padding:4px 6px"><input value="${l.name||''}" oninput="_soLines[${i}].name=this.value" placeholder="Tên hàng hóa / dịch vụ" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:5px 7px;font-size:12px;font-family:inherit;box-sizing:border-box"/></td>
+      <td style="padding:4px 4px"><input type="number" value="${l.qty}" min="0" oninput="_soLines[${i}].qty=+this.value;soCalcSOTotals()" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:5px 4px;font-size:12px;text-align:right"/></td>
+      <td style="padding:4px 4px"><input value="${l.unit||''}" oninput="_soLines[${i}].unit=this.value" placeholder="cái" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:5px 4px;font-size:12px;text-align:center"/></td>
+      <td style="padding:4px 4px"><input type="number" value="${l.unit_price}" min="0" oninput="_soLines[${i}].unit_price=+this.value;soCalcSOTotals()" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:5px 4px;font-size:12px;text-align:right"/></td>
+      <td style="padding:4px 4px"><input type="number" value="${l.discount||0}" min="0" max="100" oninput="_soLines[${i}].discount=+this.value;soCalcSOTotals()" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:5px 4px;font-size:12px;text-align:right"/></td>
+      <td style="padding:4px 4px"><input type="number" value="${l.tax_rate||0}" min="0" max="100" oninput="_soLines[${i}].tax_rate=+this.value;soCalcSOTotals()" style="width:100%;border:1px solid var(--border);border-radius:4px;padding:5px 4px;font-size:12px;text-align:right"/></td>
+      <td style="padding:4px 6px;text-align:right;font-weight:700;font-size:12px" id="so-line-total-${i}">${fmt(Math.round(l.qty*(l.unit_price||0)*(1-(l.discount||0)/100)))}</td>
+      <td style="padding:4px 4px;text-align:center"><button onclick="soRemoveSOLine(${i})" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px">✕</button></td>
+    </tr>`).join('');
+  if(_soLines.length) document.getElementById('so-empty-lines').style.display='none';
+}
+
+function soCalcSOTotals() {
+  const subtotal = _soLines.reduce((s,l)=>s+l.qty*(l.unit_price||0)*(1-(l.discount||0)/100),0);
+  const taxTotal = _soLines.reduce((s,l)=>{const b=l.qty*(l.unit_price||0)*(1-(l.discount||0)/100);return s+b*(l.tax_rate||0)/100;},0);
+  const discPct  = +(document.getElementById('so-discount-pct')?.value)||0;
+  const discAmt  = Math.round(subtotal*discPct/100);
+  const total    = Math.round(subtotal-discAmt+taxTotal);
+  const deposit  = +(document.getElementById('so-deposit')?.value)||0;
+  const remaining= Math.max(0, total-deposit);
+  const se=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
+  se('so-subtotal',  fmt(Math.round(subtotal)));
+  se('so-tax-total', fmt(Math.round(taxTotal)));
+  se('so-grand-total',fmt(total));
+  se('so-remaining', fmt(remaining));
+  _soLines.forEach((_,i)=>{
+    const l=_soLines[i];
+    const el=document.getElementById('so-line-total-'+i);
+    if(el) el.textContent=fmt(Math.round(l.qty*(l.unit_price||0)*(1-(l.discount||0)/100)));
+  });
+}
+
+async function soSaveSO(submitStatus) {
+  const custId  = document.getElementById('so-customer')?.value;
+  const editId  = document.getElementById('so-edit-id')?.value;
+  if(!custId){ notify('Chọn khách hàng trước!',false); return; }
+  const cust    = (D.customers||[]).find(c=>c.id===custId);
+  const discPct = +(document.getElementById('so-discount-pct')?.value)||0;
+  const subtotal= _soLines.reduce((s,l)=>s+l.qty*(l.unit_price||0)*(1-(l.discount||0)/100),0);
+  const taxTotal= _soLines.reduce((s,l)=>{const b=l.qty*(l.unit_price||0)*(1-(l.discount||0)/100);return s+b*(l.tax_rate||0)/100;},0);
+  const discAmt = Math.round(subtotal*discPct/100);
+  const total   = Math.round(subtotal-discAmt+taxTotal);
+  const deposit = +(document.getElementById('so-deposit')?.value)||0;
+  const soNumber= document.getElementById('so-number')?.value || soGenNumber('SO', D.salesOrders);
+  const status  = submitStatus==='pending_approval'?'pending_approval':(document.getElementById('so-status')?.value||'draft');
+
+  const so = {
+    id:              editId||uid(),
+    so_number:       soNumber,
+    customer_id:     custId,
+    customer_name:   cust?.name||'',
+    quotation_id:    document.getElementById('so-quotation-id')?.value||'',
+    owner:           document.getElementById('so-owner')?.value||AUTH_CURRENT?.name||'',
+    status,
+    branch:          document.getElementById('so-branch')?.value||'main',
+    currency:        'VND',
+    subtotal:        Math.round(subtotal),
+    discount_pct:    discPct,
+    discount_amt:    discAmt,
+    tax_amt:         Math.round(taxTotal),
+    total,
+    deposit,
+    paid:            editId?((D.salesOrders||[]).find(s=>s.id===editId)?.paid||0):0,
+    payment_status:  deposit>=total?'paid':deposit>0?'partial':'unpaid',
+    payment_terms:   document.getElementById('so-payment-terms')?.value||'immediate',
+    billing_address: document.getElementById('so-billing-address')?.value||'',
+    delivery_address:document.getElementById('so-delivery-address')?.value||'',
+    tax_code:        document.getElementById('so-tax-code')?.value||'',
+    contact:         document.getElementById('so-contact')?.value||'',
+    items_json:      JSON.stringify(_soLines),
+    assigned_team:   document.getElementById('so-team')?.value||'',
+    start_date:      document.getElementById('so-start-date')?.value||'',
+    due_date:        document.getElementById('so-due-date')?.value||'',
+    progress_pct:    +(document.getElementById('so-progress')?.value)||0,
+    internal_note:   document.getElementById('so-internal-note')?.value||'',
+    date:            document.getElementById('so-date')?.value||new Date().toISOString().slice(0,10),
+    created_at:      editId?((D.salesOrders||[]).find(s=>s.id===editId)?.created_at||Date.now()):Date.now(),
+    updated_at:      Date.now(),
+    created_by:      AUTH_CURRENT?.name||''
+  };
+
+  try {
+    await sbUpsert('sales_orders', so);
+    const idx=(D.salesOrders||[]).findIndex(s=>s.id===so.id);
+    if(idx>=0) D.salesOrders[idx]=so; else D.salesOrders.push(so);
+    if(submitStatus==='pending_approval') {
+      const appUrl=window.location.origin+window.location.pathname+'?so='+so.id;
+      tgMsg(`📦 *SO mới cần duyệt!*\n\n🆔 ${so.so_number}\n👤 Khách: ${so.customer_name}\n💰 Tổng: ${fmt(total)}₫\n👤 Sale: ${so.owner}\n\n🔗 ${appUrl}\n\n_Trương Dáng Hương Academy_`);
+    }
+    auditLog(editId?'update':'create','sales_order',`${editId?'Cập nhật':'Tạo'} SO ${so.so_number} — ${so.customer_name} — ${fmt(total)}₫`);
+    closeM('modal-so');
+    soRenderSOs();
+    renderCRM();
+    notify(`✅ Đã lưu SO ${so.so_number}`);
+  } catch(e){ notify('Lỗi lưu SO: '+e.message,false); }
+}
+
+async function soApproveAction(soId, action) {
+  const so=(D.salesOrders||[]).find(s=>s.id===soId);
+  if(!so) return;
+  const me=AUTH_CURRENT?.name||AUTH_CURRENT?.user||'';
+  let newStatus, tgNote;
+  if(action==='reject') {
+    const reason=prompt(`❌ Từ chối SO ${so.so_number}\nNhập lý do:`,'');
+    if(reason===null) return;
+    if(!reason.trim()){ notify('Cần nhập lý do!',false); return; }
+    newStatus='draft';
+    tgNote=`❌ *SO bị từ chối*\n🆔 ${so.so_number}\n👤 ${me}\n📝 ${reason.trim()}\n_Trương Dáng Hương Academy_`;
+    so.reject_reason=reason.trim();
+  } else {
+    newStatus='approved';
+    if(!so.start_date) so.start_date=new Date().toISOString().slice(0,10);
+    tgNote=`✅ *SO đã được duyệt!*\n🆔 ${so.so_number}\n👤 Khách: ${so.customer_name}\n💰 ${fmt(so.total)}₫\n👤 Duyệt bởi: ${me}\n\n✅ Sale có thể bắt đầu thực hiện!\n_Trương Dáng Hương Academy_`;
+  }
+  const updated={...so,status:newStatus,updated_at:Date.now()};
+  try {
+    await sbUpsert('sales_orders',updated);
+    const idx=(D.salesOrders||[]).findIndex(s=>s.id===soId);
+    if(idx>=0) D.salesOrders[idx]=updated;
+    tgMsg(tgNote);
+    auditLog(action==='reject'?'reject':'approve','sales_order',`${action==='reject'?'Từ chối':'Duyệt'} SO ${so.so_number} (${me})`);
+    soRenderSOs();
+    renderCRM();
+    notify(action==='reject'?`❌ Đã từ chối SO ${so.so_number}`:`✅ Đã duyệt SO ${so.so_number}`);
+  } catch(e){ notify('Lỗi: '+e.message,false); }
+}
+
+async function soConvertToSO(qtId) {
+  const qt=(D.quotations||[]).find(q=>q.id===qtId);
+  if(!qt){ notify('Không tìm thấy báo giá!',false); return; }
+  if((D.salesOrders||[]).some(s=>s.quotation_id===qtId)){
+    notify('Báo giá này đã có SO rồi!',false); return;
+  }
+  // Update quotation status → accepted
+  qt.status='accepted'; qt.updated_at=Date.now();
+  await sbUpsert('quotations',qt);
+  const idx=(D.quotations||[]).findIndex(q=>q.id===qtId);
+  if(idx>=0) D.quotations[idx]=qt;
+  // Pre-fill SO modal from quotation
+  _soEditId=null;
+  try { _soLines=JSON.parse(typeof qt.items_json==='string'?qt.items_json:JSON.stringify(qt.items_json||'[]')); } catch(e){_soLines=[];}
+  closeM('modal-quotation');
+  soFillCustomerSelects();
+  const soNumber=soGenNumber('SO',D.salesOrders);
+  document.getElementById('so-number').value        = soNumber;
+  document.getElementById('so-modal-number').textContent = soNumber;
+  document.getElementById('so-customer').value      = qt.customer_id||'';
+  document.getElementById('so-owner').value         = qt.owner||AUTH_CURRENT?.name||'';
+  document.getElementById('so-date').value          = new Date().toISOString().slice(0,10);
+  document.getElementById('so-status').value        = 'draft';
+  document.getElementById('so-quotation-id').value  = qt.id;
+  document.getElementById('so-edit-id').value       = '';
+  document.getElementById('so-discount-pct').value  = qt.discount_pct||0;
+  ['so-contact','so-billing-address','so-delivery-address','so-tax-code','so-team','so-start-date','so-due-date','so-internal-note'].forEach(id=>{
+    const el=document.getElementById(id);if(el)el.value='';
+  });
+  document.getElementById('so-deposit').value='0';
+  document.getElementById('so-progress').value='0';
+  document.getElementById('so-progress-label').textContent='0';
+  soFillCustomerInfo('so');
+  soRenderSOLines();
+  soCalcSOTotals();
+  soUpdateStatusBadge();
+  const actEl=document.getElementById('so-activity-list');
+  if(actEl) actEl.innerHTML='<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Chưa có hoạt động</div>';
+  showM('modal-so');
+  notify(`✅ Đã tạo SO từ báo giá ${qtId} — kiểm tra và lưu lại`);
+}
+
+async function soAutoCreateFromWon(customerId) {
+  const cust=(D.customers||[]).find(c=>c.id===customerId);
+  if(!cust) return;
+  // Tìm quotation accepted mới nhất của khách này
+  const qt=(D.quotations||[])
+    .filter(q=>q.customer_id===customerId&&q.status==='sent')
+    .sort((a,b)=>(b.created_at||0)-(a.created_at||0))[0];
+  if(qt) {
+    await soConvertToSO(qt.id);
+  } else {
+    // Không có quotation → mở SO trống
+    soOpenSOModal();
+    document.getElementById('so-customer').value=customerId;
+    soFillCustomerInfo('so');
+    notify(`🎉 Deal won! Điền thông tin SO cho ${cust.name}`);
+  }
+}
+
+function soRenderActivityList(soId) {
+  const el=document.getElementById('so-activity-list');
+  if(!el) return;
+  const acts=(D.soActivities||[]).filter(a=>a.so_id===soId).sort((a,b)=>(b.created_at||0)-(a.created_at||0));
+  if(!acts.length){ el.innerHTML='<div style="text-align:center;padding:16px;color:var(--muted);font-size:12px">Chưa có hoạt động</div>'; return; }
+  const iconMap={call:'📞',email:'✉️',meeting:'🤝',note:'📝',task:'✅'};
+  el.innerHTML=acts.map(a=>`
+    <div style="display:flex;gap:10px;padding:8px 0;border-bottom:0.5px solid var(--border)">
+      <div style="width:28px;height:28px;border-radius:50%;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0">${iconMap[a.type]||'📝'}</div>
+      <div style="flex:1">
+        <div style="font-size:12px;font-weight:700">${a.title||a.body||'—'}</div>
+        <div style="font-size:11px;color:var(--muted)">${a.by||'—'} · ${a.time||''}</div>
+      </div>
+    </div>`).join('');
+}
+
+async function soAddActivity() {
+  const soId=document.getElementById('so-edit-id')?.value;
+  if(!soId){ notify('Lưu SO trước khi thêm ghi chú!',false); return; }
+  const body=prompt('Nội dung ghi chú:');
+  if(!body) return;
+  const act={
+    id:uid(), so_id:soId, customer_id:'',
+    type:'note', title:body, body,
+    by:AUTH_CURRENT?.name||'', time:nowDT(), created_at:Date.now()
+  };
+  try {
+    await sbUpsert('so_activities',act);
+    D.soActivities.unshift(act);
+    soRenderActivityList(soId);
+    notify('✅ Đã ghi chú');
+  } catch(e){ notify('Lỗi: '+e.message,false); }
+}
 // ══════════════════════════════════════════════════════════════════
 // HR data — stored in Supabase (D.employees, D.attendance)
 // D.employees: array of employee objects
@@ -15527,8 +16437,7 @@ function openPOModal(poId) {
   poUpdateStatusBadge();
   poRenderLines();
   poCalcTotals();
-  const _curPO = _poEditId ? (D.purchaseOrders||[]).find(p=>p.id===_poEditId) : null;
-  poRenderApprovalFlow(_curPO);
+  poRenderApprovalFlow();
   showM('modal-add-po');
 }
 
@@ -15698,32 +16607,20 @@ function poDeleteLine(i) {
   poCalcTotals();
 }
 
-// ── Approval flow render (3 cấp: Manager → Finance → Admin) ──
-function poRenderApprovalFlow(po) {
+// ── Approval flow render ──
+function poRenderApprovalFlow() {
   const el = document.getElementById('po-approval-flow');
   if(!el) return;
-  const st = po?.status || 'draft';
-  const mgrDone = ['mgr_approved','fin_approved','approved'].includes(st);
-  const mgrWait = st === 'waiting';
-  const finDone = ['fin_approved','approved'].includes(st);
-  const finWait = st === 'mgr_approved';
-  const admDone = st === 'approved';
-  const admWait = st === 'fin_approved';
-  const rejected = st === 'rejected';
   const steps = [
-    {label:'Creator', name: po?.created_by||AUTH_CURRENT?.name||'—', status:'done'},
-    {label:'Manager', name: mgrDone?'Đã duyệt':mgrWait?'Chờ duyệt':rejected?'Từ chối':'Chưa đến',
-      status: mgrDone?'done':mgrWait?'waiting':rejected?'rejected':'pending'},
-    {label:'Finance', name: finDone?'Đã duyệt':finWait?'Chờ duyệt':'Chưa đến',
-      status: finDone?'done':finWait?'waiting':'pending'},
-    {label:'Admin',   name: admDone?'Đã duyệt':admWait?'Chờ duyệt':'Chưa đến',
-      status: admDone?'done':admWait?'waiting':'pending'},
+    {label:'Creator', name: AUTH_CURRENT?.name||'Admin', status:'done'},
+    {label:'Manager', name:'Chờ duyệt', status:'waiting'},
+    {label:'Finance', name:'Chưa đến', status:'pending'},
+    {label:'Final', name:'Chưa đến', status:'pending'},
   ];
   const cfg = {
-    done:     {bg:'#EAFAF1', color:'#1E8449', icon:'✓'},
-    waiting:  {bg:'#FEF9E7', color:'#E67E22', icon:'⏳'},
-    pending:  {bg:'var(--bg2)', color:'var(--muted)', icon:'—'},
-    rejected: {bg:'#FDEDEC', color:'#E74C3C', icon:'✕'},
+    done:    {bg:'#EAFAF1', color:'#1E8449', icon:'✓'},
+    waiting: {bg:'#FEF9E7', color:'#E67E22', icon:'⏳'},
+    pending: {bg:'var(--bg2)', color:'var(--muted)', icon:'—'},
   };
   el.innerHTML = steps.map((s,i)=>`
     <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1">
@@ -15815,14 +16712,12 @@ async function poSave(submitMode) {
     }
 
     if(submitMode==='submit') {
-      const appUrl = window.location.origin + window.location.pathname + '?po=' + po.id;
-      tgMsg(`📋 *PO mới cần duyệt!*\n\n🆔 ${po.id}\n🏭 NCC: ${po.supplier_name}\n📦 Hàng: ${po.items_summary}\n💰 Grand Total: ${fmt(grandTotal)}₫\n📅 Giao: ${po.delivery_date||'—'}\n👤 Tạo bởi: ${po.created_by}\n\n⏳ Manager vui lòng phê duyệt:\n🔗 ${appUrl}\n\n_Trương Dáng Hương Academy_`);
+      tgMsg(`📋 *PO mới cần duyệt!*\n\n🆔 ${po.id}\n🏭 NCC: ${po.supplier_name}\n📦 Hàng: ${po.items_summary}\n💰 Grand Total: ${fmt(grandTotal)}₫\n📅 Giao: ${po.delivery_date||'—'}\n👤 Tạo bởi: ${po.created_by}\n\n⏳ Vui lòng phê duyệt\n_Trương Dáng Hương Academy_`);
     }
 
     auditLog(_poEditId?'update':'create','purchase_order',`${_poEditId?'Cập nhật':'Tạo'} PO ${po.id} — ${po.supplier_name} — ${fmt(grandTotal)}₫`);
     closeM('modal-add-po');
     renderPurchaseOrders();
-    updatePOBadge();
     renderWarehouseDashboard();
     notify(`✅ Đã lưu PO: ${po.id}${submitMode==='submit'?' — Đã gửi duyệt':''}`);
   } catch(e) {
@@ -15833,186 +16728,6 @@ async function poSave(submitMode) {
 // ── Open PO detail (view/edit) ──
 function poOpenDetail(poId) {
   openPOModal(poId);
-}
-
-// ── Render PO list (tab PO) ──
-function renderPurchaseOrders() {
-  const el = document.getElementById('po-list');
-  if(!el) return;
-  const pos = D.purchaseOrders||[];
-  const role = AUTH_CURRENT?.role||'';
-
-  const stCfg = {
-    draft:        {label:'Draft',           bg:'#f0f0f0', color:'#888'},
-    waiting:      {label:'⏳ Chờ Manager',  bg:'#FEF9E7', color:'#E67E22'},
-    mgr_approved: {label:'✅ Manager OK',   bg:'#EBF5FB', color:'#1A5276'},
-    fin_approved: {label:'✅ Finance OK',   bg:'#EAF4FB', color:'#1558A7'},
-    approved:     {label:'✅ Đã duyệt',    bg:'#EAFAF1', color:'#1E8449'},
-    rejected:     {label:'❌ Từ chối',     bg:'#FDEDEC', color:'#E74C3C'},
-    ordered:      {label:'📦 Đã đặt',     bg:'#EBF5FB', color:'#1A5276'},
-    receiving:    {label:'🚚 Đang giao',  bg:'#FEF5E7', color:'#D35400'},
-    completed:    {label:'✅ Hoàn tất',   bg:'#EAFAF1', color:'#1E8449'},
-    cancelled:    {label:'🚫 Hủy',        bg:'#f0f0f0', color:'#888'},
-  };
-
-  if(!pos.length) {
-    el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Chưa có PO nào — bấm <strong>+ Tạo PO</strong> để bắt đầu.</div>';
-    return;
-  }
-
-  // URL param highlight (deep-link)
-  const focusId = new URLSearchParams(window.location.search).get('po');
-
-  el.innerHTML = `<div style="overflow-x:auto">
-    <table style="width:100%;border-collapse:collapse;font-size:12px">
-      <thead><tr style="background:var(--bg2)">
-        <th style="padding:8px 10px;text-align:left">PO Number</th>
-        <th style="padding:8px 10px;text-align:left">NCC</th>
-        <th style="padding:8px 10px;text-align:left">Hàng hóa</th>
-        <th style="padding:8px 10px;text-align:right">Grand Total</th>
-        <th style="padding:8px 10px;text-align:center">Trạng thái</th>
-        <th style="padding:8px 10px;text-align:center">Ngày tạo</th>
-        <th style="padding:8px 10px;text-align:left">Lý do từ chối</th>
-        <th style="padding:8px 10px;text-align:center">Thao tác</th>
-      </tr></thead>
-      <tbody>
-        ${pos.map(po => {
-          const st = stCfg[po.status]||{label:po.status||'—',bg:'#f0f0f0',color:'#888'};
-          const canMgr = (role==='admin'||role==='manager') && po.status==='waiting';
-          const canFin = (role==='admin'||role==='accountant') && po.status==='mgr_approved';
-          const canAdm = role==='admin' && po.status==='fin_approved';
-          const highlighted = focusId && po.id===focusId;
-          const rejectNote = po.reject_reason
-            ? `<span style="font-size:11px;color:#E74C3C">${po.reject_reason}</span>`
-            : '<span style="color:var(--muted)">—</span>';
-          const btns = (canMgr||canFin||canAdm)
-            ? `<div style="display:flex;gap:4px;justify-content:center">
-                 <button onclick="poApproveAction('${po.id}','approve')" class="btn btn-sm" style="background:#27ae60;color:#fff;padding:4px 10px;font-size:11px">✅ Duyệt</button>
-                 <button onclick="poApproveAction('${po.id}','reject')" class="btn btn-sm" style="background:#c0392b;color:#fff;padding:4px 10px;font-size:11px">❌ Từ chối</button>
-               </div>`
-            : `<button onclick="poOpenDetail('${po.id}')" class="btn btn-ghost btn-sm" style="font-size:11px">👁 Xem</button>`;
-          return `<tr id="po-row-${po.id}" style="border-bottom:1px solid var(--border);${highlighted?'background:#FFF9E6;outline:2px solid #E67E22;':''}" >
-            <td style="padding:8px 10px;font-weight:700;color:var(--brand)">${po.id}${highlighted?'<span style="font-size:9px;background:#E67E22;color:#fff;border-radius:4px;padding:1px 5px;margin-left:4px">← đây</span>':''}</td>
-            <td style="padding:8px 10px">${po.supplier_name||'—'}</td>
-            <td style="padding:8px 10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${po.items_summary||'—'}</td>
-            <td style="padding:8px 10px;text-align:right;font-weight:700">${fmt(po.total||0)}</td>
-            <td style="padding:8px 10px;text-align:center">
-              <span style="background:${st.bg};color:${st.color};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap">${st.label}</span>
-            </td>
-            <td style="padding:8px 10px;text-align:center;color:var(--muted);font-size:11px">${(po.created_at||'').slice(0,10)||'—'}</td>
-            <td style="padding:8px 10px">${rejectNote}</td>
-            <td style="padding:8px 10px;text-align:center">${btns}</td>
-          </tr>`;
-        }).join('')}
-      </tbody>
-    </table>
-  </div>`;
-
-  // Auto-scroll to highlighted row
-  if(focusId) {
-    setTimeout(()=>{
-      const row = document.getElementById('po-row-'+focusId);
-      if(row) row.scrollIntoView({behavior:'smooth', block:'center'});
-    }, 200);
-  }
-}
-
-// ── Badge: đếm PO chờ duyệt theo role ──
-function updatePOBadge() {
-  const role = AUTH_CURRENT?.role||'';
-  const pos  = D.purchaseOrders||[];
-
-  // Đếm PO mà user hiện tại có thể/cần duyệt
-  const count = pos.filter(po =>
-    ((role==='admin'||role==='manager')  && po.status==='waiting')      ||
-    ((role==='admin'||role==='accountant') && po.status==='mgr_approved') ||
-    (role==='admin' && po.status==='fin_approved')
-  ).length;
-
-  // Top nav badge
-  const nb = document.getElementById('po-nav-badge');
-  if(nb){ nb.textContent=count; nb.style.display=count>0?'inline':'none'; }
-  // Bottom nav dot
-  const mb = document.getElementById('po-nav-badge-mobile');
-  if(mb){ mb.style.display=count>0?'inline':'none'; }
-  // Tab PO badge
-  const tb = document.getElementById('po-tab-badge');
-  if(tb){ tb.textContent=count; tb.style.display=count>0?'inline':'none'; }
-}
-
-// ── Approve / Reject PO — 3 cấp: Manager → Finance → Admin ──
-async function poApproveAction(poId, action) {
-  const po = (D.purchaseOrders||[]).find(p=>p.id===poId);
-  if(!po) return;
-  const role = AUTH_CURRENT?.role||'';
-  const me   = AUTH_CURRENT?.name||AUTH_CURRENT?.user||'';
-
-  let newStatus, rejectReason='', tgNote='';
-
-  if(action==='reject') {
-    rejectReason = prompt(`❌ Từ chối PO ${poId}\n\nNhập lý do từ chối (bắt buộc):`,'');
-    if(rejectReason===null) return;
-    if(!rejectReason.trim()){ notify('Cần nhập lý do từ chối!',false); return; }
-    newStatus = 'rejected';
-    tgNote = `❌ *PO BỊ TỪ CHỐI*\n\n🆔 ${poId}\n🏭 NCC: ${po.supplier_name||'—'}\n💰 ${fmt(po.total||0)}₫\n👤 Từ chối bởi: ${me}\n📝 Lý do: ${rejectReason.trim()}\n\n_Trương Dáng Hương Academy_`;
-  } else {
-    if(po.status==='waiting'){
-      newStatus='mgr_approved';
-      tgNote=`✅ *Manager đã duyệt PO*\n\n🆔 ${poId}\n🏭 ${po.supplier_name||'—'}\n💰 ${fmt(po.total||0)}₫\n👤 Manager: ${me}\n\n⏭ Tiếp theo: Finance review\n_Trương Dáng Hương Academy_`;
-    } else if(po.status==='mgr_approved'){
-      newStatus='fin_approved';
-      tgNote=`✅ *Finance đã duyệt PO*\n\n🆔 ${poId}\n🏭 ${po.supplier_name||'—'}\n💰 ${fmt(po.total||0)}₫\n👤 Finance: ${me}\n\n⏭ Tiếp theo: Admin phê duyệt cuối\n_Trương Dáng Hương Academy_`;
-    } else if(po.status==='fin_approved'){
-      newStatus='approved';
-      tgNote=`🎉 *PO ĐƯỢC PHÊ DUYỆT ĐẦY ĐỦ (3/3)*\n\n🆔 ${poId}\n🏭 ${po.supplier_name||'—'}\n💰 ${fmt(po.total||0)}₫\n👤 Admin: ${me}\n\n✅ Có thể tiến hành đặt hàng!\n_Trương Dáng Hương Academy_`;
-    } else {
-      notify('PO không ở trạng thái cần duyệt!',false); return;
-    }
-  }
-
-  const updated = {
-    ...po,
-    status: newStatus,
-    reject_reason: action==='reject' ? rejectReason.trim() : '',
-    updated_at: new Date().toISOString()
-  };
-
-  try {
-    await sbUpsert('purchase_orders', updated);
-    const idx = D.purchaseOrders.findIndex(p=>p.id===poId);
-    if(idx>=0) D.purchaseOrders[idx]=updated; else D.purchaseOrders.push(updated);
-    tgMsg(tgNote);
-    auditLog(action==='reject'?'reject':'approve','purchase_order',
-      `${action==='reject'?'Từ chối':'Duyệt'} PO ${poId} (${me}) → ${newStatus}`+
-      (action==='reject'?` | Lý do: ${rejectReason.trim()}`:''));
-    renderPurchaseOrders();
-    updatePOBadge();
-    if(typeof renderWarehouseDashboard==='function') renderWarehouseDashboard();
-    notify(action==='reject'
-      ? `❌ Đã từ chối PO ${poId}`
-      : `✅ Đã duyệt PO ${poId} → ${newStatus}`);
-  } catch(e){
-    notify('Lỗi cập nhật PO: '+e.message,false);
-  }
-}
-
-// ── Deep-link handler: ?po=PO-xxx → tự navigate đến tab PO ──
-function poHandleDeepLink() {
-  const params = new URLSearchParams(window.location.search);
-  const poId   = params.get('po');
-  if(!poId) return;
-  // Navigate: Kho → tab PO
-  const invBtn = document.querySelector('.nav button[onclick*="go(\'inventory\'"]');
-  go('inventory', invBtn);
-  setTimeout(()=>{
-    const tabEl = document.getElementById('inv-tab-po');
-    if(tabEl){ invTab('po', tabEl); renderPurchaseOrders(); }
-    // Scroll đến PO sau khi render xong
-    setTimeout(()=>{
-      const row = document.getElementById('po-row-'+poId);
-      if(row) row.scrollIntoView({behavior:'smooth', block:'center'});
-    }, 400);
-  }, 300);
 }
 
 
@@ -16388,6 +17103,23 @@ CREATE TABLE IF NOT EXISTS audit_log (id TEXT PRIMARY KEY, user_name TEXT DEFAUL
 -- Bảng bút toán kế toán
 CREATE TABLE IF NOT EXISTS journal_entries (id TEXT PRIMARY KEY, date TEXT, ref TEXT, desc TEXT, entries JSONB, created BIGINT, created_by TEXT DEFAULT '');
 
+-- ── CRM / SO module (v5.65) ──
+-- Bảng báo giá
+CREATE TABLE IF NOT EXISTS quotations (id TEXT PRIMARY KEY, customer_id TEXT DEFAULT '', customer_name TEXT DEFAULT '', owner TEXT DEFAULT '', status TEXT DEFAULT 'draft', currency TEXT DEFAULT 'VND', subtotal NUMERIC DEFAULT 0, discount_pct NUMERIC DEFAULT 0, discount_amt NUMERIC DEFAULT 0, total NUMERIC DEFAULT 0, items_json JSONB DEFAULT '[]', note TEXT DEFAULT '', internal_note TEXT DEFAULT '', so_id TEXT DEFAULT '', expires_at BIGINT, created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())*1000, updated_at BIGINT);
+
+-- Bảng Sales Orders
+CREATE TABLE IF NOT EXISTS sales_orders (id TEXT PRIMARY KEY, so_number TEXT DEFAULT '', customer_id TEXT DEFAULT '', customer_name TEXT DEFAULT '', quotation_id TEXT DEFAULT '', owner TEXT DEFAULT '', status TEXT DEFAULT 'draft', branch TEXT DEFAULT 'main', currency TEXT DEFAULT 'VND', subtotal NUMERIC DEFAULT 0, discount_pct NUMERIC DEFAULT 0, discount_amt NUMERIC DEFAULT 0, tax_amt NUMERIC DEFAULT 0, total NUMERIC DEFAULT 0, deposit NUMERIC DEFAULT 0, paid NUMERIC DEFAULT 0, payment_status TEXT DEFAULT 'unpaid', payment_terms TEXT DEFAULT 'immediate', billing_address TEXT DEFAULT '', delivery_address TEXT DEFAULT '', tax_code TEXT DEFAULT '', contact TEXT DEFAULT '', items_json JSONB DEFAULT '[]', assigned_team TEXT DEFAULT '', start_date TEXT DEFAULT '', due_date TEXT DEFAULT '', progress_pct INT DEFAULT 0, internal_note TEXT DEFAULT '', reject_reason TEXT DEFAULT '', date TEXT DEFAULT '', created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())*1000, updated_at BIGINT, created_by TEXT DEFAULT '');
+
+-- Bảng hoạt động SO
+CREATE TABLE IF NOT EXISTS so_activities (id TEXT PRIMARY KEY, so_id TEXT DEFAULT '', customer_id TEXT DEFAULT '', type TEXT DEFAULT 'note', title TEXT DEFAULT '', body TEXT DEFAULT '', by TEXT DEFAULT '', time TEXT DEFAULT '', created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())*1000);
+
+-- Thêm cột vào customers (nếu chưa có)
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS crm_stage TEXT DEFAULT 'new';
+ALTER TABLE customers ADD COLUMN IF NOT EXISTS owner_id TEXT DEFAULT '';
+
+-- Thêm cột so_id vào transactions
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS so_id TEXT DEFAULT '';
+
 -- Enable RLS cho tất cả
 ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
 ALTER TABLE attendance ENABLE ROW LEVEL SECURITY;
@@ -16397,10 +17129,13 @@ ALTER TABLE purchase_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE approval_queue ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE journal_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE quotations ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sales_orders ENABLE ROW LEVEL SECURITY;
+ALTER TABLE so_activities ENABLE ROW LEVEL SECURITY;
 
 -- Policies (allow all cho app nội bộ)
 DO $$ DECLARE t TEXT; BEGIN
-  FOREACH t IN ARRAY ARRAY['employees','attendance','production_orders','suppliers','purchase_orders','approval_queue','audit_log','journal_entries']
+  FOREACH t IN ARRAY ARRAY['employees','attendance','production_orders','suppliers','purchase_orders','approval_queue','audit_log','journal_entries','quotations','sales_orders','so_activities']
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS allow_all ON %I', t);
     EXECUTE format('CREATE POLICY allow_all ON %I FOR ALL USING (true) WITH CHECK (true)', t);
