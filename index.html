@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.62-20260524">
+<meta name="version" content="v5.63-20260525">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -250,7 +250,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <button class="active" onclick="go('dashboard',this)">🏠 Tổng quan</button>
     <button onclick="go('students',this)">🎓 Học viên</button>
     <button onclick="go('pos',this)">🛒 Bán hàng</button>
-    <button onclick="go('inventory',this)">📦 Kho</button>
+    <button onclick="go('inventory',this)">📦 Kho<span id="po-nav-badge" style="display:none;background:#E74C3C;color:#fff;border-radius:20px;padding:1px 6px;font-size:9px;margin-left:4px;font-weight:700;vertical-align:middle">0</span></button>
     <button onclick="go('customers',this)">👥 Khách hàng</button>
     <button onclick="go('crm',this)">🎯 CRM</button>
     <button onclick="go('hr',this)">👥 Nhân sự</button>
@@ -273,7 +273,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <span class="bn-icon">🛒</span>Bán hàng
   </button>
   <button class="bottom-nav-btn" onclick="go('inventory',this);syncBottomNav(this)">
-    <span class="bn-icon">📦</span>Kho
+    <span class="bn-icon">📦</span>Kho<span id="po-nav-badge-mobile" style="display:none;background:#E74C3C;color:#fff;border-radius:20px;padding:0px 4px;font-size:8px;margin-left:2px;font-weight:700;vertical-align:middle">●</span>
   </button>
   <button class="bottom-nav-btn" onclick="go('customers',this);syncBottomNav(this)">
     <span class="bn-icon">👥</span>Khách hàng
@@ -883,7 +883,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="tab active" id="inv-tab-stock" onclick="invTab('stock',this)">📦 Kho nguyên liệu</div>
     <div class="tab" id="inv-tab-warehouse" onclick="invTab('warehouse',this);renderWarehouseDashboard()">🏠 Dashboard</div>
     <div class="tab" id="inv-tab-suppliers" onclick="invTab('suppliers',this);renderSuppliers()">🏭 NCC</div>
-    <div class="tab" id="inv-tab-po" onclick="invTab('po',this);renderPurchaseOrders()">📋 PO</div>
+    <div class="tab" id="inv-tab-po" onclick="invTab('po',this);renderPurchaseOrders()">📋 PO<span id="po-tab-badge" style="display:none;background:#E74C3C;color:#fff;border-radius:20px;padding:1px 6px;font-size:9px;margin-left:4px;font-weight:700">0</span></div>
     <div class="tab" id="inv-tab-products" onclick="invTab('products',this)">🛍 Hàng hóa</div>
   </div>
 
@@ -4454,6 +4454,9 @@ async function boot(){
         D.purchaseOrders = purchaseOrders||[];
         D.approvalQueue = approvalQueue||[];
         updateApprovalBadge();
+        updatePOBadge();
+        // Deep-link: nếu URL có ?po= thì navigate sau khi data đã sẵn
+        poHandleDeepLink();
         // CRM from Supabase — fallback to localStorage
         try {
           const rawTasks = crmTasksRaw?.[0]?.data;
@@ -15524,7 +15527,8 @@ function openPOModal(poId) {
   poUpdateStatusBadge();
   poRenderLines();
   poCalcTotals();
-  poRenderApprovalFlow();
+  const _curPO = _poEditId ? (D.purchaseOrders||[]).find(p=>p.id===_poEditId) : null;
+  poRenderApprovalFlow(_curPO);
   showM('modal-add-po');
 }
 
@@ -15694,20 +15698,32 @@ function poDeleteLine(i) {
   poCalcTotals();
 }
 
-// ── Approval flow render ──
-function poRenderApprovalFlow() {
+// ── Approval flow render (3 cấp: Manager → Finance → Admin) ──
+function poRenderApprovalFlow(po) {
   const el = document.getElementById('po-approval-flow');
   if(!el) return;
+  const st = po?.status || 'draft';
+  const mgrDone = ['mgr_approved','fin_approved','approved'].includes(st);
+  const mgrWait = st === 'waiting';
+  const finDone = ['fin_approved','approved'].includes(st);
+  const finWait = st === 'mgr_approved';
+  const admDone = st === 'approved';
+  const admWait = st === 'fin_approved';
+  const rejected = st === 'rejected';
   const steps = [
-    {label:'Creator', name: AUTH_CURRENT?.name||'Admin', status:'done'},
-    {label:'Manager', name:'Chờ duyệt', status:'waiting'},
-    {label:'Finance', name:'Chưa đến', status:'pending'},
-    {label:'Final', name:'Chưa đến', status:'pending'},
+    {label:'Creator', name: po?.created_by||AUTH_CURRENT?.name||'—', status:'done'},
+    {label:'Manager', name: mgrDone?'Đã duyệt':mgrWait?'Chờ duyệt':rejected?'Từ chối':'Chưa đến',
+      status: mgrDone?'done':mgrWait?'waiting':rejected?'rejected':'pending'},
+    {label:'Finance', name: finDone?'Đã duyệt':finWait?'Chờ duyệt':'Chưa đến',
+      status: finDone?'done':finWait?'waiting':'pending'},
+    {label:'Admin',   name: admDone?'Đã duyệt':admWait?'Chờ duyệt':'Chưa đến',
+      status: admDone?'done':admWait?'waiting':'pending'},
   ];
   const cfg = {
-    done:    {bg:'#EAFAF1', color:'#1E8449', icon:'✓'},
-    waiting: {bg:'#FEF9E7', color:'#E67E22', icon:'⏳'},
-    pending: {bg:'var(--bg2)', color:'var(--muted)', icon:'—'},
+    done:     {bg:'#EAFAF1', color:'#1E8449', icon:'✓'},
+    waiting:  {bg:'#FEF9E7', color:'#E67E22', icon:'⏳'},
+    pending:  {bg:'var(--bg2)', color:'var(--muted)', icon:'—'},
+    rejected: {bg:'#FDEDEC', color:'#E74C3C', icon:'✕'},
   };
   el.innerHTML = steps.map((s,i)=>`
     <div style="display:flex;flex-direction:column;align-items:center;gap:4px;flex:1">
@@ -15799,12 +15815,14 @@ async function poSave(submitMode) {
     }
 
     if(submitMode==='submit') {
-      tgMsg(`📋 *PO mới cần duyệt!*\n\n🆔 ${po.id}\n🏭 NCC: ${po.supplier_name}\n📦 Hàng: ${po.items_summary}\n💰 Grand Total: ${fmt(grandTotal)}₫\n📅 Giao: ${po.delivery_date||'—'}\n👤 Tạo bởi: ${po.created_by}\n\n⏳ Vui lòng phê duyệt\n_Trương Dáng Hương Academy_`);
+      const appUrl = window.location.origin + window.location.pathname + '?po=' + po.id;
+      tgMsg(`📋 *PO mới cần duyệt!*\n\n🆔 ${po.id}\n🏭 NCC: ${po.supplier_name}\n📦 Hàng: ${po.items_summary}\n💰 Grand Total: ${fmt(grandTotal)}₫\n📅 Giao: ${po.delivery_date||'—'}\n👤 Tạo bởi: ${po.created_by}\n\n⏳ Manager vui lòng phê duyệt:\n🔗 ${appUrl}\n\n_Trương Dáng Hương Academy_`);
     }
 
     auditLog(_poEditId?'update':'create','purchase_order',`${_poEditId?'Cập nhật':'Tạo'} PO ${po.id} — ${po.supplier_name} — ${fmt(grandTotal)}₫`);
     closeM('modal-add-po');
     renderPurchaseOrders();
+    updatePOBadge();
     renderWarehouseDashboard();
     notify(`✅ Đã lưu PO: ${po.id}${submitMode==='submit'?' — Đã gửi duyệt':''}`);
   } catch(e) {
@@ -15815,6 +15833,186 @@ async function poSave(submitMode) {
 // ── Open PO detail (view/edit) ──
 function poOpenDetail(poId) {
   openPOModal(poId);
+}
+
+// ── Render PO list (tab PO) ──
+function renderPurchaseOrders() {
+  const el = document.getElementById('po-list');
+  if(!el) return;
+  const pos = D.purchaseOrders||[];
+  const role = AUTH_CURRENT?.role||'';
+
+  const stCfg = {
+    draft:        {label:'Draft',           bg:'#f0f0f0', color:'#888'},
+    waiting:      {label:'⏳ Chờ Manager',  bg:'#FEF9E7', color:'#E67E22'},
+    mgr_approved: {label:'✅ Manager OK',   bg:'#EBF5FB', color:'#1A5276'},
+    fin_approved: {label:'✅ Finance OK',   bg:'#EAF4FB', color:'#1558A7'},
+    approved:     {label:'✅ Đã duyệt',    bg:'#EAFAF1', color:'#1E8449'},
+    rejected:     {label:'❌ Từ chối',     bg:'#FDEDEC', color:'#E74C3C'},
+    ordered:      {label:'📦 Đã đặt',     bg:'#EBF5FB', color:'#1A5276'},
+    receiving:    {label:'🚚 Đang giao',  bg:'#FEF5E7', color:'#D35400'},
+    completed:    {label:'✅ Hoàn tất',   bg:'#EAFAF1', color:'#1E8449'},
+    cancelled:    {label:'🚫 Hủy',        bg:'#f0f0f0', color:'#888'},
+  };
+
+  if(!pos.length) {
+    el.innerHTML = '<div style="text-align:center;padding:32px;color:var(--muted);font-size:13px">Chưa có PO nào — bấm <strong>+ Tạo PO</strong> để bắt đầu.</div>';
+    return;
+  }
+
+  // URL param highlight (deep-link)
+  const focusId = new URLSearchParams(window.location.search).get('po');
+
+  el.innerHTML = `<div style="overflow-x:auto">
+    <table style="width:100%;border-collapse:collapse;font-size:12px">
+      <thead><tr style="background:var(--bg2)">
+        <th style="padding:8px 10px;text-align:left">PO Number</th>
+        <th style="padding:8px 10px;text-align:left">NCC</th>
+        <th style="padding:8px 10px;text-align:left">Hàng hóa</th>
+        <th style="padding:8px 10px;text-align:right">Grand Total</th>
+        <th style="padding:8px 10px;text-align:center">Trạng thái</th>
+        <th style="padding:8px 10px;text-align:center">Ngày tạo</th>
+        <th style="padding:8px 10px;text-align:left">Lý do từ chối</th>
+        <th style="padding:8px 10px;text-align:center">Thao tác</th>
+      </tr></thead>
+      <tbody>
+        ${pos.map(po => {
+          const st = stCfg[po.status]||{label:po.status||'—',bg:'#f0f0f0',color:'#888'};
+          const canMgr = (role==='admin'||role==='manager') && po.status==='waiting';
+          const canFin = (role==='admin'||role==='accountant') && po.status==='mgr_approved';
+          const canAdm = role==='admin' && po.status==='fin_approved';
+          const highlighted = focusId && po.id===focusId;
+          const rejectNote = po.reject_reason
+            ? `<span style="font-size:11px;color:#E74C3C">${po.reject_reason}</span>`
+            : '<span style="color:var(--muted)">—</span>';
+          const btns = (canMgr||canFin||canAdm)
+            ? `<div style="display:flex;gap:4px;justify-content:center">
+                 <button onclick="poApproveAction('${po.id}','approve')" class="btn btn-sm" style="background:#27ae60;color:#fff;padding:4px 10px;font-size:11px">✅ Duyệt</button>
+                 <button onclick="poApproveAction('${po.id}','reject')" class="btn btn-sm" style="background:#c0392b;color:#fff;padding:4px 10px;font-size:11px">❌ Từ chối</button>
+               </div>`
+            : `<button onclick="poOpenDetail('${po.id}')" class="btn btn-ghost btn-sm" style="font-size:11px">👁 Xem</button>`;
+          return `<tr id="po-row-${po.id}" style="border-bottom:1px solid var(--border);${highlighted?'background:#FFF9E6;outline:2px solid #E67E22;':''}" >
+            <td style="padding:8px 10px;font-weight:700;color:var(--brand)">${po.id}${highlighted?'<span style="font-size:9px;background:#E67E22;color:#fff;border-radius:4px;padding:1px 5px;margin-left:4px">← đây</span>':''}</td>
+            <td style="padding:8px 10px">${po.supplier_name||'—'}</td>
+            <td style="padding:8px 10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${po.items_summary||'—'}</td>
+            <td style="padding:8px 10px;text-align:right;font-weight:700">${fmt(po.total||0)}</td>
+            <td style="padding:8px 10px;text-align:center">
+              <span style="background:${st.bg};color:${st.color};padding:2px 8px;border-radius:20px;font-size:11px;font-weight:700;white-space:nowrap">${st.label}</span>
+            </td>
+            <td style="padding:8px 10px;text-align:center;color:var(--muted);font-size:11px">${(po.created_at||'').slice(0,10)||'—'}</td>
+            <td style="padding:8px 10px">${rejectNote}</td>
+            <td style="padding:8px 10px;text-align:center">${btns}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+  </div>`;
+
+  // Auto-scroll to highlighted row
+  if(focusId) {
+    setTimeout(()=>{
+      const row = document.getElementById('po-row-'+focusId);
+      if(row) row.scrollIntoView({behavior:'smooth', block:'center'});
+    }, 200);
+  }
+}
+
+// ── Badge: đếm PO chờ duyệt theo role ──
+function updatePOBadge() {
+  const role = AUTH_CURRENT?.role||'';
+  const pos  = D.purchaseOrders||[];
+
+  // Đếm PO mà user hiện tại có thể/cần duyệt
+  const count = pos.filter(po =>
+    ((role==='admin'||role==='manager')  && po.status==='waiting')      ||
+    ((role==='admin'||role==='accountant') && po.status==='mgr_approved') ||
+    (role==='admin' && po.status==='fin_approved')
+  ).length;
+
+  // Top nav badge
+  const nb = document.getElementById('po-nav-badge');
+  if(nb){ nb.textContent=count; nb.style.display=count>0?'inline':'none'; }
+  // Bottom nav dot
+  const mb = document.getElementById('po-nav-badge-mobile');
+  if(mb){ mb.style.display=count>0?'inline':'none'; }
+  // Tab PO badge
+  const tb = document.getElementById('po-tab-badge');
+  if(tb){ tb.textContent=count; tb.style.display=count>0?'inline':'none'; }
+}
+
+// ── Approve / Reject PO — 3 cấp: Manager → Finance → Admin ──
+async function poApproveAction(poId, action) {
+  const po = (D.purchaseOrders||[]).find(p=>p.id===poId);
+  if(!po) return;
+  const role = AUTH_CURRENT?.role||'';
+  const me   = AUTH_CURRENT?.name||AUTH_CURRENT?.user||'';
+
+  let newStatus, rejectReason='', tgNote='';
+
+  if(action==='reject') {
+    rejectReason = prompt(`❌ Từ chối PO ${poId}\n\nNhập lý do từ chối (bắt buộc):`,'');
+    if(rejectReason===null) return;
+    if(!rejectReason.trim()){ notify('Cần nhập lý do từ chối!',false); return; }
+    newStatus = 'rejected';
+    tgNote = `❌ *PO BỊ TỪ CHỐI*\n\n🆔 ${poId}\n🏭 NCC: ${po.supplier_name||'—'}\n💰 ${fmt(po.total||0)}₫\n👤 Từ chối bởi: ${me}\n📝 Lý do: ${rejectReason.trim()}\n\n_Trương Dáng Hương Academy_`;
+  } else {
+    if(po.status==='waiting'){
+      newStatus='mgr_approved';
+      tgNote=`✅ *Manager đã duyệt PO*\n\n🆔 ${poId}\n🏭 ${po.supplier_name||'—'}\n💰 ${fmt(po.total||0)}₫\n👤 Manager: ${me}\n\n⏭ Tiếp theo: Finance review\n_Trương Dáng Hương Academy_`;
+    } else if(po.status==='mgr_approved'){
+      newStatus='fin_approved';
+      tgNote=`✅ *Finance đã duyệt PO*\n\n🆔 ${poId}\n🏭 ${po.supplier_name||'—'}\n💰 ${fmt(po.total||0)}₫\n👤 Finance: ${me}\n\n⏭ Tiếp theo: Admin phê duyệt cuối\n_Trương Dáng Hương Academy_`;
+    } else if(po.status==='fin_approved'){
+      newStatus='approved';
+      tgNote=`🎉 *PO ĐƯỢC PHÊ DUYỆT ĐẦY ĐỦ (3/3)*\n\n🆔 ${poId}\n🏭 ${po.supplier_name||'—'}\n💰 ${fmt(po.total||0)}₫\n👤 Admin: ${me}\n\n✅ Có thể tiến hành đặt hàng!\n_Trương Dáng Hương Academy_`;
+    } else {
+      notify('PO không ở trạng thái cần duyệt!',false); return;
+    }
+  }
+
+  const updated = {
+    ...po,
+    status: newStatus,
+    reject_reason: action==='reject' ? rejectReason.trim() : '',
+    updated_at: new Date().toISOString()
+  };
+
+  try {
+    await sbUpsert('purchase_orders', updated);
+    const idx = D.purchaseOrders.findIndex(p=>p.id===poId);
+    if(idx>=0) D.purchaseOrders[idx]=updated; else D.purchaseOrders.push(updated);
+    tgMsg(tgNote);
+    auditLog(action==='reject'?'reject':'approve','purchase_order',
+      `${action==='reject'?'Từ chối':'Duyệt'} PO ${poId} (${me}) → ${newStatus}`+
+      (action==='reject'?` | Lý do: ${rejectReason.trim()}`:''));
+    renderPurchaseOrders();
+    updatePOBadge();
+    if(typeof renderWarehouseDashboard==='function') renderWarehouseDashboard();
+    notify(action==='reject'
+      ? `❌ Đã từ chối PO ${poId}`
+      : `✅ Đã duyệt PO ${poId} → ${newStatus}`);
+  } catch(e){
+    notify('Lỗi cập nhật PO: '+e.message,false);
+  }
+}
+
+// ── Deep-link handler: ?po=PO-xxx → tự navigate đến tab PO ──
+function poHandleDeepLink() {
+  const params = new URLSearchParams(window.location.search);
+  const poId   = params.get('po');
+  if(!poId) return;
+  // Navigate: Kho → tab PO
+  const invBtn = document.querySelector('.nav button[onclick*="go(\'inventory\'"]');
+  go('inventory', invBtn);
+  setTimeout(()=>{
+    const tabEl = document.getElementById('inv-tab-po');
+    if(tabEl){ invTab('po', tabEl); renderPurchaseOrders(); }
+    // Scroll đến PO sau khi render xong
+    setTimeout(()=>{
+      const row = document.getElementById('po-row-'+poId);
+      if(row) row.scrollIntoView({behavior:'smooth', block:'center'});
+    }, 400);
+  }, 300);
 }
 
 
