@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.70-20260527">
+<meta name="version" content="v5.71-20260527">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16599,6 +16599,18 @@ function openPOModal(poId) {
   poCalcTotals();
   poRenderApprovalFlow();
   showM('modal-add-po');
+}
+
+// ── Tạo PO từ trang NCC (điền sẵn nhà cung cấp) ──
+function supplierCreatePO(supplierId) {
+  openPOModal();
+  setTimeout(()=>{
+    const supSel = document.getElementById('po-supplier');
+    if(supSel && supplierId) {
+      supSel.value = supplierId;
+      poFillSupplier(supplierId);
+    }
+  }, 100);
 }
 
 // ── Status badge color ──
