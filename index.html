@@ -17240,13 +17240,13 @@ function showMigrationSQL() {
   const sql = `-- Chạy SQL này trên Supabase Dashboard:
 
 -- Bảng nhân viên
-CREATE TABLE IF NOT EXISTS employees (id TEXT PRIMARY KEY, name TEXT, phone TEXT DEFAULT '', role TEXT DEFAULT 'staff', salary NUMERIC DEFAULT 0, start TEXT DEFAULT '', email TEXT DEFAULT '', note TEXT DEFAULT '', created_at TIMESTAMPTZ DEFAULT NOW());
+CREATE TABLE IF NOT EXISTS employees (id TEXT PRIMARY KEY, name TEXT, phone TEXT DEFAULT '', role TEXT DEFAULT 'staff', salary NUMERIC DEFAULT 0, "start" TEXT DEFAULT '', email TEXT DEFAULT '', note TEXT DEFAULT '', created_at TIMESTAMPTZ DEFAULT NOW());
 
 -- Bảng chấm công
 CREATE TABLE IF NOT EXISTS attendance (id TEXT PRIMARY KEY, emp_id TEXT, month TEXT, day INT, status TEXT, updated_at TIMESTAMPTZ DEFAULT NOW());
 
 -- Bảng lệnh sản xuất
-CREATE TABLE IF NOT EXISTS production_orders (id TEXT PRIMARY KEY, product_id TEXT, product_name TEXT, qty NUMERIC, start TEXT, end TEXT, note TEXT, status TEXT DEFAULT 'Đang sản xuất', nvl_cost NUMERIC DEFAULT 0, created BIGINT);
+CREATE TABLE IF NOT EXISTS production_orders (id TEXT PRIMARY KEY, product_id TEXT, product_name TEXT, qty NUMERIC, "start" TEXT, "end" TEXT, note TEXT, status TEXT DEFAULT 'Đang sản xuất', nvl_cost NUMERIC DEFAULT 0, created BIGINT);
 
 -- Bảng nhà cung cấp
 CREATE TABLE IF NOT EXISTS suppliers (id TEXT PRIMARY KEY, name TEXT, phone TEXT DEFAULT '', address TEXT DEFAULT '', items TEXT DEFAULT '', payment_terms TEXT DEFAULT 'immediate', debt NUMERIC DEFAULT 0, created_at TIMESTAMPTZ DEFAULT NOW());
