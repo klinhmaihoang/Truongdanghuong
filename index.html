@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.71-20260527">
+<meta name="version" content="v5.72-20260527">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -16875,7 +16875,35 @@ async function poSave(submitMode) {
   };
 
   try {
-    await sbUpsert('purchase_orders', po);
+    // Thử upsert đầy đủ, nếu lỗi schema cache → fallback về cột core
+    const saveWithFallback = async (data) => {
+      try {
+        await sbUpsert('purchase_orders', data);
+      } catch(e) {
+        if(e.message && e.message.includes('column')) {
+          // Fallback: chỉ gửi các cột gốc chắc chắn có trong bảng
+          const safe = {
+            id: data.id,
+            supplier_id: data.supplier_id,
+            supplier_name: data.supplier_name,
+            total: data.total,
+            note: data.internal_note||'',
+            status: data.status,
+            created_at: data.created_at,
+            created_by: data.created_by,
+          };
+          await sbUpsert('purchase_orders', safe);
+          // Lưu extended data vào localStorage làm backup
+          const ext = JSON.parse(localStorage.getItem('tdh_po_ext')||'{}');
+          ext[data.id] = data;
+          localStorage.setItem('tdh_po_ext', JSON.stringify(ext));
+          console.warn('PO saved with fallback columns. Run: NOTIFY pgrst, \'reload schema\'; in Supabase');
+        } else {
+          throw e;
+        }
+      }
+    };
+    await saveWithFallback(po);
     if(_poEditId) {
       const idx = D.purchaseOrders.findIndex(p=>p.id===_poEditId);
       if(idx>=0) D.purchaseOrders[idx] = po; else D.purchaseOrders.push(po);
