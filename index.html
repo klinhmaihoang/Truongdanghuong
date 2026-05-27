@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.68-20260527">
+<meta name="version" content="v5.69-20260527">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -15348,7 +15348,7 @@ async function soSaveSO(submitStatus) {
     so_number:       soNumber,
     customer_id:     custId,
     customer_name:   cust?.name||'',
-    quotation_id:    document.getElementById('so-quotation-id')?.value||'',
+    quotation_id:    document.getElementById('so-quotation-id')?.value || null,
     owner:           document.getElementById('so-owner')?.value||AUTH_CURRENT?.name||'',
     status,
     branch:          document.getElementById('so-branch')?.value||'main',
@@ -17317,6 +17317,13 @@ ALTER TABLE quotations ADD COLUMN IF NOT EXISTS updated_at BIGINT;
 
 -- Thêm cột so_id vào transactions
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS so_id TEXT DEFAULT '';
+
+-- Xóa foreign key constraints nếu có (dùng text relationship thay vì FK)
+ALTER TABLE sales_orders DROP CONSTRAINT IF EXISTS sales_orders_quotation_id_fkey;
+ALTER TABLE sales_orders DROP CONSTRAINT IF EXISTS sales_orders_customer_id_fkey;
+ALTER TABLE quotations DROP CONSTRAINT IF EXISTS quotations_customer_id_fkey;
+ALTER TABLE so_activities DROP CONSTRAINT IF EXISTS so_activities_so_id_fkey;
+ALTER TABLE so_activities DROP CONSTRAINT IF EXISTS so_activities_customer_id_fkey;
 
 -- Enable RLS cho tất cả
 ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
