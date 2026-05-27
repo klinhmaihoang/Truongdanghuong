@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.67-20260527">
+<meta name="version" content="v5.68-20260527">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -17261,7 +17261,7 @@ CREATE TABLE IF NOT EXISTS approval_queue (id TEXT PRIMARY KEY, type TEXT, order
 CREATE TABLE IF NOT EXISTS audit_log (id TEXT PRIMARY KEY, user_name TEXT DEFAULT '', role TEXT DEFAULT '', action TEXT, target TEXT, detail TEXT, time TEXT, created_at BIGINT);
 
 -- Bảng bút toán kế toán
-CREATE TABLE IF NOT EXISTS journal_entries (id TEXT PRIMARY KEY, date TEXT, ref TEXT, desc TEXT, entries JSONB, created BIGINT, created_by TEXT DEFAULT '');
+CREATE TABLE IF NOT EXISTS journal_entries (id TEXT PRIMARY KEY, date TEXT, "ref" TEXT, "desc" TEXT, entries JSONB, created BIGINT, created_by TEXT DEFAULT '');
 
 -- ── CRM / SO module (v5.65) ──
 -- Bảng báo giá
