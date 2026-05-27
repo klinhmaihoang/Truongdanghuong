@@ -2,7 +2,7 @@
 <html lang="vi">
 <head>
 <meta charset="UTF-8">
-<meta name="version" content="v5.69-20260527">
+<meta name="version" content="v5.70-20260527">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
@@ -4717,7 +4717,7 @@ async function boot(){
     // ── NHÓM 2: Data phụ — load ngầm sau khi UI đã hiện ──
     setTimeout(async()=>{
       try{
-        const [inventory,products,courses,customers,stockLog,recipes,employees,attendance,production,suppliers,purchaseOrders,approvalQueue,crmTasksRaw,crmStagesRaw,journalRaw,salaryRaw,quotationsRaw,salesOrdersRaw,soActivitiesRaw] = await Promise.all([
+        const [inventory,products,courses,customers,stockLog,recipes,employees,suppliers,purchaseOrders,approvalQueue,crmTasksRaw,crmStagesRaw,journalRaw,salaryRaw,attendance,production,quotationsRaw,salesOrdersRaw,soActivitiesRaw] = await Promise.all([
           sbGet('inventory','?order=created_at.asc'),
           sbGet('products','?order=created_at.asc'),
           sbGet('courses','?order=created_at.asc'),
