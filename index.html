@@ -6857,6 +6857,8 @@ async function checkout(){
     address,payment,shipping,discount,ship_fee:shipFee||0,tracking_code:document.getElementById('c-tracking-code')?.value?.trim()||'',subtotal,tracking_url:'',created_at:Date.now()};
   await sbUpsert('orders',pendingOrder);
   D.orders.push(pendingOrder);
+  // Sync đơn mới lên GG Sheets ngay khi tạo
+  gsSend({sheet:'DonHang',...pendingOrder, type:'retail'});
   showM('modal-qr');
 }
 
@@ -6904,8 +6906,16 @@ async function markPaid(){
   if(lowItems.length&&document.getElementById('at-stock').checked)
     setTimeout(()=>tgMsg(`⚠️ *CẢNH BÁO KHO!*\n\n${lowItems.map(i=>'• '+i.name+': còn '+i.qty+' '+i.unit).join('\n')}\n\n➡️ Cần nhập thêm nguyên liệu!\n\n_Trương Dáng Hương Academy_`),1000);
   invoice=null;
-  gsSend({sheet:'TonKho',rows:D.inventory,time:ts});
-  setTimeout(()=>gsSend({sheet:'BaoCaoLaiLo',rows:gsBaoCaoData(),time:nowDT()}),1500);
+  // ── Auto sync lên Google Sheets ──
+  const paidOrder = D.orders.find(o=>o.id===invoice?.id) || existingOrder;
+  // 1. DonHang (đơn vừa thanh toán)
+  if(paidOrder) gsSend({sheet:'DonHang',...paidOrder, time:ts, type:'retail'});
+  // 2. TonKho (kho đã trừ)
+  setTimeout(()=>gsSend({sheet:'TonKho',rows:D.inventory,time:ts}), 300);
+  // 3. KhachHang (điểm/tier vừa cập nhật)
+  setTimeout(()=>gsSend({sheet:'KhachHang',rows:gsCustomers(),time:ts}), 600);
+  // 4. ThuChi (doanh thu vừa ghi vào transactions)
+  setTimeout(()=>gsSend({sheet:'ThuChi',rows:gsThuChi(),time:ts}), 900);
 }
 
 
@@ -7121,7 +7131,7 @@ async function saveDraft(){
     auditLog('create','order',`Tạo đơn ${id}`);
     notify('💾 Đã lưu đơn tạm: '+id+' — xem trong tab "Chờ thu tiền"');
     tgMsg('💾 *Đơn tạm mới!*\n\nMã: `'+id+'`\n👤 '+name+'\n🛍️ '+items+'\n💰 '+fmt(total)+'\n🚚 '+shipping+'\n⏳ Chờ thu tiền\n🕐 '+nowDT()+'\n\n_Trương Dáng Hương Academy_');
-    gsSend({sheet:'DonHang',...order});
+    gsSend({sheet:'DonHang',...order, type:'retail'});
   }catch(e){notify('Lỗi lưu: '+e.message,false);}
 }
 
@@ -12409,6 +12419,12 @@ ${warnings.join('\n')}\n\nVẫn xác nhận đơn?`;
     if(selEl) selEl.value = '';
     auditLog('update','order',`${o.id} → ${newStatus} (từ ${oldStatus})`);
     notify(`✅ Đã chuyển: ${oldStatus} → ${newStatus}`);
+    // Sync lên Google Sheets
+    gsSend({sheet:'DonHang',...o, time:nowDT(), type: (o.id||'').startsWith('HP') ? 'academy' : 'retail'});
+    if(newStatus==='Đã thanh toán') {
+      setTimeout(()=>gsSend({sheet:'KhachHang',rows:gsCustomers(),time:nowDT()}), 500);
+      setTimeout(()=>gsSend({sheet:'ThuChi',rows:gsThuChi(),time:nowDT()}), 800);
+    }
     // Gửi TG cho tất cả thay đổi trạng thái đơn
     const _stIcons = {'Đã xác nhận':'✅','Đang chuẩn bị':'🧺','Đã book ship':'📦',
       'Đang giao':'🚚','Đã giao':'🏠','Chờ thu tiền':'💳','Đã thanh toán':'💰','Đã hủy':'✕'};
