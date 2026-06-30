@@ -5571,8 +5571,8 @@ function renderMonthly(){
       if(matchYMD) return +matchYMD[2]===m && +matchYMD[1]===currentYear;
       return false;
     });
-    const retail=monthOrders.filter(o=>!o.id.startsWith('HP')).reduce((a,o)=>a+(o.total||0),0);
-    const tuition=monthOrders.filter(o=>o.id.startsWith('HP')).reduce((a,o)=>a+(o.total||0),0);
+    const retail=monthOrders.filter(o=>!(o.id||'').startsWith('HP')).reduce((a,o)=>a+(o.total||0),0);
+    const tuition=monthOrders.filter(o=>(o.id||'').startsWith('HP')).reduce((a,o)=>a+(o.total||0),0);
     const total=retail+tuition;
     const count=monthOrders.length;
     return{m,retail,tuition,total,count};
@@ -6190,8 +6190,8 @@ function renderDash(){
     if(spc) { spc.style.display=''; renderSalePerformance(); }
   }
   const activeStudents=D.students.filter(s=>s.status==='Đang học'&&!s.deleted_at);
-  const retailOrders=D.orders.filter(o=>!o.id.startsWith('HP')&&o.status!=='Đã hủy');
-  const tuitionOrders=D.orders.filter(o=>o.id.startsWith('HP'));
+  const retailOrders=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&o.status!=='Đã hủy');
+  const tuitionOrders=D.orders.filter(o=>(o.id||'').startsWith('HP'));
   const retailRev=retailOrders.filter(o=>o.status==='Đã thanh toán').reduce((a,o)=>a+(o.total||0),0);
   const tuitionRev=tuitionOrders.filter(o=>o.status==='Đã thanh toán').reduce((a,o)=>a+(o.total||0),0);
 
@@ -6931,7 +6931,7 @@ function filterOrders(){
     (o.items||'').toLowerCase().includes(q)
   );
   // Render filtered into current active panel
-  const retailFiltered=filtered.filter(o=>!o.id.startsWith('HP')&&o.status!=='Đã hủy');
+  const retailFiltered=filtered.filter(o=>!(o.id||'').startsWith('HP')&&o.status!=='Đã hủy');
   const elR=document.getElementById('retail-orders');
   if(elR&&document.getElementById('panel-retail-orders').style.display!=='none'){
     elR.innerHTML=retailFiltered.slice().reverse().map(o=>`<tr>
@@ -6976,10 +6976,10 @@ function ordTab(el,type){
 }
 
 function renderOrders(){
-  const retailOrders=D.orders.filter(o=>!o.id.startsWith('HP')&&o.status!=='Đã hủy');
-  const tuitionOrders=D.orders.filter(o=>o.id.startsWith('HP')&&o.status!=='Đã hủy');
+  const retailOrders=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&o.status!=='Đã hủy');
+  const tuitionOrders=D.orders.filter(o=>(o.id||'').startsWith('HP')&&o.status!=='Đã hủy');
   const ACTIVE2=typeof ACTIVE_STATUSES!=='undefined'?ACTIVE_STATUSES:['Chờ xác nhận','Đã xác nhận','Đang chuẩn bị','Đã book ship','Đang giao','Đã giao','Chờ thu tiền','Chờ thanh toán'];
-  const pending=D.orders.filter(o=>!o.id.startsWith('HP')&&ACTIVE2.includes(o.status)).length;
+  const pending=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&ACTIVE2.includes(o.status)).length;
 
   // Update badge
   const badge=document.getElementById('pending-badge');
@@ -7043,7 +7043,7 @@ function renderOrders(){
 function renderPendingOrders(){
   const el=document.getElementById('pending-orders');if(!el)return;
   const ACTIVE = typeof ACTIVE_STATUSES!=='undefined' ? ACTIVE_STATUSES : ['Chờ xác nhận','Đã xác nhận','Đang chuẩn bị','Đã book ship','Đang giao','Đã giao','Chờ thu tiền','Chờ thanh toán'];
-  const pending=D.orders.filter(o=>!o.id.startsWith('HP')&&ACTIVE.includes(o.status)).slice().reverse();
+  const pending=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&ACTIVE.includes(o.status)).slice().reverse();
   const badge=document.getElementById('pending-badge');
   if(badge) badge.textContent=pending.length||'';
   if(!pending.length){
@@ -7171,7 +7171,7 @@ function cancelOrderFromPending(id){
 
 function remindAllPending(){
   const ACTIVE3=typeof ACTIVE_STATUSES!=='undefined'?ACTIVE_STATUSES:['Chờ xác nhận','Đã xác nhận','Đang chuẩn bị','Đã book ship','Đang giao','Đã giao','Chờ thu tiền','Chờ thanh toán'];
-  const pending=D.orders.filter(o=>!o.id.startsWith('HP')&&ACTIVE3.includes(o.status));
+  const pending=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&ACTIVE3.includes(o.status));
   if(!pending.length){notify('Không có đơn nào đang chờ!');return;}
   const lines=pending.map(o=>{
     const h=o.created_at?Math.round((Date.now()-o.created_at)/3600000):0;
@@ -7288,7 +7288,7 @@ async function undoFeePaid(dotNum){
       await sbPatch('students',upd,`?id=eq.${id}`);
       Object.assign(s,upd);
       const relatedOrders=D.orders.filter(o=>
-        o.customer===s.name&&o.id.startsWith('HP')&&
+        o.customer===s.name&&(o.id||'').startsWith('HP')&&
         (o.items||'').includes(dotNum===1?(isOnline?'Online':'đợt 1'):'đợt 2')
       );
       for(const o of relatedOrders){
@@ -7977,10 +7977,10 @@ function confirmAct(title,msg,cb){
 function sendDailyReport(){
   const active=D.students.filter(s=>s.status==='Đang học'&&!s.deleted_at);
   const unpaid=D.students.filter(s=>!s.deleted_at&&(s.fee||0)>0&&!s.paid1);
-  const pending=D.orders.filter(o=>typeof ACTIVE_STATUSES!=='undefined'?(!o.id.startsWith('HP')&&ACTIVE_STATUSES.includes(o.status)):(o.status==='Chờ thanh toán'&&!o.id.startsWith('HP')));
+  const pending=D.orders.filter(o=>typeof ACTIVE_STATUSES!=='undefined'?(!(o.id||'').startsWith('HP')&&ACTIVE_STATUSES.includes(o.status)):(o.status==='Chờ thanh toán'&&!(o.id||'').startsWith('HP')));
   const low=D.inventory.filter(i=>i.qty<=i.min);
   const today=todayStr();
-  const todayOrders=D.orders.filter(o=>o.status==='Đã thanh toán'&&!o.id.startsWith('HP')&&(o.time||'').includes(today));
+  const todayOrders=D.orders.filter(o=>o.status==='Đã thanh toán'&&!(o.id||'').startsWith('HP')&&(o.time||'').includes(today));
   const todayRev=todayOrders.reduce((a,o)=>a+(o.total||0),0);
 
     // Học viên học ngày mai
@@ -8197,7 +8197,7 @@ function buildAutoTxs(filterMonth){
   const autoTxs=[];
 
   // Thu từ bán lẻ (đã thanh toán, không phải HP)
-  D.orders.filter(o=>o.status==='Đã thanh toán'&&!o.id.startsWith('HP')).forEach(o=>{
+  D.orders.filter(o=>o.status==='Đã thanh toán'&&!(o.id||'').startsWith('HP')).forEach(o=>{
     const m=getMonthKey(o.time);
     if(filterMonth&&m!==filterMonth) return;
     autoTxs.push({
@@ -8208,7 +8208,7 @@ function buildAutoTxs(filterMonth){
   });
 
   // Thu học phí (đơn HP đã thanh toán)
-  D.orders.filter(o=>o.status==='Đã thanh toán'&&o.id.startsWith('HP')).forEach(o=>{
+  D.orders.filter(o=>o.status==='Đã thanh toán'&&(o.id||'').startsWith('HP')).forEach(o=>{
     const m=getMonthKey(o.time);
     if(filterMonth&&m!==filterMonth) return;
     autoTxs.push({
@@ -8456,7 +8456,7 @@ function checkDailyRemind(){
 function printFeeReceipt(){
   const id=document.getElementById('cf-student-id').value;
   const s=D.students.find(x=>x.id===id);if(!s)return;
-  const hpOrders=D.orders.filter(o=>o.id.startsWith('HP')&&o.customer===s.name&&o.status==='Đã thanh toán');
+  const hpOrders=D.orders.filter(o=>(o.id||'').startsWith('HP')&&o.customer===s.name&&o.status==='Đã thanh toán');
   if(!hpOrders.length){notify('Chưa có lần thu nào để in!',false);return;}
   printAllFeeReceipt(s, hpOrders);
   notify('Đang xuất phiếu thu...');
@@ -8465,7 +8465,7 @@ function printFeeReceipt(){
 
 function printStudentFee(){
   const s=D.students.find(x=>x.id===selectedStudentId);if(!s)return;
-  const hpOrders=D.orders.filter(o=>o.id.startsWith('HP')&&o.customer===s.name&&o.status==='Đã thanh toán');
+  const hpOrders=D.orders.filter(o=>(o.id||'').startsWith('HP')&&o.customer===s.name&&o.status==='Đã thanh toán');
   if(!hpOrders.length){notify('Học viên này chưa có lần thu nào!',false);return;}
   // In phiếu tổng hợp tất cả đợt đã thu
   printAllFeeReceipt(s, hpOrders);
@@ -8481,7 +8481,7 @@ function exportPDF(orderId){
     total:invoice.total,time:invoice.time,note:invoice.note,status:'Chờ thanh toán'
   }:null;
   if(!order){notify('Không tìm thấy đơn hàng!',false);return;}
-  if(order.id.startsWith('HP')){
+  if((order.id||'').startsWith('HP')){
     printFeePDF(order);
   } else {
     printRetailPDF(order);
@@ -12517,7 +12517,7 @@ function renderPrep() {
   // Lọc đơn hàng trong khoảng ngày — tất cả đơn CHƯA hủy và CHƯA thanh toán hoàn toàn
   const EXCLUDE = ['Đã thanh toán','Đã hủy'];
   const orders = D.orders.filter(o=>{
-    if(o.id.startsWith('HP')) return false;
+    if((o.id||'').startsWith('HP')) return false;
     if(EXCLUDE.includes(o.status)) return false;
     // Lọc theo ngày tạo đơn
     const d = o.created_at ? new Date(o.created_at) : (o.time ? new Date(o.time.split(' ').reverse().join('T')) : null);
@@ -12657,7 +12657,7 @@ function exportPrepExcel() {
   const from = new Date(fromStr); from.setHours(0,0,0,0);
   const to   = new Date(toStr);   to.setHours(23,59,59,999);
   const orders = D.orders.filter(o => {
-    if(o.id.startsWith('HP')||EXCLUDE.includes(o.status)) return false;
+    if((o.id||'').startsWith('HP')||EXCLUDE.includes(o.status)) return false;
     const d = o.created_at?new Date(o.created_at):null; if(!d) return false;
     return d>=from&&d<=to;
   });
@@ -12763,7 +12763,7 @@ async function syncCustomersFromOrders() {
   if(btn) { btn.textContent = '⏳ Đang sync...'; btn.disabled = true; }
 
   const paidOrders = D.orders.filter(o =>
-    !o.id.startsWith('HP') &&
+    !(o.id||'').startsWith('HP') &&
     o.customer && o.customer !== 'Khách lẻ' &&
     o.status !== 'Đã hủy'
   );
@@ -12924,12 +12924,12 @@ function gsBaoCaoData() {
   };
 
   // Doanh thu Academy
-  D.orders.filter(o=>o.id.startsWith('HP')&&o.status==='Đã thanh toán').forEach(o=>{
+  D.orders.filter(o=>(o.id||'').startsWith('HP')&&o.status==='Đã thanh toán').forEach(o=>{
     const mo=getMonth(o.time); if(!mo) return;
     ensure(mo); monthMap[mo].acaThu += (o.total||0);
   });
   // Doanh thu Retail
-  D.orders.filter(o=>!o.id.startsWith('HP')&&o.status==='Đã thanh toán').forEach(o=>{
+  D.orders.filter(o=>!(o.id||'').startsWith('HP')&&o.status==='Đã thanh toán').forEach(o=>{
     const mo=getMonth(o.time); if(!mo) return;
     ensure(mo); monthMap[mo].retThu += (o.total||0);
   });
@@ -13392,8 +13392,8 @@ function renderIncomeStatement() {
   };
 
   // ── DOANH THU ──
-  const acaOrders = D.orders.filter(o => o.id.startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
-  const retOrders = D.orders.filter(o => !o.id.startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
+  const acaOrders = D.orders.filter(o => (o.id||'').startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
+  const retOrders = D.orders.filter(o => !(o.id||'').startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
   const acaThu = acaOrders.reduce((s,o) => s+(o.total||0), 0);
   const retThu = retOrders.reduce((s,o) => s+(o.total||0), 0);
   const totalThu = acaThu + retThu;
@@ -14083,8 +14083,8 @@ function exportISPDF() {
   const matchMonth = (t) => !filterMonth || getMonthKey(t) === filterMonth;
 
   // Gather data
-  const acaOrders = D.orders.filter(o => o.id.startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
-  const retOrders = D.orders.filter(o => !o.id.startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
+  const acaOrders = D.orders.filter(o => (o.id||'').startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
+  const retOrders = D.orders.filter(o => !(o.id||'').startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
   const acaThu = acaOrders.reduce((s,o)=>s+(o.total||0),0);
   const retThu = retOrders.reduce((s,o)=>s+(o.total||0),0);
   const totalThu = acaThu + retThu;
@@ -16163,6 +16163,7 @@ function accRenderJournal() {
 }
 
 function accRenderLedger() {
+  try {
   const el=document.getElementById('acc-ledger-content'); if(!el) return;
   const journal=loadJournal();
   // Auto-add from transactions
@@ -16184,6 +16185,11 @@ function accRenderLedger() {
       <div style="font-size:11px;color:var(--muted)">Nợ: ${fmt(totalDebit)} | Có: ${fmt(totalCredit)}</div>
     </div>`;
   }).join('')||'<div style="text-align:center;padding:24px;color:var(--muted)">Chưa có số liệu</div>';
+  } catch(err) {
+    console.error('accRenderLedger error:', err);
+    const el=document.getElementById('acc-ledger-content');
+    if(el) el.innerHTML='<div style="text-align:center;padding:24px;color:#E74C3C">Lỗi hiển thị: '+err.message+'</div>';
+  }
 }
 
 function accAutoJournal() {
@@ -16201,6 +16207,7 @@ function accAutoJournal() {
 }
 
 function accRenderBalance() {
+  try {
   const el=document.getElementById('acc-balance-content'); if(!el) return;
   const allJournal=[...loadJournal(),...accAutoJournal()];
   const getBalance=(code)=>{
@@ -16272,14 +16279,20 @@ function accRenderBalance() {
         </div>
       </div>
     </div>`;
+  } catch(err) {
+    console.error('accRenderBalance error:', err);
+    const el=document.getElementById('acc-balance-content');
+    if(el) el.innerHTML='<div style="text-align:center;padding:24px;color:#E74C3C">Lỗi hiển thị: '+err.message+'</div>';
+  }
 }
 
 function accRenderPnL() {
+  try {
   const el=document.getElementById('acc-pnl-content'); if(!el) return;
   const orders=D.orders?.filter(o=>o.status==='Đã thanh toán')||[];
   const txs=D.transactions||[];
-  const aca=orders.filter(o=>o.id.startsWith('HP')).reduce((s,o)=>s+(o.total||0),0);
-  const ret=orders.filter(o=>!o.id.startsWith('HP')).reduce((s,o)=>s+(o.total||0),0);
+  const aca=orders.filter(o=>(o.id||'').startsWith('HP')).reduce((s,o)=>s+(o.total||0),0);
+  const ret=orders.filter(o=>!(o.id||'').startsWith('HP')).reduce((s,o)=>s+(o.total||0),0);
   const totalRev=aca+ret;
   const chiTxs=txs.filter(t=>t.type==='chi');
   const nvl=chiTxs.filter(t=>t.cost_group==='nvl'||t.cost_group==='baobao'||t.cost_group==='ship').reduce((s,t)=>s+(t.amount||0),0);
@@ -16307,9 +16320,15 @@ function accRenderPnL() {
     ${row('🏆 LÃI RÒNG',netProfit,true,netProfit>=0?'#1E8449':'#E74C3C','#FFF3CD')}
     <div style="padding:8px 16px;font-size:12px;color:var(--muted)">Biên lợi nhuận: ${totalRev>0?(netProfit/totalRev*100).toFixed(1):'0'}%</div>
   </div>`;
+  } catch(err) {
+    console.error('accRenderPnL error:', err);
+    const el=document.getElementById('acc-pnl-content');
+    if(el) el.innerHTML='<div style="text-align:center;padding:24px;color:#E74C3C">Lỗi hiển thị: '+err.message+'</div>';
+  }
 }
 
 function accRenderVAT() {
+  try {
   const el=document.getElementById('acc-vat-content'); if(!el) return;
   const orders=D.orders?.filter(o=>o.status==='Đã thanh toán')||[];
   const txs=D.transactions?.filter(t=>t.type==='chi')||[];
@@ -16345,6 +16364,11 @@ function accRenderVAT() {
       ℹ️ Lưu ý: Số liệu VAT tính theo phương pháp khấu trừ, thuế suất 10%. Cần kiểm tra với kế toán chuyên nghiệp trước khi khai thuế.
     </div>
   </div>`;
+  } catch(err) {
+    console.error('accRenderVAT error:', err);
+    const el=document.getElementById('acc-vat-content');
+    if(el) el.innerHTML='<div style="text-align:center;padding:24px;color:#E74C3C">Lỗi hiển thị: '+err.message+'</div>';
+  }
 }
 
 function accGenerateFromData() {
@@ -17893,15 +17917,15 @@ function renderCEODashboard() {
   for(let i=5;i>=0;i--) {
     const d = new Date(now.getFullYear(),now.getMonth()-i,1);
     const mk = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
-    const acaRev = orders.filter(o=>paidOrders(o)&&o.id.startsWith('HP')&&getMonthKey(o.time)===mk).reduce((s,o)=>s+(o.total||0),0);
-    const retRev = orders.filter(o=>paidOrders(o)&&!o.id.startsWith('HP')&&getMonthKey(o.time)===mk).reduce((s,o)=>s+(o.total||0),0);
+    const acaRev = orders.filter(o=>paidOrders(o)&&(o.id||'').startsWith('HP')&&getMonthKey(o.time)===mk).reduce((s,o)=>s+(o.total||0),0);
+    const retRev = orders.filter(o=>paidOrders(o)&&!(o.id||'').startsWith('HP')&&getMonthKey(o.time)===mk).reduce((s,o)=>s+(o.total||0),0);
     months6.push({mk, label:'T'+(d.getMonth()+1), aca:acaRev, ret:retRev, total:acaRev+retRev});
   }
   const maxRev6 = Math.max(...months6.map(m=>m.total), 1);
 
   // Channel mix
-  const acaRev = orders.filter(o=>paidOrders(o)&&o.id.startsWith('HP')).reduce((s,o)=>s+(o.total||0),0);
-  const retRev = orders.filter(o=>paidOrders(o)&&!o.id.startsWith('HP')).reduce((s,o)=>s+(o.total||0),0);
+  const acaRev = orders.filter(o=>paidOrders(o)&&(o.id||'').startsWith('HP')).reduce((s,o)=>s+(o.total||0),0);
+  const retRev = orders.filter(o=>paidOrders(o)&&!(o.id||'').startsWith('HP')).reduce((s,o)=>s+(o.total||0),0);
   const totalRevAll = acaRev + retRev;
   const acaPct = totalRevAll>0 ? Math.round(acaRev/totalRevAll*100) : 0;
 
