@@ -4724,12 +4724,12 @@ async function boot(){
     setTimeout(async()=>{
       try{
         const [inventory,products,courses,customers,stockLog,recipes,employees,suppliers,purchaseOrders,approvalQueue,crmTasksRaw,crmStagesRaw,journalRaw,salaryRaw,attendance,production,quotationsRaw,salesOrdersRaw,soActivitiesRaw] = await Promise.all([
-          sbGet('inventory','?order=created_at.asc'),
-          sbGet('products','?order=created_at.asc'),
-          sbGet('courses','?order=created_at.asc'),
-          sbGet('customers','?order=created_at.asc'),
-          sbGet('stock_log','?order=created_at.desc&limit=200'),
-          sbGet('recipes','?order=created_at.asc'),
+          sbGet('inventory','?order=created_at.asc').catch(e=>{console.warn('inventory load lỗi:',e.message);return [];}),
+          sbGet('products','?order=created_at.asc').catch(e=>{console.warn('products load lỗi:',e.message);return [];}),
+          sbGet('courses','?order=created_at.asc').catch(e=>{console.warn('courses load lỗi:',e.message);return [];}),
+          sbGet('customers','?order=created_at.asc').catch(e=>{console.warn('customers load lỗi:',e.message);return [];}),
+          sbGet('stock_log','?order=created_at.desc&limit=200').catch(e=>{console.warn('stock_log load lỗi:',e.message);return [];}),
+          sbGet('recipes','?order=created_at.asc').catch(e=>{console.warn('recipes load lỗi:',e.message);return [];}),
           sbGet('employees','?order=created_at.asc').catch(()=>[]),
           sbGet('suppliers','?order=created_at.asc').catch(()=>[]),
           sbGet('purchase_orders','?order=created_at.desc&limit=50').catch(()=>[]),
@@ -4739,7 +4739,7 @@ async function boot(){
           sbGet('journal_entries','?order=created.desc&limit=200').catch(()=>[]),
           sbGet('salary_records','?order=month.desc&limit=200').catch(()=>[]),
           sbGet('attendance','?order=month.asc').catch(()=>[]),
-          sbGet('production_orders','?order=created_at.desc&limit=100').catch(()=>[]),
+          sbGet('production_orders','?order=created.desc&limit=100').catch(()=>[]),
           sbGet('quotations','?order=created_at.desc&limit=100').catch(()=>[]),
           sbGet('sales_orders','?order=created_at.desc&limit=100').catch(()=>[]),
           sbGet('so_activities','?order=created_at.desc&limit=200').catch(()=>[]),
