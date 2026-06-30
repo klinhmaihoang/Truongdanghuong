@@ -9952,7 +9952,7 @@ async function saveMat() {
 
   const matObj = { ma, ten, don_vi, gia, ncc, note, _custom: true };
 
-  // Lưu lên Supabase
+  // Lưu lên Supabase — BẮT BUỘC thành công, không cho lưu local nếu lỗi
   try {
     await sbUpsert('dmhh', {
       ma, ten, don_vi, gia, ncc, note,
@@ -9960,10 +9960,11 @@ async function saveMat() {
       created_at: new Date().toISOString()
     });
   } catch(e) {
-    notify('⚠️ Lưu offline — chỉ trên máy này');
+    notify('❌ LƯU THẤT BẠI — Không kết nối được Supabase! Nguyên liệu CHƯA được lưu, vui lòng thử lại. Lỗi: '+e.message, false);
+    return; // dừng lại, không đóng modal, không mất dữ liệu đang nhập
   }
 
-  // Cập nhật local
+  // Cập nhật local (chỉ chạy khi lưu Supabase thành công)
   const idx = CC_mats.findIndex(m => m.ma === ma);
   if (idx >= 0) CC_mats[idx] = {...CC_mats[idx], ...matObj};
   else CC_mats.push(matObj);
@@ -10938,7 +10939,10 @@ async function saveSemi() {
   };
 
   try { await sbUpsert('semi_recipes', record); }
-  catch(e) { notify('⚠️ Lưu offline (lỗi Supabase)', false); }
+  catch(e) {
+    notify('❌ LƯU THẤT BẠI — Không kết nối được Supabase! Vui lòng thử lại. Lỗi: '+e.message, false);
+    return;
+  }
 
   // Cập nhật local
   const idx = CC_semis.findIndex(x=>x.id===record.id);
@@ -10953,7 +10957,10 @@ async function saveSemi() {
       _custom: true
     };
     try { await sbUpsert('dmhh', {...matObj, created_at:new Date().toISOString()}); }
-    catch(e) {}
+    catch(e) {
+      notify('❌ LƯU DMHH THẤT BẠI — Không kết nối được Supabase! Lỗi: '+e.message, false);
+      return;
+    }
     const mIdx = CC_mats.findIndex(m=>m.ma===nlMa);
     if (mIdx>=0) CC_mats[mIdx]={...CC_mats[mIdx],...matObj};
     else CC_mats.push(matObj);
