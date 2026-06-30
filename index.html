@@ -8876,11 +8876,11 @@ function renderCostCalc() {
 }
 
 function getCost(p) {
-  // Dùng cost có sẵn (từ BOM), hoặc tính lại nếu là custom
+  // Dùng cost có sẵn (từ BOM), hoặc tính lại nếu là custom — chỉ tra giá từ DMHH (BOM_DATA.materials), không lấy từ Kho
   if (p._custom) {
     return (p.ingredients||[]).reduce((s,i)=>{
-      const mat = D.inventory.find(m=>m.id===i.ma_nl||m.name===i.ten_nl);
-      return s + (mat?(mat.cost||0):(i.don_gia||0)) * (i.so_luong||0);
+      const mat = BOM_DATA.materials.find(m=>m.ma===i.ma_nl||m.ten===i.ten_nl);
+      return s + (mat?(mat.gia||0):(i.don_gia||0)) * (i.so_luong||0);
     },0);
   }
   return p.cost || 0;
@@ -9197,7 +9197,6 @@ function _bomRenderIngRows(p, editMode) {
     // EDIT: editable rows
     const allMats = {};
     BOM_DATA.materials.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
-    D.inventory.forEach(m=>{ if(!allMats[m.id]) allMats[m.id]={id:m.id,name:m.name,unit:m.unit,cost:m.cost||0}; });
     const matOpts = (cur='')=>Object.values(allMats).map(m=>
       `<option value="${m.id}" data-cost="${m.cost}" data-unit="${m.unit}" ${m.id===cur||m.name===cur?'selected':''}>${m.name}</option>`
     ).join('');
@@ -9271,7 +9270,6 @@ function bomAddIngRow() {
   const tbody = document.getElementById('bom-ing-rows');
   const allMats = {};
   BOM_DATA.materials.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
-  D.inventory.forEach(m=>{ if(!allMats[m.id]) allMats[m.id]={id:m.id,name:m.name,unit:m.unit,cost:m.cost||0}; });
   const matOpts = Object.values(allMats).map(m=>
     `<option value="${m.id}" data-cost="${m.cost}" data-unit="${m.unit}">${m.name}</option>`
   ).join('');
@@ -9550,10 +9548,9 @@ function xlExportDrinkCost() {
 // ── THÊM MÓN TỰ NHẬP ────────────────────────────────────────
 function addDrinkIngredient(matId='',qty='') {
   const container=document.getElementById('drink-ingredient-rows');
-  // Dùng DMHH từ BOM làm option chính, bổ sung từ D.inventory
+  // Chỉ dùng nguyên liệu từ DMHH (Danh mục hàng hóa của Tính Cost) — không lấy từ Kho
   const allMats = {};
   BOM_DATA.materials.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
-  D.inventory.forEach(m=>{ if(!allMats[m.id]) allMats[m.id]={id:m.id,name:m.name,unit:m.unit,cost:m.cost||0}; });
   const matOpts = Object.values(allMats).map(m=>
     `<option value="${m.id}" data-cost="${m.cost}" data-unit="${m.unit}" ${m.id===matId?'selected':''}>${m.name} (${Math.round(m.cost)}₫/${m.unit})</option>`
   ).join('');
@@ -10774,7 +10771,6 @@ function semiAddIngRow(matId='', qty='') {
   const container = document.getElementById('semi-ing-rows');
   const allMats = {};
   CC_mats.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
-  D.inventory.forEach(m=>{ if(!allMats[m.id]) allMats[m.id]={id:m.id,name:m.name,unit:m.unit,cost:m.cost||0}; });
   const matOpts = Object.values(allMats).map(m =>
     `<option value="${m.id}" data-cost="${m.cost}" data-unit="${m.unit||''}" ${m.id===matId?'selected':''}>
       ${m.name} — ${Math.round(m.cost*10)/10}₫/${m.unit||'đv'}
