@@ -13940,6 +13940,7 @@ function finSwitchTab(tab) {
   if(tab==='expenses') {
     // Move page-expenses content into fin-panel-expenses
     const srcPage = document.getElementById('page-expenses');
+    const expPanel = document.getElementById('fin-panel-expenses');
     if(srcPage && expPanel && !expPanel.hasChildNodes()) {
       while(srcPage.firstChild) expPanel.appendChild(srcPage.firstChild);
     }
@@ -13947,6 +13948,7 @@ function finSwitchTab(tab) {
   }
   if(tab==='reports') {
     const srcPage = document.getElementById('page-reports');
+    const rpPanel = document.getElementById('fin-panel-reports');
     if(srcPage && rpPanel && !rpPanel.hasChildNodes()) {
       while(srcPage.firstChild) rpPanel.appendChild(srcPage.firstChild);
     }
@@ -13958,9 +13960,12 @@ function finSwitchTab(tab) {
   }
   if(tab==='costcalc') {
     const srcPage = document.getElementById('page-costcalc');
+    const ccPanel = document.getElementById('fin-panel-costcalc');
     if(srcPage && ccPanel && !ccPanel.hasChildNodes()) {
       while(srcPage.firstChild) ccPanel.appendChild(srcPage.firstChild);
     }
+    if(typeof renderCostCalcGroups==='function') renderCostCalcGroups();
+    if(typeof renderCostCalc==='function') renderCostCalc();
   }
   if(tab==='thu-chi') {
     renderFinance();
