@@ -2050,6 +2050,21 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <input id="mat-edit-ten" placeholder="VD: Syrup dâu tây Monin"/>
     </div>
 
+    <div style="background:var(--bg2);border-radius:10px;padding:10px 12px;margin-bottom:12px">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);margin-bottom:8px">🧮 TÍNH NHANH ĐƠN GIÁ (tùy chọn)</div>
+      <div class="form-row" style="margin-bottom:0">
+        <div class="fg">
+          <label style="font-size:11px">Tổng giá mua (₫)</label>
+          <input id="mat-calc-total" type="number" min="0" placeholder="VD: 165000" oninput="matCalcUnitPrice()"/>
+        </div>
+        <div class="fg">
+          <label style="font-size:11px">Tổng khối lượng/số lượng</label>
+          <input id="mat-calc-qty" type="number" min="0" step="0.001" placeholder="VD: 1000 (nếu đơn vị là gram)" oninput="matCalcUnitPrice()"/>
+        </div>
+      </div>
+      <div id="mat-calc-result" style="font-size:12px;color:var(--brand);font-weight:700;margin-top:6px;display:none"></div>
+    </div>
+
     <div class="form-row">
       <div class="fg">
         <label>Giá nhập (₫/đv) *</label>
@@ -8876,10 +8891,10 @@ function renderCostCalc() {
 }
 
 function getCost(p) {
-  // Dùng cost có sẵn (từ BOM), hoặc tính lại nếu là custom — chỉ tra giá từ DMHH (BOM_DATA.materials), không lấy từ Kho
+  // Dùng cost có sẵn (từ BOM), hoặc tính lại nếu là custom — tra giá từ CC_mats (DMHH thật, gồm cả NL mới thêm)
   if (p._custom) {
     return (p.ingredients||[]).reduce((s,i)=>{
-      const mat = BOM_DATA.materials.find(m=>m.ma===i.ma_nl||m.ten===i.ten_nl);
+      const mat = CC_mats.find(m=>m.ma===i.ma_nl||m.ten===i.ten_nl);
       return s + (mat?(mat.gia||0):(i.don_gia||0)) * (i.so_luong||0);
     },0);
   }
@@ -9196,7 +9211,7 @@ function _bomRenderIngRows(p, editMode) {
   } else {
     // EDIT: editable rows
     const allMats = {};
-    BOM_DATA.materials.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
+    CC_mats.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
     const matOpts = (cur='')=>Object.values(allMats).map(m=>
       `<option value="${m.id}" data-cost="${m.cost}" data-unit="${m.unit}" ${m.id===cur||m.name===cur?'selected':''}>${m.name}</option>`
     ).join('');
@@ -9269,7 +9284,7 @@ function bomAddIngRow() {
   // Thêm 1 dòng rỗng vào tbody
   const tbody = document.getElementById('bom-ing-rows');
   const allMats = {};
-  BOM_DATA.materials.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
+  CC_mats.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
   const matOpts = Object.values(allMats).map(m=>
     `<option value="${m.id}" data-cost="${m.cost}" data-unit="${m.unit}">${m.name}</option>`
   ).join('');
@@ -9550,7 +9565,7 @@ function addDrinkIngredient(matId='',qty='') {
   const container=document.getElementById('drink-ingredient-rows');
   // Chỉ dùng nguyên liệu từ DMHH (Danh mục hàng hóa của Tính Cost) — không lấy từ Kho
   const allMats = {};
-  BOM_DATA.materials.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
+  CC_mats.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
   const matOpts = Object.values(allMats).map(m=>
     `<option value="${m.id}" data-cost="${m.cost}" data-unit="${m.unit}" ${m.id===matId?'selected':''}>${m.name} (${Math.round(m.cost)}₫/${m.unit})</option>`
   ).join('');
@@ -9875,6 +9890,9 @@ function openAddMat() {
   document.getElementById('mat-edit-gia').value = '';
   document.getElementById('mat-edit-ncc').value = '';
   document.getElementById('mat-edit-note').value = '';
+  document.getElementById('mat-calc-total').value = '';
+  document.getElementById('mat-calc-qty').value = '';
+  document.getElementById('mat-calc-result').style.display = 'none';
   showM('modal-mat-edit');
 }
 
@@ -9891,10 +9909,28 @@ function openEditDmhh(ma) {
   document.getElementById('mat-edit-gia').value = m.gia||'';
   document.getElementById('mat-edit-ncc').value = m.ncc||'';
   document.getElementById('mat-edit-note').value = m.note||'';
+  document.getElementById('mat-calc-total').value = '';
+  document.getElementById('mat-calc-qty').value = '';
+  document.getElementById('mat-calc-result').style.display = 'none';
   showM('modal-mat-edit');
 }
 
 // ── LƯU NGUYÊN LIỆU ─────────────────────────────────────────
+function matCalcUnitPrice() {
+  const total = parseFloat(document.getElementById('mat-calc-total')?.value)||0;
+  const qty   = parseFloat(document.getElementById('mat-calc-qty')?.value)||0;
+  const resultEl = document.getElementById('mat-calc-result');
+  const giaInput = document.getElementById('mat-edit-gia');
+  if (total > 0 && qty > 0) {
+    const unitPrice = total / qty;
+    giaInput.value = Math.round(unitPrice*100)/100;
+    resultEl.style.display = '';
+    resultEl.textContent = `= ${unitPrice.toLocaleString('vi-VN',{maximumFractionDigits:2})}₫ / đơn vị — đã tự điền vào ô "Giá nhập" bên dưới`;
+  } else {
+    resultEl.style.display = 'none';
+  }
+}
+
 async function saveMat() {
   const editMa  = document.getElementById('mat-edit-ma').value.trim();
   const ma      = (document.getElementById('mat-edit-ma-show').value||'').trim().toUpperCase();
