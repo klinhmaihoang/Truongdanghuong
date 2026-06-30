@@ -2380,7 +2380,14 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       </div>
     </div>
     <div class="form-row">
-      <div class="fg"><label>Giá bán (₫)</label><input id="drink-price" type="number" placeholder="35000" oninput="recalcDrinkLive()"/></div>
+      <div class="fg"><label>Giá bán (₫)</label><input id="drink-price" type="number" placeholder="35000" oninput="recalcDrinkLive()"/>
+        <div id="drink-price-suggest" style="display:none;margin-top:6px;font-size:11px;color:var(--muted)">
+          💡 Gợi ý (cost <select id="drink-target-pct" onchange="updatePriceSuggest()" style="font-size:11px;border:1px solid var(--border);border-radius:5px;padding:1px 4px;font-family:inherit">
+            <option value="20">20%</option><option value="25">25%</option><option value="30" selected>30%</option><option value="35">35%</option>
+          </select>): <b id="drink-price-suggest-val" style="color:var(--brand)">—</b>
+          <button type="button" class="btn btn-ghost btn-sm" style="padding:1px 8px;font-size:11px;margin-left:4px" onclick="applyPriceSuggest()">Dùng giá này</button>
+        </div>
+      </div>
       <div class="fg"><label>Size</label>
         <select id="drink-size" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;outline:none">
           <option>240ml</option><option>650ml</option><option>Khác</option>
@@ -9606,6 +9613,36 @@ function recalcDrinkLive(){
     pctEl.style.color=pct<25?'var(--green)':pct<=35?'#e67e22':'var(--red)';
     document.getElementById('summary-profit').textContent=fmtVND(price-total);
   }else{document.getElementById('summary-pct').textContent='—';document.getElementById('summary-profit').textContent='—';}
+  updatePriceSuggest(total);
+}
+
+// ── GỢI Ý GIÁ BÁN dựa trên % cost mục tiêu (vẫn cho chỉnh tay) ──
+function updatePriceSuggest(totalCost){
+  const suggestBox=document.getElementById('drink-price-suggest');
+  if(totalCost===undefined){
+    // Gọi độc lập (vd khi đổi % mục tiêu) — tính lại cost hiện tại
+    totalCost=0;
+    document.querySelectorAll('.drink-ing-row').forEach(row=>{
+      const sel=row.querySelector('.ing-mat');const qty=parseFloat(row.querySelector('.ing-qty').value)||0;
+      if(sel&&sel.value){const o=sel.options[sel.selectedIndex];totalCost+=(parseFloat(o.dataset.cost)||0)*qty;}
+    });
+  }
+  if(!suggestBox) return;
+  if(totalCost<=0){ suggestBox.style.display='none'; return; }
+  suggestBox.style.display='';
+  const targetPct=parseFloat(document.getElementById('drink-target-pct')?.value)||30;
+  const suggested=Math.round(totalCost/(targetPct/100)/500)*500; // làm tròn 500đ cho dễ niêm yết
+  document.getElementById('drink-price-suggest-val').textContent=fmtVND(suggested);
+}
+
+function applyPriceSuggest(){
+  const val=document.getElementById('drink-price-suggest-val').textContent;
+  const num=parseFloat(val.replace(/[^\d]/g,''));
+  if(num>0){
+    document.getElementById('drink-price').value=num;
+    recalcDrinkLive();
+    notify('✅ Đã áp giá đề xuất: '+fmtVND(num)+' — vẫn có thể chỉnh tay nếu muốn');
+  }
 }
 
 async function saveDrinkRecipe(){
@@ -10644,7 +10681,7 @@ setTimeout(()=>{
 
 // Patch initCostCalc để load NVL data
 const _origInit3 = initCostCalc;
-async function initCostCalc() {
+initCostCalc = async function() {
   await _origInit3();
   await loadNvlOrders();
   // Init datalist NVL
@@ -10663,7 +10700,7 @@ let SEMI_currentId = null;
 
 // ── PATCH ccSwitchTab để hỗ trợ tab 'semi' ──────────────────
 const _origCcSwitchTab = ccSwitchTab;
-function ccSwitchTab(tab, el) {
+ccSwitchTab = function(tab, el) {
   document.getElementById('cc-panel-drinks').style.display = tab==='drinks' ? '' : 'none';
   document.getElementById('cc-panel-mats').style.display   = tab==='mats'   ? '' : 'none';
   document.getElementById('cc-panel-semi').style.display   = tab==='semi'   ? '' : 'none';
@@ -17597,6 +17634,16 @@ CREATE TABLE IF NOT EXISTS audit_log (id TEXT PRIMARY KEY, user_name TEXT DEFAUL
 -- Bảng bút toán kế toán
 CREATE TABLE IF NOT EXISTS journal_entries (id TEXT PRIMARY KEY, date TEXT, "ref" TEXT, "desc" TEXT, entries JSONB, created BIGINT, created_by TEXT DEFAULT '');
 
+-- ── MODULE TÍNH COST (Kế toán → Tính Cost) ──
+-- Bảng Danh mục hàng hóa / nguyên liệu (DMHH)
+CREATE TABLE IF NOT EXISTS dmhh (ma TEXT PRIMARY KEY, ten TEXT, don_vi TEXT, gia NUMERIC DEFAULT 0, ncc TEXT DEFAULT '', note TEXT DEFAULT '', _custom BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT NOW());
+
+-- Bảng công thức món nước (BOM)
+CREATE TABLE IF NOT EXISTS drink_recipes (id TEXT PRIMARY KEY, name TEXT, nhom TEXT DEFAULT 'Khác', size TEXT DEFAULT '—', sale_price NUMERIC DEFAULT 0, ingredients JSONB DEFAULT '[]', created_at TIMESTAMPTZ DEFAULT NOW());
+
+-- Bảng công thức bán thành phẩm (syrup, nước cốt tự pha...)
+CREATE TABLE IF NOT EXISTS semi_recipes (id TEXT PRIMARY KEY, ten TEXT, don_vi TEXT DEFAULT '', ingredients JSONB DEFAULT '[]', yield_qty NUMERIC DEFAULT 0, cost_per_unit NUMERIC DEFAULT 0, type TEXT DEFAULT 'thanh_pham', created_at TIMESTAMPTZ DEFAULT NOW());
+
 -- ── CRM / SO module (v5.65) ──
 -- Bảng báo giá
 CREATE TABLE IF NOT EXISTS quotations (id TEXT PRIMARY KEY, customer_id TEXT DEFAULT '', customer_name TEXT DEFAULT '', owner TEXT DEFAULT '', status TEXT DEFAULT 'draft', currency TEXT DEFAULT 'VND', subtotal NUMERIC DEFAULT 0, discount_pct NUMERIC DEFAULT 0, discount_amt NUMERIC DEFAULT 0, total NUMERIC DEFAULT 0, items_json JSONB DEFAULT '[]', note TEXT DEFAULT '', internal_note TEXT DEFAULT '', so_id TEXT DEFAULT '', expires_at BIGINT, created_at BIGINT DEFAULT EXTRACT(EPOCH FROM NOW())*1000, updated_at BIGINT);
@@ -17674,7 +17721,7 @@ ALTER TABLE so_activities ENABLE ROW LEVEL SECURITY;
 
 -- Policies (allow all cho app nội bộ)
 DO $$ DECLARE t TEXT; BEGIN
-  FOREACH t IN ARRAY ARRAY['employees','attendance','production_orders','suppliers','purchase_orders','approval_queue','audit_log','journal_entries','quotations','sales_orders','so_activities']
+  FOREACH t IN ARRAY ARRAY['employees','attendance','production_orders','suppliers','purchase_orders','approval_queue','audit_log','journal_entries','quotations','sales_orders','so_activities','dmhh','drink_recipes','semi_recipes']
   LOOP
     EXECUTE format('DROP POLICY IF EXISTS allow_all ON %I', t);
     EXECUTE format('CREATE POLICY allow_all ON %I FOR ALL USING (true) WITH CHECK (true)', t);
