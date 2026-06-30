@@ -14040,8 +14040,15 @@ function finSwitchTab(tab) {
     if(srcPage && ccPanel && !ccPanel.hasChildNodes()) {
       while(srcPage.firstChild) ccPanel.appendChild(srcPage.firstChild);
     }
-    if(typeof renderCostCalcGroups==='function') renderCostCalcGroups();
-    if(typeof renderCostCalc==='function') renderCostCalc();
+    // Đảm bảo CC_mats/CC_products đã được load từ Supabase trước khi render
+    (async () => {
+      if (typeof loadMaterials==='function' && (!CC_mats || CC_mats.length===0)) {
+        await loadMaterials();
+      }
+      if (typeof renderMatList==='function') renderMatList();
+      if (typeof renderCostCalcGroups==='function') renderCostCalcGroups();
+      if (typeof renderCostCalc==='function') renderCostCalc();
+    })();
   }
   if(tab==='thu-chi') {
     renderFinance();
