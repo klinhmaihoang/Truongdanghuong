@@ -399,7 +399,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
         <input id="student-search" placeholder="🔍 Tìm theo tên, SĐT, khóa học..." oninput="renderStudents()"
           style="width:100%;padding:9px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit"/>
       </div>
-      <table><thead><tr><th>Họ tên</th><th class="hide-mobile">Khóa học</th><th>Học phí</th><th class="hide-mobile">Ngày học</th><th class="hide-mobile">Thanh toán</th><th class="hide-mobile">Trạng thái</th><th></th></tr></thead>
+      <table><thead><tr><th>Họ tên</th><th class="hide-mobile">Khóa học</th><th class="hide-mobile" style="min-width:80px">Kênh LL</th><th>Học phí</th><th class="hide-mobile">Ngày học</th><th class="hide-mobile">Thanh toán</th><th class="hide-mobile">Trạng thái</th><th></th></tr></thead>
       <tbody id="student-list"></tbody></table>
     </div>
   </div>
@@ -3897,6 +3897,21 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       <div class="fg"><label>🏁 Ngày kết thúc học</label><input id="fs-end-date" type="date"/></div>
       <div class="fg"></div>
     </div>
+    <div class="form-row">
+      <div class="fg">
+        <label>📣 Kênh liên lạc</label>
+        <select id="fs-channel" onchange="toggleChannelOther()">
+          <option value="Zalo">Zalo</option>
+          <option value="Messenger">Messenger</option>
+          <option value="TikTok">TikTok</option>
+          <option value="Khác">Khác...</option>
+        </select>
+      </div>
+      <div class="fg" id="fg-channel-other" style="display:none">
+        <label>Kênh khác (ghi rõ)</label>
+        <input id="fs-channel-other" placeholder="VD: Instagram, Hotline..."/>
+      </div>
+    </div>
     <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="fs-note" placeholder="Ghi chú..."/></div>
     <div class="btn-group" style="margin-top:8px">
       <button class="btn btn-green btn-sm" onclick="addStudent()">Lưu học viên</button>
@@ -6303,6 +6318,7 @@ function renderStudents(){
     return`<tr style="cursor:pointer" onclick="openStDetail('${s.id}')">
       <td><strong>${s.name}</strong><br><span style="font-size:11px;color:var(--muted)">${s.phone||''}</span></td>
       <td class="hide-mobile" style="font-size:12px">${courseName}</td>
+      <td class="hide-mobile" style="font-size:12px;white-space:nowrap">${s.contact_channel?`<span style="background:${{Zalo:'#0068ff',Messenger:'#0099ff',TikTok:'#010101'}[s.contact_channel]||'#888'};color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">${s.contact_channel}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
       <td style="color:var(--brand);font-weight:700">${fee===0?'<span class="tag t-paid">Miễn phí</span>':fmt(fee)}</td>
       <td class="hide-mobile">${classTag||'<span style="color:var(--muted)">—</span>'}</td>
       <td class="hide-mobile"><div style="display:flex;gap:4px">${paid1Tag}${paid2Tag}</div></td>
@@ -6341,6 +6357,7 @@ function openStDetail(id){
     ${s.class_time?`<div class="detail-row"><span class="detail-label">🕐 Giờ học</span><span style="font-weight:700;color:var(--brand)">${s.class_time}</span></div>`:''}
     ${fee>0?`<div class="detail-row"><span class="detail-label">Đợt 1</span><span>${s.paid1?`<span class="tag t-paid">✓ Đã thu ${fmt(dep)}</span> <small style="color:var(--muted)">${s.paid1_at||''}</small>`:`<span class="tag t-low">Chưa thu — ${fmt(dep)}</span>`}</span></div>`:''}
     ${fee>0&&s.type!=='Online'?`<div class="detail-row"><span class="detail-label">Đợt 2</span><span>${s.paid2?`<span class="tag t-paid">✓ Đã thu ${fmt(rest)}</span> <small style="color:var(--muted)">${s.paid2_at||''}</small>`:`<span class="tag t-pending">Chưa thu — ${fmt(rest)}</span>`}</span></div>`:''}
+    ${s.contact_channel?`<div class="detail-row"><span class="detail-label">📣 Kênh liên lạc</span><span style="font-weight:700">${s.contact_channel}</span></div>`:''}
     <div class="detail-row"><span class="detail-label">Ghi chú</span><span style="color:var(--muted)">${s.note||'—'}</span></div>
   `;
   // Set dropdown trạng thái
@@ -6548,6 +6565,12 @@ function renderDeletedStudents(){
   </tr>`).join('');
 }
 
+function toggleChannelOther() {
+  const sel = document.getElementById('fs-channel');
+  const box = document.getElementById('fg-channel-other');
+  if (sel && box) box.style.display = sel.value === 'Khác' ? '' : 'none';
+}
+
 async function addStudent(){
   const n=document.getElementById('fs-name').value.trim();
   if(!n){notify('Vui lòng nhập họ tên!',false);return;}
@@ -6555,6 +6578,9 @@ async function addStudent(){
   const course=D.courses.find(c=>c.id===courseId);
   const type=document.getElementById('fs-type').value;
   const feeVal=+document.getElementById('fs-fee').value||(course&&!course.is_free?course.fee:0);
+  const chSel = document.getElementById('fs-channel')?.value||'Zalo';
+  const chOther = document.getElementById('fs-channel-other')?.value.trim()||'';
+  const contact_channel = chSel==='Khác' ? (chOther||'Khác') : chSel;
   const s={id:uid(),name:n,phone:document.getElementById('fs-phone').value,
     type,course_id:courseId,course:course?course.name:'',
     email:document.getElementById('fs-email').value,fee:feeVal,
@@ -6563,13 +6589,14 @@ async function addStudent(){
     class_time:type==='Offline'?(document.getElementById('fs-class-time').value||''):'',
     end_date:document.getElementById('fs-end-date').value||null,
     note:document.getElementById('fs-note').value,
+    contact_channel,
     paid1:false,paid1_at:null,paid2:false,paid2_at:null,
     status:'Đang học',created_at:Date.now()};
   try{
     await sbUpsert('students',s);
     D.students.push(s);
     closeM('modal-add-student');
-    ['fs-name','fs-phone','fs-email','fs-fee','fs-start','fs-class-date','fs-end-date','fs-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+    ['fs-name','fs-phone','fs-email','fs-fee','fs-start','fs-class-date','fs-end-date','fs-note','fs-channel-other'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const fsCh=document.getElementById('fs-channel');if(fsCh)fsCh.value='Zalo';const fgOt=document.getElementById('fg-channel-other');if(fgOt)fgOt.style.display='none';
     renderStudents();renderDash();notify('Đã thêm: '+n);
     if(document.getElementById('at-student').checked)
       tgMsg(`🎓 *Học viên mới!*\n\n👤 ${n}\n📱 ${type}\n📚 ${course?course.name:'—'}\n💰 ${feeVal===0?'Miễn phí':fmt(feeVal)}\n${s.class_date?`🗓 Ngày học: ${s.class_date}\n`:''}\n_Trương Dáng Hương Academy_`);
