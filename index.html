@@ -3864,6 +3864,21 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       <div class="fg"><label>🏁 Ngày kết thúc học</label><input id="es-end-date" type="date"/></div>
       <div class="fg"></div>
     </div>
+    <div class="form-row">
+      <div class="fg">
+        <label>📣 Kênh liên lạc</label>
+        <select id="es-channel" onchange="toggleEditChannelOther()">
+          <option value="Zalo">Zalo</option>
+          <option value="Messenger">Messenger</option>
+          <option value="TikTok">TikTok</option>
+          <option value="Khác">Khác...</option>
+        </select>
+      </div>
+      <div class="fg" id="fg-es-channel-other" style="display:none">
+        <label>Kênh khác (ghi rõ)</label>
+        <input id="es-channel-other" placeholder="VD: Instagram, Hotline..."/>
+      </div>
+    </div>
     <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="es-note" placeholder="Ghi chú thêm..."/></div>
     <div class="btn-group" style="margin-top:8px">
       <button class="btn btn-green btn-sm" onclick="saveEditStudent()">💾 Lưu thay đổi</button>
@@ -6493,8 +6508,31 @@ function openEditStudent(){
     courseEl.innerHTML=`<option value="${s.course_id||''}" selected>${s.course||'Cơ bản'}</option>`;
   }
 
+  // Fill kênh liên lạc
+  const esCh = document.getElementById('es-channel');
+  const esFgOther = document.getElementById('fg-es-channel-other');
+  const esChOther = document.getElementById('es-channel-other');
+  const knownChannels = ['Zalo','Messenger','TikTok'];
+  if (esCh) {
+    const ch = s.contact_channel||'Zalo';
+    if (knownChannels.includes(ch)) {
+      esCh.value = ch;
+      if(esFgOther) esFgOther.style.display='none';
+    } else {
+      esCh.value = 'Khác';
+      if(esFgOther) esFgOther.style.display='';
+      if(esChOther) esChOther.value = ch;
+    }
+  }
+
   closeM('modal-student-detail');
   setTimeout(()=>showM('modal-edit-student'),150);
+}
+
+function toggleEditChannelOther() {
+  const sel = document.getElementById('es-channel');
+  const box = document.getElementById('fg-es-channel-other');
+  if (sel && box) box.style.display = sel.value === 'Khác' ? '' : 'none';
 }
 
 async function saveEditStudent(){
@@ -6513,6 +6551,10 @@ async function saveEditStudent(){
     startFmt=`${p[2]}/${p[1]}/${p[0]}`;
   }
 
+  const esChSel = document.getElementById('es-channel')?.value||'Zalo';
+  const esChOther = document.getElementById('es-channel-other')?.value.trim()||'';
+  const contact_channel = esChSel==='Khác' ? (esChOther||'Khác') : esChSel;
+
   const upd={
     name,
     phone:document.getElementById('es-phone').value,
@@ -6526,6 +6568,7 @@ async function saveEditStudent(){
     end_date:document.getElementById('es-end-date').value||null,
     class_time:document.getElementById('es-class-time')?.value||'',
     note:document.getElementById('es-note').value,
+    contact_channel,
   };
 
   try{
