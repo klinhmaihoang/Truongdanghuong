@@ -6364,15 +6364,33 @@ function addToGoogleCalendar(id) {
     `Kênh LL: ${s.contact_channel||'—'}`
   );
 
-  // Parse ngày — hỗ trợ cả DD/MM/YYYY và YYYY-MM-DD
+  // Parse ngày — hỗ trợ YYYY-MM-DD (từ input date) và DD/MM/YYYY (từ s.start)
   function parseDate(str) {
     if (!str) return null;
-    if (str.includes('/')) { const p=str.split('/'); return `${p[2]}${p[1].padStart(2,'0')}${p[0].padStart(2,'0')}`; }
-    return str.replace(/-/g,'');
+    if (str.includes('-') && str.indexOf('-') === 4) {
+      // YYYY-MM-DD → YYYYMMDD (đúng)
+      return str.replace(/-/g,'');
+    }
+    if (str.includes('/')) {
+      // DD/MM/YYYY → YYYYMMDD
+      const p = str.split('/');
+      if (p.length === 3) return `${p[2]}${p[1].padStart(2,'0')}${p[0].padStart(2,'0')}`;
+    }
+    return null;
   }
 
-  const startDate = parseDate(s.class_date || s.start);
-  const endDate   = parseDate(s.end_date || s.class_date || s.start);
+  // Parse giờ HH:MM → HHMMSS (đảm bảo đủ 6 ký tự)
+  function parseTime(str) {
+    const clean = (str||'').trim();
+    const parts = clean.split(':');
+    const hh = (parts[0]||'00').padStart(2,'0');
+    const mm = (parts[1]||'00').padStart(2,'0');
+    return hh + mm + '00'; // VD: '9:00' → '090000', '15:00' → '150000'
+  }
+
+  // Ưu tiên class_date (YYYY-MM-DD từ input date) hơn start (DD/MM/YYYY dạng text)
+  const startDate = parseDate(s.class_date) || parseDate(s.start);
+  const endDate   = parseDate(s.end_date) || parseDate(s.class_date) || parseDate(s.start);
 
   if (!startDate) { notify('Học viên chưa có ngày bắt đầu!', false); return; }
 
@@ -6380,17 +6398,18 @@ function addToGoogleCalendar(id) {
   let url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&details=${details}`;
 
   if (s.class_time && startDate) {
-    // Có giờ cụ thể — tạo event có giờ bắt đầu/kết thúc
+    // Có giờ cụ thể — tạo event có giờ (dạng local, không có Z để tránh lệch múi giờ)
     const timeParts = s.class_time.replace(/\s/g,'').split('-');
-    const startTime = (timeParts[0]||'08:00').replace(':','') + '00';
-    const endTime   = (timeParts[1]||'10:00').replace(':','') + '00';
+    const startTime = parseTime(timeParts[0]);
+    const endTime   = parseTime(timeParts[1] || timeParts[0]);
     url += `&dates=${startDate}T${startTime}/${endDate}T${endTime}`;
   } else {
-    // Không có giờ — tạo all-day event
+    // Không có giờ — tạo all-day event (endDate phải là ngày kế tiếp)
     const endDateNext = (() => {
-      const d = new Date(endDate.slice(0,4)+'-'+endDate.slice(4,6)+'-'+endDate.slice(6,8));
-      d.setDate(d.getDate()+1);
-      return d.toISOString().slice(0,10).replace(/-/g,'');
+      const y=endDate.slice(0,4), m=endDate.slice(4,6), d=endDate.slice(6,8);
+      const dt = new Date(`${y}-${m}-${d}`);
+      dt.setDate(dt.getDate()+1);
+      return dt.toISOString().slice(0,10).replace(/-/g,'');
     })();
     url += `&dates=${startDate}/${endDateNext}`;
   }
