@@ -3901,7 +3901,27 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Email</label><input id="fs-email" placeholder="email@example.com"/></div>
-      <div class="fg"><label>Học phí (₫)</label><input id="fs-fee" type="number" placeholder="2500000"/></div>
+      <div class="fg"><label>Học phí gốc (₫)</label><input id="fs-fee" type="number" placeholder="2500000" oninput="calcDiscountedFee()"/></div>
+    </div>
+    <div class="form-row" style="align-items:flex-end">
+      <div class="fg">
+        <label>🏷️ Chiết khấu</label>
+        <div style="display:flex;gap:6px">
+          <select id="fs-discount-type" onchange="calcDiscountedFee()" style="width:80px;flex-shrink:0;border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;font-size:13px;font-family:inherit">
+            <option value="pct">%</option>
+            <option value="fixed">₫</option>
+          </select>
+          <input id="fs-discount-val" type="number" min="0" placeholder="0" oninput="calcDiscountedFee()" style="flex:1"/>
+        </div>
+      </div>
+      <div class="fg">
+        <label>Ghi chú chiết khấu</label>
+        <input id="fs-discount-note" placeholder="VD: Giới thiệu bạn bè, học lại..."/>
+      </div>
+    </div>
+    <div id="fs-fee-preview" style="display:none;background:var(--brand-light);border-radius:8px;padding:8px 12px;margin-bottom:4px;font-size:13px">
+      💰 Học phí sau CK: <strong id="fs-fee-final" style="color:var(--brand);font-size:15px"></strong>
+      <span id="fs-fee-saved" style="color:var(--green);margin-left:8px;font-size:12px"></span>
     </div>
     <div class="form-row">
       <div class="fg"><label>Ngày đăng ký</label><input id="fs-start" type="date"/></div>
@@ -6440,7 +6460,9 @@ function openStDetail(id){
     <div class="detail-row"><span class="detail-label">Ngày đăng ký</span><span>${s.start||'—'}</span></div>
     ${s.class_date?`<div class="detail-row"><span class="detail-label">📅 Ngày học</span><span style="font-weight:700;color:var(--brand)">${s.class_date}</span></div>`:''}
     ${s.end_date?`<div class="detail-row"><span class="detail-label">🏁 Kết thúc học</span><span style="color:var(--muted)">${s.end_date}</span></div>`:''}
-    <div class="detail-row"><span class="detail-label">Học phí</span><span style="color:var(--brand);font-weight:700">${fee===0?'Miễn phí':fmt(fee)}</span></div>
+    <div class="detail-row"><span class="detail-label">Học phí</span><span style="color:var(--brand);font-weight:700">${fee===0?'Miễn phí':fmt(fee)}${s.discount_saved>0?`<span style="color:var(--green);font-size:11px;margin-left:6px;font-weight:400">(CK ${s.discount_type==='pct'?s.discount_value+'%':fmt(s.discount_value)} — tiết kiệm ${fmt(s.discount_saved)})</span>`:''}</span></div>
+    ${s.fee_original&&s.discount_saved>0?`<div class="detail-row"><span class="detail-label" style="color:var(--muted)">Học phí gốc</span><span style="text-decoration:line-through;color:var(--muted)">${fmt(s.fee_original)}</span></div>`:''}
+    ${s.discount_note?`<div class="detail-row"><span class="detail-label">🏷️ Lý do CK</span><span style="color:var(--green)">${s.discount_note}</span></div>`:''}
     ${s.class_time?`<div class="detail-row"><span class="detail-label">🕐 Giờ học</span><span style="font-weight:700;color:var(--brand)">${s.class_time}</span></div>`:''}
     ${fee>0?`<div class="detail-row"><span class="detail-label">${isOnlineSt?'💳 Học phí (1 lần)':'Đợt 1'}</span><span>${s.paid1?`<span class="tag t-paid">✓ Đã thu ${fmt(dep)}</span> <small style="color:var(--muted)">${s.paid1_at||''}</small>`:`<span class="tag t-low">Chưa thu — ${fmt(dep)}</span>`}</span></div>`:''}
     ${fee>0&&!isOnlineSt?`<div class="detail-row"><span class="detail-label">Đợt 2</span><span>${s.paid2?`<span class="tag t-paid">✓ Đã thu ${fmt(rest)}</span> <small style="color:var(--muted)">${s.paid2_at||''}</small>`:`<span class="tag t-pending">Chưa thu — ${fmt(rest)}</span>`}</span></div>`:''}
@@ -6687,13 +6709,34 @@ function toggleChannelOther() {
   if (sel && box) box.style.display = sel.value === 'Khác' ? '' : 'none';
 }
 
+function calcDiscountedFee() {
+  const fee = +document.getElementById('fs-fee')?.value || 0;
+  const dType = document.getElementById('fs-discount-type')?.value || 'pct';
+  const dVal = +document.getElementById('fs-discount-val')?.value || 0;
+  const preview = document.getElementById('fs-fee-preview');
+  const finalEl = document.getElementById('fs-fee-final');
+  const savedEl = document.getElementById('fs-fee-saved');
+  if (!preview) return;
+  if (fee <= 0 || dVal <= 0) { preview.style.display = 'none'; return; }
+  const saved = dType === 'pct' ? Math.round(fee * dVal / 100) : Math.min(dVal, fee);
+  const final = fee - saved;
+  preview.style.display = '';
+  finalEl.textContent = fmtVND ? fmtVND(final) : final.toLocaleString('vi-VN') + 'đ';
+  savedEl.textContent = `(tiết kiệm ${fmtVND ? fmtVND(saved) : saved.toLocaleString('vi-VN')+'đ'})`;
+}
+
 async function addStudent(){
   const n=document.getElementById('fs-name').value.trim();
   if(!n){notify('Vui lòng nhập họ tên!',false);return;}
   const courseId=document.getElementById('fs-course-id').value;
   const course=D.courses.find(c=>c.id===courseId);
   const type=document.getElementById('fs-type').value;
-  const feeVal=+document.getElementById('fs-fee').value||(course&&!course.is_free?course.fee:0);
+  const feeOrig=+document.getElementById('fs-fee').value||(course&&!course.is_free?course.fee:0);
+  const discType = document.getElementById('fs-discount-type')?.value||'pct';
+  const discVal = +document.getElementById('fs-discount-val')?.value||0;
+  const discSaved = discVal>0 ? (discType==='pct' ? Math.round(feeOrig*discVal/100) : Math.min(discVal,feeOrig)) : 0;
+  const feeVal = feeOrig - discSaved;
+  const discNote = document.getElementById('fs-discount-note')?.value.trim()||'';
   const chSel = document.getElementById('fs-channel')?.value||'Zalo';
   const chOther = document.getElementById('fs-channel-other')?.value.trim()||'';
   const contact_channel = chSel==='Khác' ? (chOther||'Khác') : chSel;
@@ -6706,13 +6749,18 @@ async function addStudent(){
     end_date:document.getElementById('fs-end-date').value||null,
     note:document.getElementById('fs-note').value,
     contact_channel,
+    fee_original: feeOrig,
+    discount_type: discVal>0 ? discType : null,
+    discount_value: discVal>0 ? discVal : null,
+    discount_saved: discSaved>0 ? discSaved : null,
+    discount_note: discNote||null,
     paid1:false,paid1_at:null,paid2:false,paid2_at:null,
     status:'Đang học',created_at:Date.now()};
   try{
     await sbUpsert('students',s);
     D.students.push(s);
     closeM('modal-add-student');
-    ['fs-name','fs-phone','fs-email','fs-fee','fs-start','fs-class-date','fs-end-date','fs-note','fs-channel-other'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const fsCh=document.getElementById('fs-channel');if(fsCh)fsCh.value='Zalo';const fgOt=document.getElementById('fg-channel-other');if(fgOt)fgOt.style.display='none';
+    ['fs-name','fs-phone','fs-email','fs-fee','fs-start','fs-class-date','fs-end-date','fs-note','fs-channel-other','fs-discount-val','fs-discount-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const fsDT=document.getElementById('fs-discount-type');if(fsDT)fsDT.value='pct';const fsPrev=document.getElementById('fs-fee-preview');if(fsPrev)fsPrev.style.display='none';;const fsCh=document.getElementById('fs-channel');if(fsCh)fsCh.value='Zalo';const fgOt=document.getElementById('fg-channel-other');if(fgOt)fgOt.style.display='none';
     renderStudents();renderDash();notify('Đã thêm: '+n);
     if(document.getElementById('at-student').checked)
       tgMsg(`🎓 *Học viên mới!*\n\n👤 ${n}\n📱 ${type}\n📚 ${course?course.name:'—'}\n💰 ${feeVal===0?'Miễn phí':fmt(feeVal)}\n${s.class_date?`🗓 Ngày học: ${s.class_date}\n`:''}\n_Trương Dáng Hương Academy_`);
