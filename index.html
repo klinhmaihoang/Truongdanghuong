@@ -5868,7 +5868,7 @@ function drinkRpRender() {
   // Tổng hợp theo tên sản phẩm
   const byProduct = {}; // {name: {qty, revenue, cost, bom}}
   orders.forEach(o => {
-    (o.items||'').split(',').forEach(item => {
+    parseItemsList(o.items).forEach(item => {
       const m = item.trim().match(/^(.+?)(?:\s+x(\d+))?$/);
       if(!m) return;
       const name = m[1].trim();
@@ -5896,7 +5896,7 @@ function drinkRpRender() {
     if(!d) return;
     const key = dateStr(d);
     if(!byDay[key]) return;
-    (o.items||'').split(',').forEach(item => {
+    parseItemsList(o.items).forEach(item => {
       const m=item.trim().match(/^(.+?)(?:\s+x(\d+))?$/);
       if(!m) return;
       const name=m[1].trim(), qty=+(m[2]||1);
@@ -6215,7 +6215,7 @@ function renderRpSales(){
   const prodCount={};
   const prodRev={};
   paid.forEach(o=>{
-    (o.items||'').split(',').forEach(item=>{
+    parseItemsList(o.items).forEach(item=>{
       const m=item.trim().match(/^(.+?)(?:\s+x(\d+))?$/);
       if(!m)return;
       const name=m[1].trim(); const qty=+(m[2]||1);
@@ -7438,7 +7438,7 @@ async function saveDraft(){
 function collectPending(id){
   const o=D.orders.find(x=>x.id===id);if(!o)return;
   invoice={id:o.id,name:o.customer,email:o.email||'',note:o.note||'',total:o.total,items:o.items,time:o.time};
-  cart=o.items.split(',').map(s=>{
+  cart=parseItemsList(o.items).map(s=>{
     const m=s.trim().match(/^(.+?)(?:\s+x(\d+))?$/);if(!m)return null;
     const name=m[1].trim();const qty=+(m[2]||1);
     const p=D.products.find(x=>x.name===name)||{name,price:0};
@@ -8837,7 +8837,7 @@ function printRetailPDF(order){
         <td style="text-align:right;padding:3px 0">T.tiền</td>
       </tr>
       ${(()=>{
-        const itemList = (order.items||'').split(',').map(s=>s.trim()).filter(Boolean);
+        const itemList = parseItemsList(order.items);
         return itemList.map(s=>{
           const {name, qty, unit, lineTotal, unitPrice} = parseItemStr(s);
           const displayQty = Number.isInteger(qty) ? qty : +qty.toFixed(2);
@@ -12053,7 +12053,16 @@ function showOrderDetail(id) {
   addrEl.style.display = o.address?'':'none';
   // Items — parse "Sản phẩm x3, Sản phẩm2" into tags
   const itemsEl = document.getElementById('od-items-view');
-  const itemList = (o.items||'').split(',').map(s=>s.trim()).filter(Boolean);
+  // items có thể là Array (từ GAS) hoặc string (format cũ)
+  const _itemsRaw = o.items||[];
+  const itemList = Array.isArray(_itemsRaw)
+    ? _itemsRaw.map(i => {
+        const name = i.name||i.product||i.ten||'';
+        const qty  = i.qty||i.quantity||i.so_luong||1;
+        const price= i.price||i.gia||0;
+        return price ? `${name} x${qty} @${price}` : `${name} x${qty}`;
+      }).filter(Boolean)
+    : String(_itemsRaw).split(',').map(s=>s.trim()).filter(Boolean);
   let catalogTotal = 0;
   const parsedItems = itemList.map(item => {
     const p = parseItemStr(item);
@@ -12142,7 +12151,7 @@ function odEnterEdit() {
   // Build item rows — dùng parseItemStr để lấy đúng thành tiền đã lưu
   const itemsContainer = document.getElementById('od-edit-items');
   itemsContainer.innerHTML = '';
-  const itemList2 = (o.items||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const itemList2 = parseItemsList(o.items);
   itemList2.forEach(s => {
     const {name, qty, lineTotal} = parseItemStr(s);
     odAddItem(name, qty, lineTotal || null);
@@ -12272,7 +12281,7 @@ async function odSaveEdit() {
     items.push(str);
   });
   // Nếu items rỗng (do scroll làm mất input trên mobile) → giữ items cũ
-  const finalItems = items.length ? items : (o.items||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const finalItems = items.length ? items : parseItemsList(o.items);
   if(!finalItems.length){notify('Thêm ít nhất 1 sản phẩm!',false);return;}
   const disc    = Math.min(100,Math.max(0,parseFloat(document.getElementById('od-edit-discount')?.value)||0));
   const shipFee = Math.max(0, parseFloat(document.getElementById('od-edit-ship-fee')?.value)||0);
@@ -12671,7 +12680,7 @@ async function runMigration() {
 
 // Kiểm tra kho đủ cho 1 đơn hàng
 function checkStockForOrder(o) {
-  const items = (o.items||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const items = parseItemsList(o.items);
   const warnings = [];
   const needed = {}; // mat_id -> total needed
 
@@ -12704,7 +12713,7 @@ function checkStockForOrder(o) {
 
 // Trừ kho cho 1 đơn hàng theo công thức
 async function deductStockForOrder(o) {
-  const items = (o.items||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const items = parseItemsList(o.items);
   const logs = [];
   for(const itemStr of items) {
     const {name, qty} = parseItemStr(itemStr);
@@ -12823,7 +12832,7 @@ ${warnings.join('\n')}\n\nVẫn xác nhận đơn?`;
 // Tính lại tổng tiền từ parseItemStr (dùng @saved hoặc catalog price)
 async function odRecalcTotal() {
   const o = OD_current; if(!o) return;
-  const itemList = (o.items||'').split(',').map(s=>s.trim()).filter(Boolean);
+  const itemList = parseItemsList(o.items);
   let newTotal = 0;
   const details = [];
   itemList.forEach(s => {
@@ -12920,7 +12929,7 @@ function renderPrep() {
   // Tổng hợp sản phẩm — dùng parseItemStr để xử lý đúng @giá
   const byProduct = {};
   orders.forEach(o => {
-    (o.items||'').split(',').forEach(item => {
+    parseItemsList(o.items).forEach(item => {
       const s = item.trim();
       if(!s) return;
       const parsed = parseItemStr(s);
@@ -13045,7 +13054,7 @@ function exportPrepExcel() {
 
   const rows2 = [['Mã đơn','Khách hàng','Sản phẩm','Số lượng','Đơn vị','Trạng thái','Thời gian']];
   orders.forEach(o => {
-    (o.items||'').split(',').forEach(item => {
+    parseItemsList(o.items).forEach(item => {
       const s=item.trim();
       const mFull=s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)\s*\(([^)]+)\)$/i);
       const mQty=s.match(/^(.+?)\s+x(\d+(?:\.\d+)?)$/i);
@@ -13127,6 +13136,20 @@ function odOpenTrackingCode() {
   const prov = odGetTrackingProvider(code);
   const url  = prov?.url(code);
   if(url) window.open(url, '_blank');
+}
+
+// Helper: parse items từ Array (GAS) hoặc string cũ thành array of strings
+function parseItemsList(items) {
+  if (!items) return [];
+  if (Array.isArray(items)) {
+    return items.map(i => {
+      const name  = i.name||i.product||i.ten||'';
+      const qty   = i.qty||i.quantity||i.so_luong||1;
+      const price = i.price||i.gia||0;
+      return price ? `${name} x${qty} @${price}` : `${name} x${qty}`;
+    }).filter(Boolean);
+  }
+  return String(items).split(',').map(s=>s.trim()).filter(Boolean);
 }
 
 function cleanItems(items) {
@@ -18358,7 +18381,7 @@ function renderCEODashboard() {
   // Top products by order count this month
   const prodMap = {};
   orders.filter(o=>paidOrders(o)&&getMonthKey(o.time)===thisMonth).forEach(o=>{
-    (o.items||'').split(',').forEach(item=>{
+    parseItemsList(o.items).forEach(item=>{
       const name = item.trim().replace(/\s*\(.*?\)\s*/g,'').replace(/\s*x\d+\s*$/i,'').trim();
       if(!name||name.length<2) return;
       if(!prodMap[name]) prodMap[name]={name,count:0,revenue:0};
