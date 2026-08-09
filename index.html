@@ -4631,7 +4631,7 @@ const SUPABASE_KEY = '';
 const NEON_HOST    = '';
 const NEON_TOKEN   = '';
 
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbxDybNCMlFJMDd2JTTnwsK06GFjJMij5dIhpWG30bQM-fJB90Dca3akVclEB9VUigLE/exec';
+const GAS_URL = 'https://script.google.com/macros/s/AKfycbwk6oBp1yjg8E4AexktyJ2VQpdUImsdBVl47xWBUGtY4Y7Be7kwZIKBf8cOGM6A31oh/exec';
 
 function getGasUrl() {
   return cfg?.gsUrl || GAS_URL;
@@ -4870,7 +4870,7 @@ async function boot(){
     startPolling();
   }catch(e){
     setSyncStatus(false,'Lỗi kết nối');
-    notify('Không kết nối được Supabase: '+e.message,false);
+    notify('Không kết nối được Database: '+e.message,false);
     render();
   }
 }
@@ -4902,7 +4902,7 @@ async function pollUpdates(){
     // Reset lỗi khi kết nối lại
     if(_pollFailCount>0){
       _pollFailCount=0;
-      notify('✅ Đã kết nối lại Supabase!');
+      notify('✅ Đã kết nối lại!');
     }
     setSyncStatus(true,'Đồng bộ lúc '+nowTime());
     // Chỉ re-render nếu không đang mở modal đơn hàng (tránh overwrite sau khi vừa update)
@@ -4914,11 +4914,11 @@ async function pollUpdates(){
     if(_pollFailCount===1){
       // Lần đầu mất kết nối
       setSyncStatus(false,'Mất kết nối');
-      notify('⚠️ Mất kết nối Supabase — đang thử lại...',false);
+      notify('⚠️ Mất kết nối — đang thử lại...',false);
     } else if(_pollFailCount===3){
       // Mất kết nối 3 lần liên tiếp (~45s)
       setSyncStatus(false,'Offline — dữ liệu có thể chưa cập nhật');
-      notify('❌ Không kết nối được Supabase sau 3 lần thử. Kiểm tra mạng!',false);
+      notify('❌ Không kết nối được sau 3 lần thử. Kiểm tra mạng!',false);
     }
     // Exponential backoff: lần 1=15s, lần 2=30s, lần 3+=60s
     const delay=_pollFailCount===1?15000:_pollFailCount===2?30000:60000;
@@ -6312,7 +6312,7 @@ function renderDash(){
   // Đơn bán lẻ gần đây (5 đơn mới nhất)
   document.getElementById('dash-orders').innerHTML=retailOrders.slice(-5).reverse().map(o=>`<tr>
     <td style="font-size:12px">${o.customer}</td>
-    <td style="font-size:11px;color:var(--muted)">${o.items.substring(0,20)}${o.items.length>20?'...':''}</td>
+    <td style="font-size:11px;color:var(--muted)">${(typeof o.items==='string'?o.items:JSON.stringify(o.items||[])).substring(0,20)}${(typeof o.items==='string'?o.items:JSON.stringify(o.items||[])).length>20?'...':''}</td>
     <td style="color:var(--brand);font-weight:700;font-size:12px">${fmt(o.total||0)}</td>
     <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':'t-pending'}" style="font-size:10px">${o.status==='Đã thanh toán'?'✓':'⏳'}</span></td>
   </tr>`).join('') || '<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:14px;font-size:12px">Chưa có đơn bán lẻ</td></tr>';
@@ -7309,7 +7309,7 @@ function renderArchivedOrders(){
     return`<tr>
       <td style="font-weight:700;color:var(--muted);text-decoration:line-through">${o.id}</td>
       <td style="color:var(--muted)">${o.customer}</td>
-      <td style="font-size:12px;color:var(--muted)">${o.items.substring(0,25)}${o.items.length>25?'...':''}</td>
+      <td style="font-size:12px;color:var(--muted)">${(typeof o.items==='string'?o.items:JSON.stringify(o.items||[])).substring(0,25)}${(typeof o.items==='string'?o.items:JSON.stringify(o.items||[])).length>25?'...':''}</td>
       <td style="color:var(--muted);text-decoration:line-through">${fmt(o.total||0)}</td>
       <td style="font-size:12px;color:var(--muted)">${o.time}</td>
       <td style="font-size:12px;color:var(--red)">${cancelReason}</td>
@@ -8024,7 +8024,7 @@ async function saveTg(){
       document.getElementById('tg-status').textContent='@'+d.result.username;
       document.getElementById('tg-status').style.color='var(--teal)';
       notify('✓ Kết nối thành công @'+d.result.username);
-      tgMsg(`🎉 *Kết nối thành công!*\n\n🏫 *Trương Dáng Hương Academy*\n✅ Sync Supabase đang hoạt động!\n✅ Telegram Bot đã kết nối!\n\n_Chào mừng team!_ 🍵`);
+      tgMsg(`🎉 *Kết nối thành công!*\n\n🏫 *Trương Dáng Hương Academy*\n✅ Database đang hoạt động!\n✅ Telegram Bot đã kết nối!\n\n_Chào mừng team!_ 🍵`);
     }else notify('Token không hợp lệ',false);
   }catch(e){notify('Không kết nối được Telegram',false);}
 }
@@ -8419,7 +8419,7 @@ function buildAutoTxs(filterMonth){
     if(filterMonth&&m!==filterMonth) return;
     autoTxs.push({
       id:'auto_ord_'+o.id, type:'thu', category:'Bán lẻ sản phẩm',
-      amount:o.total||0, note:o.customer+(o.items?' — '+o.items.substring(0,40):''),
+      amount:o.total||0, note:o.customer+(o.items?' — '+(typeof o.items==='string'?o.items:JSON.stringify(o.items||[])).substring(0,40):''),
       time:o.time||'', _auto:true, _ref:o.id
     });
   });
@@ -8430,7 +8430,7 @@ function buildAutoTxs(filterMonth){
     if(filterMonth&&m!==filterMonth) return;
     autoTxs.push({
       id:'auto_hp_'+o.id, type:'thu', category:'Học phí',
-      amount:o.total||0, note:o.customer+(o.items?' — '+o.items.substring(0,40):''),
+      amount:o.total||0, note:o.customer+(o.items?' — '+(typeof o.items==='string'?o.items:JSON.stringify(o.items||[])).substring(0,40):''),
       time:o.time||'', _auto:true, _ref:o.id
     });
   });
@@ -9665,7 +9665,7 @@ async function saveTrialAsPrice() {
         ingredients: (p.ingredients||[]).map(i=>({mat_id:i.ma_nl,mat_name:i.ten_nl,mat_unit:i.don_vi,qty:i.so_luong,cost_snapshot:i.don_gia}))
       });
     } catch(e) {
-      notify('❌ LƯU THẤT BẠI — Không kết nối được Supabase! Lỗi: '+e.message, false);
+      notify('❌ LƯU THẤT BẠI — Không kết nối được! Lỗi: '+e.message, false);
       return;
     }
   }
@@ -10219,7 +10219,7 @@ async function saveMat() {
       created_at: new Date().toISOString()
     });
   } catch(e) {
-    notify('❌ LƯU THẤT BẠI — Không kết nối được Supabase! Nguyên liệu CHƯA được lưu, vui lòng thử lại. Lỗi: '+e.message, false);
+    notify('❌ LƯU THẤT BẠI — Nguyên liệu CHƯA được lưu, vui lòng thử lại. Lỗi: '+e.message, false);
     return; // dừng lại, không đóng modal, không mất dữ liệu đang nhập
   }
 
@@ -11199,7 +11199,7 @@ async function saveSemi() {
 
   try { await sbUpsert('semi_recipes', record); }
   catch(e) {
-    notify('❌ LƯU THẤT BẠI — Không kết nối được Supabase! Vui lòng thử lại. Lỗi: '+e.message, false);
+    notify('❌ LƯU THẤT BẠI — Vui lòng thử lại. Lỗi: '+e.message, false);
     return;
   }
 
@@ -11217,7 +11217,7 @@ async function saveSemi() {
     };
     try { await sbUpsert('dmhh', {...matObj, created_at:new Date().toISOString()}); }
     catch(e) {
-      notify('❌ LƯU DMHH THẤT BẠI — Không kết nối được Supabase! Lỗi: '+e.message, false);
+      notify('❌ LƯU DMHH THẤT BẠI — Lỗi: '+e.message, false);
       return;
     }
     const mIdx = CC_mats.findIndex(m=>m.ma===nlMa);
