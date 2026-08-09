@@ -13130,6 +13130,14 @@ function odOpenTrackingCode() {
 }
 
 function cleanItems(items) {
+  // items có thể là Array (từ GAS/JSON) hoặc string (format cũ)
+  if (Array.isArray(items)) {
+    return items.map(i => {
+      const name = i.name || i.product || i.ten || '';
+      const qty  = i.qty  || i.quantity || i.so_luong || '';
+      return qty ? name + ' x' + qty : name;
+    }).filter(Boolean).join(', ');
+  }
   return (items||'').split(',').map(s=>
     s.trim().replace(/\s*@\d+\s*$/,'')
   ).join(', ');
