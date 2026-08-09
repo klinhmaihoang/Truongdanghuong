@@ -7099,6 +7099,8 @@ async function handleProductCSVImport(evt){
         }
 
         const id = cleanStr(r.id) || uid();
+        // Ghi chú: KHÔNG gửi vat/discount trong request tạo mới — khớp đúng format
+        // đã xác nhận hoạt động ổn định của addProduct(). Sau khi tạo xong sẽ patch riêng.
         const product = {
           id,
           name,
@@ -7106,18 +7108,26 @@ async function handleProductCSVImport(evt){
           price: cleanNum(r.price),
           cost: cleanNum(r.cost),
           unit: cleanStr(r.unit),
-          vat: cleanNum(r.vat),
-          discount: cleanNum(r.discount),
           mat_id: cleanStr(r.mat_id),
           mat_use: cleanNum(r.mat_use),
           created_at: cleanStr(r.created_at) ? (parseInt(cleanStr(r.created_at)) || Date.now()) : Date.now()
         };
+        const vat = cleanNum(r.vat), discount = cleanNum(r.discount);
 
         try{
           const existing = D.products.find(x => x.id === id);
           await sbUpsertWithRetry('products', product);
           if(existing){ Object.assign(existing, product); updated++; }
           else { D.products.push(product); added++; }
+
+          // Best-effort: gán vat/discount riêng bằng patch (không chặn import nếu lỗi)
+          if(vat || discount){
+            try{
+              await sbPatch('products', {vat, discount}, `?id=eq.${id}`);
+              const p = D.products.find(x => x.id === id);
+              if(p){ p.vat = vat; p.discount = discount; }
+            }catch(e2){ console.warn(`Không gán được vat/discount cho ${rowLabel}:`, e2.message); }
+          }
         }catch(e){
           failed++;
           errorDetails.push(`${rowLabel} (${name}): ${e.message || 'lỗi không xác định'}`);
