@@ -4671,6 +4671,34 @@ function _parseFilter(filter) {
   return { eqs, neqs, order, limit };
 }
 
+// ── Normalize GAS rows (convert string TRUE/FALSE → boolean, null strings → null) ──
+function normalizeRow(r, table) {
+  if (!r) return r;
+  const boolFields = {
+    students:    ['paid1','paid2','is_free'],
+    inventory:   [],
+    courses:     ['is_free'],
+    app_users:   [],
+  };
+  const fields = boolFields[table] || [];
+  const out = {...r};
+  // Convert all null strings
+  for (const k in out) {
+    if (out[k] === 'null' || out[k] === 'NULL') out[k] = null;
+  }
+  // Convert boolean fields
+  fields.forEach(f => {
+    if (out[f] === 'TRUE' || out[f] === true || out[f] === 1 || out[f] === '1') out[f] = true;
+    else if (out[f] === 'FALSE' || out[f] === false || out[f] === 0 || out[f] === '0' || out[f] === null || out[f] === '') out[f] = false;
+  });
+  // Convert numeric strings for known numeric fields
+  const numFields = ['fee','total','amount','qty','min','cost','points','total_spent','visit_count','paid1_amount','paid2_amount','fee_original','discount_value','discount_saved'];
+  numFields.forEach(f => {
+    if (f in out && out[f] !== null && out[f] !== '') out[f] = parseFloat(out[f]) || 0;
+  });
+  return out;
+}
+
 // ── Compatibility API ─────────────────────────────────────────────
 
 const sbGet = async (t, f='') => {
@@ -4679,7 +4707,7 @@ const sbGet = async (t, f='') => {
   try {
     const { eqs, neqs, order, limit } = _parseFilter(f);
     const result = await gasCall({ action:'db_read', table:t, filters: Object.keys(eqs).length ? eqs : null, order, limit });
-    let rows = result.rows || [];
+    let rows = (result.rows || []).map(r => normalizeRow(r, t));
     // Client-side neq filter
     for (const [k, v] of Object.entries(neqs)) {
       rows = rows.filter(r => String(r[k]) !== String(v));
@@ -4688,6 +4716,27 @@ const sbGet = async (t, f='') => {
   } catch(e) {
     console.warn(`sbGet(${t}) lỗi:`, e.message);
     return [];
+  }
+};
+
+// Đọc nhiều bảng trong 1 request GAS (tránh timeout)
+const sbGetBulk = async (tables) => {
+  try {
+    const result = await gasCall({
+      action: 'db_read_bulk',
+      tables: tables.map(t => typeof t === 'string'
+        ? {table:t, filters:null, order:{col:'created_at',dir:'asc'}, limit:null}
+        : t)
+    });
+    const raw = result.results || {};
+    const normalized = {};
+    for (const t in raw) {
+      normalized[t] = (raw[t] || []).map(r => normalizeRow(r, t));
+    }
+    return normalized;
+  } catch(e) {
+    console.warn('sbGetBulk lỗi:', e.message);
+    return {};
   }
 };
 
@@ -4767,12 +4816,17 @@ async function boot(){
   setSyncStatus(false,'Đang kết nối...');
   try{
     // ── NHÓM 1: Data cốt lõi — load ngay, hiển thị UI sớm ──
-    const [orders, students, transactions, settings] = await Promise.all([
-      sbGet('orders','?order=created_at.desc&limit=500&deleted_at=is.null&status=neq.Đã hủy'),
-      sbGet('students','?order=created_at.asc'),
-      sbGet('transactions','?order=created_at.desc&limit=500'),
-      sbGet('settings','?id=eq.main'),
+    // Bulk request nhóm 1 — 1 request thay vì 4
+    const _bulk1 = await sbGetBulk([
+      {table:'orders',       order:{col:'created_at',dir:'desc'}, limit:500},
+      {table:'students',     order:{col:'created_at',dir:'asc'}},
+      {table:'transactions', order:{col:'created_at',dir:'desc'}, limit:500},
+      {table:'settings',     filters:{id:'main'}, limit:1},
     ]);
+    const orders       = _bulk1.orders       || [];
+    const students     = _bulk1.students     || [];
+    const transactions = _bulk1.transactions || [];
+    const settings     = _bulk1.settings     || [];
 
     D.orders       = orders||[];
     D.students     = students||[];
@@ -4799,27 +4853,49 @@ async function boot(){
     // ── NHÓM 2: Data phụ — load ngầm sau khi UI đã hiện ──
     setTimeout(async()=>{
       try{
-        const [inventory,products,courses,customers,stockLog,recipes,employees,suppliers,purchaseOrders,approvalQueue,crmTasksRaw,crmStagesRaw,journalRaw,salaryRaw,attendance,production,quotationsRaw,salesOrdersRaw,soActivitiesRaw] = await Promise.all([
-          sbGet('inventory','?order=created_at.asc').catch(e=>{console.warn('inventory load lỗi:',e.message);return [];}),
-          sbGet('products','?order=created_at.asc').catch(e=>{console.warn('products load lỗi:',e.message);return [];}),
-          sbGet('courses','?order=created_at.asc').catch(e=>{console.warn('courses load lỗi:',e.message);return [];}),
-          sbGet('customers','?order=created_at.asc').catch(e=>{console.warn('customers load lỗi:',e.message);return [];}),
-          sbGet('stock_log','?order=created_at.desc&limit=200').catch(e=>{console.warn('stock_log load lỗi:',e.message);return [];}),
-          sbGet('recipes','?order=created_at.asc').catch(e=>{console.warn('recipes load lỗi:',e.message);return [];}),
-          sbGet('employees','?order=created_at.asc').catch(()=>[]),
-          sbGet('suppliers','?order=created_at.asc').catch(()=>[]),
-          sbGet('purchase_orders','?order=created_at.desc&limit=50').catch(()=>[]),
-          sbGet('approval_queue','?order=created_at.desc&limit=50').catch(()=>[]),
-          sbGet('crm_tasks','?id=eq.crm_tasks_main').catch(()=>[]),
-          sbGet('crm_stages','?id=eq.crm_stages_main').catch(()=>[]),
-          sbGet('journal_entries','?order=created.desc&limit=200').catch(()=>[]),
-          sbGet('salary_records','?order=month.desc&limit=200').catch(()=>[]),
-          sbGet('attendance','?order=month.asc').catch(()=>[]),
-          sbGet('production_orders','?order=created.desc&limit=100').catch(()=>[]),
-          sbGet('quotations','?order=created_at.desc&limit=100').catch(()=>[]),
-          sbGet('sales_orders','?order=created_at.desc&limit=100').catch(()=>[]),
-          sbGet('so_activities','?order=created_at.desc&limit=200').catch(()=>[]),
+        // Bulk request nhóm 2 — 2 request thay vì 19
+        const _bulk2a = await sbGetBulk([
+          {table:'inventory',       order:{col:'created_at',dir:'asc'}},
+          {table:'products',        order:{col:'created_at',dir:'asc'}},
+          {table:'courses',         order:{col:'created_at',dir:'asc'}},
+          {table:'customers',       order:{col:'created_at',dir:'asc'}},
+          {table:'stock_log',       order:{col:'created_at',dir:'desc'}, limit:200},
+          {table:'recipes',         order:{col:'created_at',dir:'asc'}},
+          {table:'employees',       order:{col:'created_at',dir:'asc'}},
+          {table:'suppliers',       order:{col:'created_at',dir:'asc'}},
+          {table:'purchase_orders', order:{col:'created_at',dir:'desc'}, limit:100},
+          {table:'approval_queue',  order:{col:'created_at',dir:'desc'}, limit:50},
         ]);
+        const _bulk2b = await sbGetBulk([
+          {table:'crm_tasks',         order:{col:'created_at',dir:'desc'}, limit:100},
+          {table:'crm_stages',        order:{col:'created_at',dir:'desc'}, limit:20},
+          {table:'journal_entries',   order:{col:'created_at',dir:'desc'}, limit:200},
+          {table:'salary_records',    order:{col:'month',dir:'desc'}, limit:200},
+          {table:'attendance',        order:{col:'month',dir:'asc'}},
+          {table:'production_orders', order:{col:'created',dir:'desc'}, limit:100},
+          {table:'quotations',        order:{col:'created_at',dir:'desc'}, limit:100},
+          {table:'sales_orders',      order:{col:'created_at',dir:'desc'}, limit:100},
+          {table:'so_activities',     order:{col:'created_at',dir:'desc'}, limit:200},
+        ]);
+        const inventory       = _bulk2a.inventory       || [];
+        const products        = _bulk2a.products        || [];
+        const courses         = _bulk2a.courses         || [];
+        const customers       = _bulk2a.customers       || [];
+        const stockLog        = _bulk2a.stock_log       || [];
+        const recipes         = _bulk2a.recipes         || [];
+        const employees       = _bulk2a.employees       || [];
+        const suppliers       = _bulk2a.suppliers       || [];
+        const purchaseOrders  = _bulk2a.purchase_orders || [];
+        const approvalQueue   = _bulk2a.approval_queue  || [];
+        const crmTasksRaw     = _bulk2b.crm_tasks       || [];
+        const crmStagesRaw    = _bulk2b.crm_stages      || [];
+        const journalRaw      = _bulk2b.journal_entries || [];
+        const salaryRaw       = _bulk2b.salary_records  || [];
+        const attendance      = _bulk2b.attendance      || [];
+        const production      = _bulk2b.production_orders|| [];
+        const quotationsRaw   = _bulk2b.quotations      || [];
+        const salesOrdersRaw  = _bulk2b.sales_orders    || [];
+        const soActivitiesRaw = _bulk2b.so_activities   || [];
 
         D.inventory = inventory&&inventory.length ? inventory : DEFAULTS.inventory;
         D.products  = (products&&products.length ? products : DEFAULTS.products).map(p=>({unit:'', ...p}));
@@ -4883,15 +4959,22 @@ async function pollUpdates(){
   if(_isPolling) return; // Tránh chạy đè nhau
   _isPolling=true;
   try{
-    const [students,inventory,products,orders,courses,customers,transactions] = await Promise.all([
-      sbGet('students','?order=created_at.asc'),
-      sbGet('inventory','?order=created_at.asc'),
-      sbGet('products','?order=created_at.asc'),
-      sbGet('orders','?order=created_at.desc&limit=500&deleted_at=is.null&status=neq.Đã hủy'),
-      sbGet('courses','?order=created_at.asc'),
-      sbGet('customers','?order=created_at.asc'),
-      sbGet('transactions','?order=created_at.desc&limit=500'),
+    const _poll = await sbGetBulk([
+      {table:'students',     order:{col:'created_at',dir:'asc'}},
+      {table:'inventory',    order:{col:'created_at',dir:'asc'}},
+      {table:'products',     order:{col:'created_at',dir:'asc'}},
+      {table:'orders',       order:{col:'created_at',dir:'desc'}, limit:500},
+      {table:'courses',      order:{col:'created_at',dir:'asc'}},
+      {table:'customers',    order:{col:'created_at',dir:'asc'}},
+      {table:'transactions', order:{col:'created_at',dir:'desc'}, limit:500},
     ]);
+    const students     = _poll.students     || [];
+    const inventory    = _poll.inventory    || [];
+    const products     = _poll.products     || [];
+    const orders       = _poll.orders       || [];
+    const courses      = _poll.courses      || [];
+    const customers    = _poll.customers    || [];
+    const transactions = _poll.transactions || [];
     D.students=students||D.students;
     D.inventory=inventory&&inventory.length?inventory:D.inventory;
     D.products=products&&products.length?products:D.products;
@@ -5135,7 +5218,7 @@ async function checkReminders(){
   const msgs=[];
 
   D.students.filter(s=>s.status==='Đang học').forEach(s=>{
-    const fee=s.fee||0;
+    const fee=parseFloat(s.fee)||0;
     const dep=Math.round(fee*0.3);
     const rest=fee-dep;
     const course=D.courses.find(c=>c.id===s.course_id);
@@ -5216,7 +5299,7 @@ async function autoUpdateStudentStatus(){
       const ed=new Date(s.end_date); ed.setHours(0,0,0,0);
       const daysToEnd=Math.round((ed-today)/86400000);
       if(diff<=0&&daysToEnd>=0){
-        const fee=s.fee||0;
+        const fee=parseFloat(s.fee)||0;
         const rest=fee-Math.round(fee*0.3);
         unpaidReminders.push({s,rest,daysToEnd});
       }
@@ -6291,7 +6374,7 @@ function renderDash(){
     unpaidRows.innerHTML=unpaid.map(s=>{
       const dep=Math.round((s.fee||0)*0.3);
       return`<tr style="cursor:pointer" onclick="openStDetail('${s.id}')">
-        <td><strong>${s.name}</strong><br><span style="font-size:11px;color:var(--muted)">${s.phone||''}</span></td>
+        <td><strong>${s.name||'(chưa có tên)'}</strong><br><span style="font-size:11px;color:var(--muted)">${s.phone||''}</span></td>
         <td style="font-size:12px">${s.course||''}</td>
         <td style="color:var(--brand);font-weight:700">${fmt(s.fee||0)}</td>
         <td><span class="tag t-low">❌ Chưa thu đợt 1 — ${fmt(dep)}</span></td>
@@ -6333,13 +6416,13 @@ function renderStudents(){
     if(!q)return true;
     const course=D.courses.find(c=>c.id===s.course_id);
     const courseName=(course?course.name:(s.course||'')).toLowerCase();
-    return s.name.toLowerCase().includes(q)||(s.phone||'').includes(q)||courseName.includes(q);
+    return (s.name||'').toLowerCase().includes(q)||(s.phone||'').includes(q)||courseName.includes(q);
   });
   document.getElementById('student-list').innerHTML=list.map(s=>{
     const course=D.courses.find(c=>c.id===s.course_id);
     const courseName=course?course.name:(s.course||'—');
-    const fee=s.fee||0;
-    const isOnlineS = (s.type||'').toLowerCase()==='online';
+    const fee=parseFloat(s.fee)||0;
+    const isOnlineS = (s.type||'offline').toLowerCase()==='online';
     const dep=isOnlineS ? fee : Math.round(fee*0.3);
     const paid1Tag=s.paid1?'<span class="tag t-paid" style="font-size:10px">✓'+(isOnlineS?'Đã TT':'Đ1')+'</span>':'<span class="tag t-low" style="font-size:10px">'+(isOnlineS?'Chưa TT':'Đ1')+'</span>';
     const paid2Tag=fee>0&&!isOnlineS?(s.paid2?'<span class="tag t-paid" style="font-size:10px">✓Đ2</span>':'<span class="tag t-pending" style="font-size:10px">Đ2</span>'):'';
@@ -8213,7 +8296,7 @@ function sendDailyReport(){
     studentsTomoRow.forEach(s=>{
       const course=D.courses.find(c=>c.id===s.course_id);
       const cName=course?course.name:(s.course||'—');
-      const fee=s.fee||0;
+      const fee=parseFloat(s.fee)||0;
       const dep=s.paid1_amount||Math.round(fee*0.3);
       const rest=s.paid2_amount||(fee-dep);
       const paidStr=s.paid2?'✅ Đã TT đủ':s.paid1?'✅ Đã cọc '+fmt(dep)+' — còn '+fmt(rest):'❌ Chưa cọc — cần thu '+fmt(dep);
