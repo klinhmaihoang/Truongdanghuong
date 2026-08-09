@@ -965,8 +965,13 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="card">
       <div class="card-head">
         <span class="card-title">Danh sách hàng hóa &amp; giá bán</span>
-        <button class="btn btn-sm" onclick="showM('modal-add-product')">+ Thêm sản phẩm</button>
+        <div class="btn-group" style="gap:6px">
+          <button class="btn btn-sm" onclick="showM('modal-add-product')">+ Thêm sản phẩm</button>
+          <button class="btn btn-green btn-sm" onclick="document.getElementById('product-csv-input').click()">📥 Import CSV</button>
+          <input id="product-csv-input" type="file" accept=".csv" style="display:none" onchange="handleProductCSVImport(event)"/>
+        </div>
       </div>
+      <div id="product-import-summary"></div>
       <table><thead><tr><th>Icon</th><th>Tên sản phẩm</th><th>Giá bán (₫)</th><th class="hide-mobile">Giá nhập (₫)</th><th class="hide-mobile">Lợi nhuận</th><th class="hide-mobile">Nguyên liệu</th><th class="hide-mobile">Đơn vị tính</th><th></th></tr></thead>
       <tbody id="product-list"></tbody></table>
     </div>
@@ -6988,6 +6993,105 @@ async function addProduct(){
     if(document.getElementById('at-prod').checked)
       tgMsg(`🆕 *Thêm sản phẩm mới!*\n\n📦 ${name}\n💰 Giá bán: ${fmt(price)}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
   }catch(e){notify('Lưu thất bại: '+e.message,false);}
+}
+
+// ── IMPORT HÀNG HÓA TỪ CSV ────────────────────────────────────
+// Parser CSV đơn giản, hỗ trợ field có dấu ngoặc kép chứa dấu phẩy
+function parseCSVText(text){
+  text = text.replace(/^\uFEFF/, ''); // bỏ BOM nếu có
+  const lines = text.split(/\r\n|\n|\r/).filter(l => l.length > 0);
+  if(!lines.length) return [];
+  const parseLine = (line) => {
+    const out = []; let cur = ''; let inQ = false;
+    for(let i=0;i<line.length;i++){
+      const c = line[i];
+      if(inQ){
+        if(c === '"'){
+          if(line[i+1] === '"'){ cur += '"'; i++; } else inQ = false;
+        } else cur += c;
+      } else {
+        if(c === '"') inQ = true;
+        else if(c === ','){ out.push(cur); cur=''; }
+        else cur += c;
+      }
+    }
+    out.push(cur);
+    return out;
+  };
+  const headers = parseLine(lines[0]).map(h => h.trim());
+  return lines.slice(1).map(line => {
+    const vals = parseLine(line);
+    const row = {};
+    headers.forEach((h,i) => row[h] = (vals[i] ?? '').trim());
+    return row;
+  });
+}
+
+async function handleProductCSVImport(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  evt.target.value = ''; // reset để chọn lại cùng file lần sau vẫn trigger được
+
+  const summaryEl = document.getElementById('product-import-summary');
+  const text = await file.text();
+  let rows;
+  try{ rows = parseCSVText(text); }
+  catch(e){ notify('Không đọc được file CSV: '+e.message, false); return; }
+
+  if(!rows.length){ notify('File CSV trống hoặc không đúng định dạng!', false); return; }
+
+  // Cột bắt buộc tối thiểu
+  const first = rows[0];
+  if(!('name' in first) || !('price' in first)){
+    notify('File CSV thiếu cột "name" hoặc "price" — kiểm tra lại header!', false);
+    return;
+  }
+
+  confirmAct(
+    `Import ${rows.length} dòng hàng hóa từ CSV?`,
+    'Hàng hóa trùng mã (id) sẽ được cập nhật đè, hàng mới sẽ được thêm mới.',
+    async () => {
+      if(summaryEl) summaryEl.innerHTML = `<div style="padding:8px 4px;color:var(--muted);font-size:12px">⏳ Đang import 0/${rows.length}...</div>`;
+
+      let added = 0, updated = 0, failed = 0;
+      for(let i=0;i<rows.length;i++){
+        const r = rows[i];
+        const id = (r.id||'').trim() || uid();
+        const product = {
+          id,
+          name: (r.name||'').trim(),
+          icon: (r.icon||'').trim() || '📦',
+          price: parseFloat(r.price) || 0,
+          cost: parseFloat(r.cost) || 0,
+          unit: (r.unit||'').trim(),
+          vat: parseFloat(r.vat) || 0,
+          discount: parseFloat(r.discount) || 0,
+          mat_id: (r.mat_id||'').trim(),
+          mat_use: parseFloat(r.mat_use) || 0,
+          created_at: r.created_at ? (parseInt(r.created_at) || Date.now()) : Date.now()
+        };
+        if(!product.name){ failed++; continue; }
+
+        try{
+          const existing = D.products.find(x => x.id === id);
+          await sbUpsert('products', product);
+          if(existing){ Object.assign(existing, product); updated++; }
+          else { D.products.push(product); added++; }
+        }catch(e){ failed++; }
+
+        if(summaryEl && (i % 3 === 0 || i === rows.length-1)){
+          summaryEl.innerHTML = `<div style="padding:8px 4px;color:var(--muted);font-size:12px">⏳ Đang import ${i+1}/${rows.length}...</div>`;
+        }
+      }
+
+      renderProductList();
+      const msg = `✅ Import xong: ${added} thêm mới, ${updated} cập nhật${failed?`, ${failed} lỗi`:''}`;
+      if(summaryEl) summaryEl.innerHTML = `<div style="padding:8px 4px;color:${failed?'var(--red)':'var(--teal)'};font-size:12px;font-weight:600">${msg}</div>`;
+      notify(msg, !failed);
+      if(document.getElementById('at-prod')?.checked)
+        tgMsg(`📥 *Import hàng hóa CSV!*\n\n✅ ${added} thêm mới\n♻️ ${updated} cập nhật\n${failed?`❌ ${failed} lỗi\n`:''}🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+    }
+  );
 }
 
 // ── CART ──
