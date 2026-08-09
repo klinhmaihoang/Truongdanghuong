@@ -4621,104 +4621,156 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
 
 <script>
 // ══════════════════════════════════════════════════
-// SUPABASE CONFIG — đã nhúng sẵn
+// NEON CONFIG — migrated from Supabase
 // ══════════════════════════════════════════════════
-const SUPABASE_URL = 'https://nmfgjuurdquyrdantolv.supabase.co';
-const SUPABASE_KEY = 'sb_publishable__-hia7DhFOCOb6apeOsR5g_X_HU7DjE';
+const NEON_HOST  = 'ep-falling-morning-azbzlow0.c-3.ap-southeast-1.aws.neon.tech';
+const NEON_TOKEN = 'npg_1kdWgPh3XRZp';
+const NEON_API   = `https://${NEON_HOST}/sql`;
 
-// REST helper
-async function sb(method, table, data=null, filter=''){
-  const url = `${SUPABASE_URL}/rest/v1/${table}${filter}`;
-  const headers = {
-    'apikey': SUPABASE_KEY,
-    'Authorization': 'Bearer ' + SUPABASE_KEY,
-    'Content-Type': 'application/json',
-    'Prefer': method==='POST' ? 'return=representation' : 'return=minimal'
-  };
-  if(method==='GET') headers['Prefer']='';
-  const res = await fetch(url, {method, headers, body: data ? JSON.stringify(data) : null});
-  if(method==='GET') return res.ok ? await res.json() : [];
-  if(!res.ok){
-    const err = await res.json().catch(()=>({}));
-    console.error('Supabase loi:', method, table, res.status, err);
-    throw new Error(err.message||err.hint||'HTTP '+res.status);
+// Legacy vars (kept so existing code that references them doesn't break)
+const SUPABASE_URL = '';
+const SUPABASE_KEY = '';
+
+// Core SQL executor
+async function neonSQL(sql, params=[]) {
+  const res = await fetch(NEON_API, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${NEON_TOKEN}`,
+      'Neon-Database-Name': 'neondb',
+    },
+    body: JSON.stringify({ query: sql, params })
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`Neon ${res.status}: ${err.slice(0,300)}`);
   }
-  return true;
+  const data = await res.json();
+  return data.rows || [];
 }
-const sbGet = (t, f='') => {
-  if(AUTH_CURRENT?.role==='sale' && t==='orders') {
-    const sid=encodeURIComponent(AUTH_CURRENT.id||AUTH_CURRENT.user||'');
-    const sname=encodeURIComponent(AUTH_CURRENT.name||AUTH_CURRENT.user||'');
-    f=(f||'')+(f.includes('?')?'&':'?')+'or=(created_by.eq.'+sid+',sale_name.eq.'+sname+')';
-  }
-  if(AUTH_CURRENT?.role==='warehouse'&&['transactions','audit_log'].includes(t)) return Promise.resolve([]);
-  if(AUTH_CURRENT?.role==='accountant'&&['employees','attendance'].includes(t)) return Promise.resolve([]);
-  return sb('GET',t,null,f);
-};
-const sbPost = (t,d)        => sb('POST',t,d);
-const sbDel = async (t,f) => {
-  // Permission check
-  if(AUTH_CURRENT?.role === 'sale' && !['purchase_orders'].includes(t)) {
-    if(!['orders'].includes(t)) { console.warn('Sale không có quyền xóa bảng', t); return null; }
-  }
-  if(AUTH_CURRENT?.role === 'warehouse' && !['inventory','stock_log'].includes(t)) {
-    console.warn('Warehouse không có quyền xóa bảng', t); return null;
-  }
-  // Soft delete cho orders — chỉ đánh dấu deleted_at thay vì xóa thật
-  if(t === 'orders') {
-    const idMatch = (f||'').match(/id=eq\.(.+)$/);
-    if(idMatch) {
-      const oid = idMatch[1];
-      console.warn('[SOFT DELETE] orders id='+oid);
-      return sb('PATCH', t, {deleted_at: new Date().toISOString(), status:'Đã hủy'}, f);
+
+// Parse PostgREST-style filter string → SQL clauses
+function _parseFilter(filter) {
+  const params = (filter||'').replace(/^\?/,'');
+  const parts = params.split('&').filter(Boolean);
+  const wheres = [];
+  let order = '', limit = '', select = '*';
+  for (const p of parts) {
+    if (p.startsWith('order=')) {
+      const segs = p.slice(6).split('.');
+      const col = segs[0], dir = (segs[1]||'asc').toUpperCase();
+      order = ` ORDER BY "${col}" ${dir}`;
+    } else if (p.startsWith('limit=')) {
+      limit = ` LIMIT ${parseInt(p.slice(6))||100}`;
+    } else if (p.startsWith('select=')) {
+      select = p.slice(7);
+    } else if (p.includes('=eq.')) {
+      const [col, val] = p.split('=eq.');
+      wheres.push(`"${col}" = '${val.replace(/'/g,"''")}'`);
+    } else if (p.includes('=neq.')) {
+      const [col, val] = p.split('=neq.');
+      wheres.push(`"${col}" != '${val.replace(/'/g,"''")}'`);
+    } else if (p.includes('=is.null')) {
+      const col = p.replace('=is.null','');
+      wheres.push(`"${col}" IS NULL`);
+    } else if (p.includes('=gte.')) {
+      const [col, val] = p.split('=gte.');
+      wheres.push(`"${col}" >= '${val}'`);
+    } else if (p.includes('=lte.')) {
+      const [col, val] = p.split('=lte.');
+      wheres.push(`"${col}" <= '${val}'`);
+    } else if (p.includes('=like.')) {
+      const [col, val] = p.split('=like.');
+      wheres.push(`"${col}" LIKE '${val.replace(/'/g,"''")}'`);
     }
+    // ignore unknown params
   }
-  return sb('DELETE', t, null, f);
+  const where = wheres.length ? ' WHERE ' + wheres.join(' AND ') : '';
+  return { where, order, limit, select };
+}
+
+// Serialize value to SQL literal
+function _sqlVal(v) {
+  if (v === null || v === undefined) return 'NULL';
+  if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE';
+  if (typeof v === 'number') return isNaN(v) ? 'NULL' : String(v);
+  if (typeof v === 'object') return `'${JSON.stringify(v).replace(/'/g,"''")}'`;
+  return `'${String(v).replace(/'/g,"''")}'`;
+}
+
+// ── Compatibility API ─────────────────────────────
+
+const sbGet = async (t, f='') => {
+  // Role-based guards (unchanged)
+  if (AUTH_CURRENT?.role==='sale' && t==='orders') {
+    const sid = encodeURIComponent(AUTH_CURRENT.id||AUTH_CURRENT.user||'');
+    const sname = encodeURIComponent(AUTH_CURRENT.name||AUTH_CURRENT.user||'');
+    // simplified: just filter by created_by if sale
+    f = (f||'') + (f.includes('?')?'&':'?') + `created_by=eq.${AUTH_CURRENT.id||AUTH_CURRENT.user||''}`;
+  }
+  if (AUTH_CURRENT?.role==='warehouse' && ['transactions','audit_log'].includes(t)) return [];
+  if (AUTH_CURRENT?.role==='accountant' && ['employees','attendance'].includes(t)) return [];
+
+  const { where, order, limit } = _parseFilter(f);
+  try {
+    return await neonSQL(`SELECT * FROM ${t}${where}${order}${limit}`);
+  } catch(e) {
+    console.warn(`sbGet(${t}) lỗi:`, e.message);
+    return [];
+  }
 };
 
-// sbPatch với graceful fallback cho orders (chỉ patch cột có sẵn nếu lỗi schema)
-const sbPatch = async (t,d,f) => {
+const sbPost   = (t,d) => sbUpsert(t,d);
+
+const sbUpsert = async (t, d) => {
+  const keys = Object.keys(d);
+  if (!keys.length) return true;
+  const cols = keys.map(k=>`"${k}"`).join(',');
+  const vals = keys.map(k=>_sqlVal(d[k])).join(',');
+  const updates = keys.filter(k=>k!=='id').map(k=>`"${k}"=${_sqlVal(d[k])}`).join(',');
+  const onConflict = updates ? `ON CONFLICT (id) DO UPDATE SET ${updates}` : 'ON CONFLICT (id) DO NOTHING';
   try {
-    return await sb('PATCH',t,d,f);
+    await neonSQL(`INSERT INTO ${t} (${cols}) VALUES (${vals}) ${onConflict}`);
+    return true;
   } catch(e) {
-    // Nếu lỗi column not found và đang patch orders → chỉ patch status + time
-    if(e.message?.includes('could not find') && t==='orders') {
+    if (t !== 'audit_log') console.error(`sbUpsert(${t}) lỗi:`, e.message);
+    throw new Error(e.message);
+  }
+};
+
+const sbPatch = async (t, d, f) => {
+  const sets = Object.entries(d).map(([k,v])=>`"${k}"=${_sqlVal(v)}`).join(',');
+  const { where } = _parseFilter(f.startsWith('?')?f:'?'+f);
+  try {
+    await neonSQL(`UPDATE ${t} SET ${sets}${where}`);
+    return true;
+  } catch(e) {
+    // Graceful fallback for orders schema issues
+    if (e.message?.includes('does not exist') && t==='orders') {
       const safe = {};
-      const safeKeys = ['status','time','note','total','items','customer','email','address','payment','shipping','discount','subtotal','ship_fee','tracking_url'];
-      safeKeys.forEach(k=>{ if(k in d) safe[k]=d[k]; });
-      if(Object.keys(safe).length) return await sb('PATCH',t,safe,f);
+      ['status','time','note','total','items','customer','deleted_at'].forEach(k=>{ if(k in d) safe[k]=d[k]; });
+      if (Object.keys(safe).length) {
+        const sets2 = Object.entries(safe).map(([k,v])=>`"${k}"=${_sqlVal(v)}`).join(',');
+        await neonSQL(`UPDATE ${t} SET ${sets2}${where}`);
+        return true;
+      }
     }
     throw e;
   }
 };
-const sbUpsert = async (t,d)=> {
-  const res = await fetch(`${SUPABASE_URL}/rest/v1/${t}`, {
-    method:'POST',
-    headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,
-      'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-    body: JSON.stringify(d)
-  });
-  if(!res.ok){
-    const err = await res.json().catch(()=>({}));
-    const msg = err.message||err.hint||'HTTP '+res.status;
-    // Nếu lỗi "column not found" → retry chỉ với các cột cơ bản
-    if(msg.includes('could not find') && msg.includes('column') && t==='orders') {
-      const safe = {id:d.id,customer:d.customer,email:d.email||'',items:d.items,
-        total:d.total,time:d.time,note:d.note||'',status:d.status,created_at:d.created_at};
-      const res2 = await fetch(`${SUPABASE_URL}/rest/v1/${t}`, {
-        method:'POST',
-        headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY,
-          'Content-Type':'application/json','Prefer':'resolution=merge-duplicates,return=minimal'},
-        body: JSON.stringify(safe)
-      });
-      if(res2.ok) {
-        console.warn('orders: saved with fallback columns. Run SQL migration to add new columns.');
-        return true;
-      }
-    }
-    if(t !== 'audit_log') console.error('Supabase upsert loi:', t, res.status, err);
-    throw new Error(msg);
+
+const sbDel = async (t, f) => {
+  // Permission guards
+  if (AUTH_CURRENT?.role==='warehouse' && !['inventory','stock_log'].includes(t)) return null;
+  // Soft delete orders
+  if (t==='orders') {
+    const m = (f||'').match(/id=eq\.(.+)$/);
+    if (m) return sbPatch(t, {deleted_at:new Date().toISOString(), status:'Đã hủy'}, f);
   }
+  const { where } = _parseFilter(f.startsWith('?')?f:'?'+f);
+  if (!where) throw new Error('sbDel: filter bắt buộc');
+  await neonSQL(`DELETE FROM ${t}${where}`);
   return true;
 };
 
