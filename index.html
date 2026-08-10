@@ -5388,9 +5388,20 @@ async function testTomorrowReport(){
       }
       return;
     }
-    if(dbg) dbg.style.display='none';
-    notify('✓ Đã gửi báo cáo lịch học ngày mai lên Telegram + Zalo!');
-    // Hiện thử nội dung để kiểm tra
+    // Luôn hiện kết quả gửi từng kênh — kể cả khi "thành công" tổng thể, 1 trong 2
+    // kênh vẫn có thể lỗi âm thầm (VD thiếu token, sai chat id)
+    const sr = res.sendResult || {};
+    if(dbg){
+      dbg.style.display='block';
+      dbg.textContent = 'Kết quả gửi từng kênh:\n\n'+JSON.stringify(sr, null, 2);
+    }
+    const tgOk = sr.tg && !sr.tg.error && !sr.tg.skipped && sr.tg.httpCode===200;
+    const zaloOk = sr.zalo && !sr.zalo.error && !sr.zalo.skipped && sr.zalo.httpCode===200;
+    if(tgOk && zaloOk){
+      notify('✓ Đã gửi thành công lên cả Telegram + Zalo!');
+    } else {
+      notify(`Gửi xong nhưng có kênh lỗi — Telegram: ${tgOk?'OK':'lỗi'}, Zalo: ${zaloOk?'OK':'lỗi'}. Xem chi tiết khung bên dưới.`, false);
+    }
     console.log('Nội dung báo cáo đã gửi:\n' + res.preview);
   }catch(e){
     notify('Lỗi: '+e.message, false);
