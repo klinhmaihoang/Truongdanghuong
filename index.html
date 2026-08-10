@@ -2582,6 +2582,17 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="stat" style="--accent:var(--red)"><div class="stat-num" id="sched-stat-unpaid">0</div><div class="stat-label">Chưa TT</div></div>
   </div>
 
+  <!-- Báo cáo lịch học ngày mai tự động -->
+  <div class="card" style="margin-bottom:14px;background:#fff8ec;border:1px solid var(--brand)">
+    <div class="card-head">
+      <span class="card-title">🔔 Báo cáo lịch học ngày mai (Telegram + Zalo)</span>
+      <button class="btn btn-tg btn-sm" onclick="testTomorrowReport()">📤 Gửi thử ngay</button>
+    </div>
+    <div class="guide" style="margin-bottom:0">
+      Báo cáo này chạy <b>tự động phía server</b> mỗi tối (không cần mở app), liệt kê số học viên, tên, khóa học, giờ học, loại và số tiền đã thu — gửi cùng lúc lên cả Telegram và Zalo. Để bật chạy tự động: vào <b>Apps Script → Trình kích hoạt (⏰) → + Thêm trình kích hoạt → chọn hàm <code>sendTomorrowClassReport</code> → Time-driven → Day timer → chọn khung giờ (VD 20:00–21:00)</b>. Nút bên phải để gửi thử ngay, kiểm tra nội dung trước khi bật lịch tự động.
+    </div>
+  </div>
+
   <!-- Calendar grid -->
   <div class="card" style="padding:0;overflow:hidden">
     <!-- Header ngày trong tuần -->
@@ -3345,6 +3356,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <button class="btn btn-ghost btn-sm" onclick="zaloMsg('🎉 Đây là tin nhắn test từ Trương Dáng Hương Academy!')">Gửi tin test</button>
       <button class="btn btn-ghost btn-sm" onclick="clearZalo()">Xóa cấu hình</button>
     </div>
+    <div id="zalo-debug" style="display:none;margin-top:10px;padding:10px;background:#0d1117;border-radius:8px;font-family:monospace;font-size:11px;color:#9fdb9f;white-space:pre-wrap;word-break:break-all;max-height:220px;overflow:auto"></div>
   </div>
 
   <!-- TÍCH ĐIỂM CONFIG -->
@@ -5355,6 +5367,26 @@ function deleteCourse(){
       notify('Đã xóa khóa học');
     }catch(e){notify('Lỗi: '+e.message,false);}
   });
+}
+
+// ══════════════════════════════════════════════════
+// BÁO CÁO LỊCH HỌC NGÀY MAI — gửi thử thủ công từ app
+// (chạy tự động thật sự nằm ở Apps Script Trigger — xem hướng dẫn trong UI)
+// ══════════════════════════════════════════════════
+async function testTomorrowReport(){
+  notify('Đang kiểm tra lịch học ngày mai...');
+  try{
+    const res = await gasCall({action:'send_tomorrow_report'});
+    if(!res.sent){
+      notify(res.message || 'Không có học viên nào có lịch học ngày mai.', false);
+      return;
+    }
+    notify('✓ Đã gửi báo cáo lịch học ngày mai lên Telegram + Zalo!');
+    // Hiện thử nội dung để kiểm tra
+    console.log('Nội dung báo cáo đã gửi:\n' + res.preview);
+  }catch(e){
+    notify('Lỗi: '+e.message, false);
+  }
 }
 
 // ══════════════════════════════════════════════════
@@ -8529,8 +8561,14 @@ function clearZalo(){
 // Lấy Chat ID tự động: đọc tin nhắn gần nhất người dùng gửi cho bot qua getUpdates
 async function zaloGetChatId(){
   const t=document.getElementById('zalo-token').value.trim();
+  const dbg=document.getElementById('zalo-debug');
   if(!t){notify('Nhập Bot Token trước!',false);return;}
   notify('Đang tìm Chat ID — đảm bảo đã nhắn tin cho bot trên Zalo...');
+  const showDebug=(label,obj)=>{
+    if(!dbg) return;
+    dbg.style.display='block';
+    dbg.textContent = label+'\n'+JSON.stringify(obj,null,2);
+  };
   try{
     // getUpdates và webhook xung khắc nhau (theo tài liệu Zalo) — nếu bot đã có
     // webhook được đăng ký sẵn (VD: qua Zalo Bot Manager), getUpdates sẽ luôn rỗng.
@@ -8538,10 +8576,10 @@ async function zaloGetChatId(){
     try{ await zaloApiCall(t,'deleteWebhook',{}); }catch(e0){ /* bỏ qua nếu lỗi, thử getUpdates tiếp */ }
 
     const d=await zaloApiCall(t,'getUpdates',{});
-    console.log('Zalo getUpdates raw response:', d);
 
     if(d.ok===false){
-      notify('Zalo báo lỗi: '+(d.description||d.error_code||'không rõ')+' — xem chi tiết Console (F12)', false);
+      showDebug('❌ Zalo báo lỗi:', d);
+      notify('Zalo báo lỗi: '+(d.description||d.error_code||'không rõ')+' — xem khung debug bên dưới nút', false);
       return;
     }
 
@@ -8550,6 +8588,7 @@ async function zaloGetChatId(){
     let raw = d.result || d.data;
     let updates = Array.isArray(raw) ? raw : (raw ? [raw] : []);
     if(!updates.length){
+      showDebug('⚠️ Không có update nào, response gốc:', d);
       notify('Chưa thấy tin nhắn nào! Vào Zalo, tìm bot vừa tạo, nhắn 1 câu bất kỳ rồi thử lại.', false);
       return;
     }
@@ -8559,13 +8598,17 @@ async function zaloGetChatId(){
     const chatId = msg.chat?.id || msg.chat_id || last.chat_id || msg.from?.id || last.chatId;
 
     if(!chatId){
-      console.warn('Zalo update object (không tìm thấy chat id):', last);
-      notify('Không đọc được Chat ID từ phản hồi — xem chi tiết trong Console (F12), gửi mình phần "message: {...}" mở rộng ra.', false);
+      showDebug('⚠️ Có tin nhắn nhưng không tìm thấy Chat ID trong cấu trúc này:', last);
+      notify('Không đọc được Chat ID — xem khung debug bên dưới nút "Lấy Chat ID", gửi ảnh chụp khung đó cho mình.', false);
       return;
     }
     document.getElementById('zalo-chatid').value = chatId;
+    if(dbg) dbg.style.display='none';
     notify('✓ Đã tự động điền Chat ID: '+chatId);
-  }catch(e){ notify('Lỗi khi lấy Chat ID: '+e.message, false); }
+  }catch(e){
+    showDebug('❌ Lỗi exception:', {message:e.message, stack:e.stack});
+    notify('Lỗi khi lấy Chat ID: '+e.message, false);
+  }
 }
 
 function addLog(e){tgLog.unshift(e);if(tgLog.length>100)tgLog.pop();renderLog();}
