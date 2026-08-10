@@ -8467,6 +8467,13 @@ async function tgMsg(text){
 // ══════════════════════════════════════════════════
 // ZALO BOT — song song với Telegram, dùng chung 1 log
 // ══════════════════════════════════════════════════
+// Gọi Zalo Bot API qua Google Apps Script (tránh bị trình duyệt chặn CORS
+// khi gọi thẳng tới bot-api.zaloplatforms.com từ phía client)
+async function zaloApiCall(token, method, payload){
+  const res = await gasCall({action:'zalo_proxy', token, method, payload: payload||{}});
+  return res.data || {};
+}
+
 async function zaloMsg(text){
   const t=cfg.zaloToken, c=cfg.zaloChatId;
   if(!t||!c) return; // chưa cấu hình Zalo — im lặng bỏ qua, không ảnh hưởng Telegram
@@ -8474,11 +8481,7 @@ async function zaloMsg(text){
   try{
     // Zalo Bot chưa hỗ trợ Markdown như Telegram — gửi plain text, bỏ ký tự * `
     const plain=text.replace(/[*`]/g,'');
-    const r=await fetch(`https://bot-api.zaloplatforms.com/bot${t}/sendMessage`,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({chat_id:c,text:plain})
-    });
-    const d=await r.json();
+    const d=await zaloApiCall(t,'sendMessage',{chat_id:c,text:plain});
     entry.ok = d.ok !== false; // Zalo Bot API trả về khác nhau tuỳ version, ưu tiên coi HTTP 200 là ok
     entry.text=(entry.ok?'✓ Đã gửi: ':'✗ Lỗi: ')+entry.text;
     if(!entry.ok) entry.err = d.error?.message || d.description || JSON.stringify(d);
@@ -8494,8 +8497,7 @@ async function saveZalo(){
   saveCfgLocal();
   await saveSettingsFull();
   try{
-    const r=await fetch(`https://bot-api.zaloplatforms.com/bot${t}/getMe`);
-    const d=await r.json();
+    const d=await zaloApiCall(t,'getMe',{});
     if(d.ok!==false && (d.result||d.data)){
       const info=d.result||d.data;
       document.getElementById('zalo-dot').style.background='var(--teal)';
@@ -8510,7 +8512,7 @@ async function saveZalo(){
       document.getElementById('zalo-status').style.color='var(--teal)';
       notify('Đã lưu cấu hình Zalo Bot — gửi tin test để kiểm tra kết nối');
     }
-  }catch(e){notify('Không kết nối được Zalo Bot — kiểm tra lại Token',false);}
+  }catch(e){notify('Không kết nối được Zalo Bot: '+e.message,false);}
 }
 
 function clearZalo(){
@@ -8530,8 +8532,7 @@ async function zaloGetChatId(){
   if(!t){notify('Nhập Bot Token trước!',false);return;}
   notify('Đang tìm Chat ID — đảm bảo đã nhắn tin cho bot trên Zalo...');
   try{
-    const r=await fetch(`https://bot-api.zaloplatforms.com/bot${t}/getUpdates`);
-    const d=await r.json();
+    const d=await zaloApiCall(t,'getUpdates',{});
     const updates = d.result || d.data || [];
     if(!updates.length){
       notify('Chưa thấy tin nhắn nào! Vào Zalo, tìm bot vừa tạo, nhắn 1 câu bất kỳ rồi thử lại.', false);
