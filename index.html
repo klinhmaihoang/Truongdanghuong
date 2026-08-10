@@ -3314,6 +3314,39 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
   </div>
 
+  <!-- ZALO BOT -->
+  <div class="tg-box">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="width:42px;height:42px;background:#0068ff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;color:#fff;font-weight:700">Za</div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700;color:#0068ff">Kết nối Zalo Bot</div>
+        <div style="font-size:12px;color:var(--muted)">Thông báo tự động gửi qua Zalo — không cần Zalo OA</div>
+      </div>
+      <span style="display:flex;align-items:center;gap:6px;font-size:12px">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block;transition:.3s" id="zalo-dot"></span>
+        <span id="zalo-status" style="color:var(--muted)">Chưa kết nối</span>
+      </span>
+    </div>
+    <div class="guide" style="margin-bottom:14px">
+      <b>Cách lấy Bot Token:</b> Mở Zalo trên điện thoại → quét mã QR tại <a href="https://zalo.me/s/botcreator/" target="_blank" style="color:var(--brand)">zalo.me/s/botcreator</a> → đặt tên bot (phải bắt đầu bằng chữ "Bot", VD: "Bot Trương Dáng Hương") → Zalo sẽ nhắn Token về ngay trong Zalo. Sau đó, <b>tự nhắn tin cho bot vừa tạo</b> 1 câu bất kỳ rồi bấm "Lấy Chat ID" bên dưới.
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Bot Token</label><input id="zalo-token" placeholder="3954860262754104425:vxJ..." type="password"/></div>
+      <div class="fg">
+        <label>Chat ID</label>
+        <div style="display:flex;gap:6px">
+          <input id="zalo-chatid" placeholder="Bấm nút bên phải để tự lấy" style="flex:1"/>
+          <button class="btn btn-ghost btn-sm" style="white-space:nowrap" onclick="zaloGetChatId()">🔎 Lấy Chat ID</button>
+        </div>
+      </div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-sm" style="background:#0068ff;color:#fff" onclick="saveZalo()">Lưu &amp; kiểm tra kết nối</button>
+      <button class="btn btn-ghost btn-sm" onclick="zaloMsg('🎉 Đây là tin nhắn test từ Trương Dáng Hương Academy!')">Gửi tin test</button>
+      <button class="btn btn-ghost btn-sm" onclick="clearZalo()">Xóa cấu hình</button>
+    </div>
+  </div>
+
   <!-- TÍCH ĐIỂM CONFIG -->
   <div class="card">
     <div class="card-head"><span class="card-title">⭐ Cài đặt tích điểm khách hàng</span></div>
@@ -4788,7 +4821,7 @@ const sbDel = async (t, f) => {
 // STATE
 // ══════════════════════════════════════════════════
 let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[],transactions:[],quotations:[],salesOrders:[],soActivities:[]};
-let cfg = {tgToken:'',tgChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',accPhone:'0984830303',gsUrl:'https://script.google.com/macros/s/AKfycbwk6oBp1yjg8E4AexktyJ2VQpdUImsdBVl47xWBUGtY4Y7Be7kwZIKBf8cOGM6A31oh/exec'};
+let cfg = {tgToken:'',tgChatId:'',zaloToken:'',zaloChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',accPhone:'0984830303',gsUrl:'https://script.google.com/macros/s/AKfycbwk6oBp1yjg8E4AexktyJ2VQpdUImsdBVl47xWBUGtY4Y7Be7kwZIKBf8cOGM6A31oh/exec'};
 let cart=[], invoice=null, selectedStudentId=null, stFilter='all', tgLog=[];
 
 const DEFAULTS = {
@@ -4847,6 +4880,8 @@ async function boot(){
       cfg={
         tgToken:  s.tg_token  ||cfg.tgToken ||'',
         tgChatId: s.tg_chat_id||cfg.tgChatId||'',
+        zaloToken:  s.zalo_token  ||cfg.zaloToken ||'',
+        zaloChatId: s.zalo_chat_id||cfg.zaloChatId||'',
         bankAcc:  s.bank_acc  ||cfg.bankAcc ||'',
         bankId:   s.bank_id   ||cfg.bankId  ||'VCB',
         accName:  s.acc_name  ||cfg.accName ||'TRUONG DANG HUONG',
@@ -5049,6 +5084,13 @@ function applyTgUI(){
     document.getElementById('tg-dot').style.background='var(--teal)';
     document.getElementById('tg-status').textContent='Đã cấu hình';
     document.getElementById('tg-status').style.color='var(--teal)';
+  }
+  const ztEl=document.getElementById('zalo-token'), zcEl=document.getElementById('zalo-chatid');
+  if(ztEl&&cfg.zaloToken) ztEl.value=cfg.zaloToken;
+  if(zcEl&&cfg.zaloChatId) zcEl.value=cfg.zaloChatId;
+  if(cfg.zaloToken&&cfg.zaloChatId){
+    const zd=document.getElementById('zalo-dot'), zs=document.getElementById('zalo-status');
+    if(zd&&zs){ zd.style.background='var(--teal)'; zs.textContent='Đã cấu hình'; zs.style.color='var(--teal)'; }
   }
 }
 
@@ -8357,16 +8399,15 @@ async function saveTg(){
   const t=document.getElementById('tg-token').value.trim();
   const c=document.getElementById('tg-chatid').value.trim();
   if(!t||!c){notify('Nhập đầy đủ Token và Chat ID!',false);return;}
-  cfg={tgToken:t,tgChatId:c,
+  cfg={...cfg,tgToken:t,tgChatId:c,
     bankAcc:document.getElementById('tg-bank-acc').value.trim(),
     bankId:document.getElementById('tg-bank-id').value,
     accName:document.getElementById('tg-acc-name').value.trim()||'TRUONG DANG HUONG',
     accPhone:document.getElementById('tg-acc-phone')?.value.trim()||cfg.accPhone||'',
     gsUrl:document.getElementById('gs-url').value.trim()||cfg.gsUrl};
   saveCfgLocal();
-  // Lưu lên Supabase để sync cho cả team
-  await sbUpsert('settings',{id:'main',tg_token:t,tg_chat_id:c,
-    bank_acc:cfg.bankAcc,bank_id:cfg.bankId,acc_name:cfg.accName});
+  // Lưu lên server — luôn gửi ĐỦ mọi field của settings, tránh field khác bị xóa trắng
+  await saveSettingsFull();
   try{
     const r=await fetch(`https://api.telegram.org/bot${t}/getMe`);
     const d=await r.json();
@@ -8380,10 +8421,23 @@ async function saveTg(){
   }catch(e){notify('Không kết nối được Telegram',false);}
 }
 
+// Gửi ĐẦY ĐỦ mọi field của bảng settings — tránh field khác bị ghi đè trống
+// mỗi khi chỉ 1 phần cấu hình (VD: riêng Telegram, hoặc riêng Zalo) được lưu.
+async function saveSettingsFull(){
+  await sbUpsert('settings',{
+    id:'main',
+    tg_token:cfg.tgToken||'', tg_chat_id:cfg.tgChatId||'',
+    zalo_token:cfg.zaloToken||'', zalo_chat_id:cfg.zaloChatId||'',
+    bank_acc:cfg.bankAcc||'', bank_id:cfg.bankId||'VCB',
+    acc_name:cfg.accName||'TRUONG DANG HUONG', acc_phone:cfg.accPhone||'',
+    gs_url:cfg.gsUrl||''
+  });
+}
+
 function clearTg(){
   cfg={...cfg,tgToken:'',tgChatId:''};
   saveCfgLocal();
-  sbUpsert('settings',{id:'main',tg_token:'',tg_chat_id:''});
+  saveSettingsFull();
   ['tg-token','tg-chatid'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('tg-dot').style.background='var(--red)';
   document.getElementById('tg-status').textContent='Chưa kết nối';
@@ -8392,6 +8446,9 @@ function clearTg(){
 }
 
 async function tgMsg(text){
+  // Gửi song song qua Zalo Bot (không phụ thuộc Telegram có cấu hình hay không)
+  zaloMsg(text);
+
   const t=cfg.tgToken, c=cfg.tgChatId;
   const entry={time:nowTime(),text:text.split('\n')[0].replace(/[*`]/g,''),ok:false,err:''};
   if(!t||!c){entry.text='[Chưa cấu hình] '+entry.text;addLog(entry);return;}
@@ -8406,6 +8463,88 @@ async function tgMsg(text){
   }catch(e){entry.text='✗ Lỗi mạng: '+entry.text;entry.err=e.message;}
   addLog(entry);
 }
+
+// ══════════════════════════════════════════════════
+// ZALO BOT — song song với Telegram, dùng chung 1 log
+// ══════════════════════════════════════════════════
+async function zaloMsg(text){
+  const t=cfg.zaloToken, c=cfg.zaloChatId;
+  if(!t||!c) return; // chưa cấu hình Zalo — im lặng bỏ qua, không ảnh hưởng Telegram
+  const entry={time:nowTime(),text:'[Zalo] '+text.split('\n')[0].replace(/[*`]/g,''),ok:false,err:''};
+  try{
+    // Zalo Bot chưa hỗ trợ Markdown như Telegram — gửi plain text, bỏ ký tự * `
+    const plain=text.replace(/[*`]/g,'');
+    const r=await fetch(`https://bot-api.zaloplatforms.com/bot${t}/sendMessage`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({chat_id:c,text:plain})
+    });
+    const d=await r.json();
+    entry.ok = d.ok !== false; // Zalo Bot API trả về khác nhau tuỳ version, ưu tiên coi HTTP 200 là ok
+    entry.text=(entry.ok?'✓ Đã gửi: ':'✗ Lỗi: ')+entry.text;
+    if(!entry.ok) entry.err = d.error?.message || d.description || JSON.stringify(d);
+  }catch(e){entry.text='✗ Lỗi mạng: '+entry.text;entry.err=e.message;}
+  addLog(entry);
+}
+
+async function saveZalo(){
+  const t=document.getElementById('zalo-token').value.trim();
+  const c=document.getElementById('zalo-chatid').value.trim();
+  if(!t||!c){notify('Nhập đầy đủ Bot Token và Chat ID!',false);return;}
+  cfg={...cfg,zaloToken:t,zaloChatId:c};
+  saveCfgLocal();
+  await saveSettingsFull();
+  try{
+    const r=await fetch(`https://bot-api.zaloplatforms.com/bot${t}/getMe`);
+    const d=await r.json();
+    if(d.ok!==false && (d.result||d.data)){
+      const info=d.result||d.data;
+      document.getElementById('zalo-dot').style.background='var(--teal)';
+      document.getElementById('zalo-status').textContent=info.username||info.name||'Đã kết nối';
+      document.getElementById('zalo-status').style.color='var(--teal)';
+      notify('✓ Kết nối Zalo Bot thành công');
+      zaloMsg(`🎉 Kết nối thành công!\n\n🏫 Trương Dáng Hương Academy\n✅ Zalo Bot đã kết nối!\n\nChào mừng team! 🍵`);
+    } else {
+      // Một số version API không có getMe rõ ràng — vẫn coi là thành công nếu không lỗi mạng
+      document.getElementById('zalo-dot').style.background='var(--teal)';
+      document.getElementById('zalo-status').textContent='Đã cấu hình';
+      document.getElementById('zalo-status').style.color='var(--teal)';
+      notify('Đã lưu cấu hình Zalo Bot — gửi tin test để kiểm tra kết nối');
+    }
+  }catch(e){notify('Không kết nối được Zalo Bot — kiểm tra lại Token',false);}
+}
+
+function clearZalo(){
+  cfg={...cfg,zaloToken:'',zaloChatId:''};
+  saveCfgLocal();
+  saveSettingsFull();
+  ['zalo-token','zalo-chatid'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('zalo-dot').style.background='var(--red)';
+  document.getElementById('zalo-status').textContent='Chưa kết nối';
+  document.getElementById('zalo-status').style.color='var(--muted)';
+  notify('Đã xóa cấu hình Zalo Bot');
+}
+
+// Lấy Chat ID tự động: đọc tin nhắn gần nhất người dùng gửi cho bot qua getUpdates
+async function zaloGetChatId(){
+  const t=document.getElementById('zalo-token').value.trim();
+  if(!t){notify('Nhập Bot Token trước!',false);return;}
+  notify('Đang tìm Chat ID — đảm bảo đã nhắn tin cho bot trên Zalo...');
+  try{
+    const r=await fetch(`https://bot-api.zaloplatforms.com/bot${t}/getUpdates`);
+    const d=await r.json();
+    const updates = d.result || d.data || [];
+    if(!updates.length){
+      notify('Chưa thấy tin nhắn nào! Vào Zalo, tìm bot vừa tạo, nhắn 1 câu bất kỳ rồi thử lại.', false);
+      return;
+    }
+    const last = updates[updates.length-1];
+    const chatId = last.message?.chat?.id || last.chat_id || last.chat?.id;
+    if(!chatId){ notify('Không đọc được Chat ID từ phản hồi, thử nhắn lại cho bot.', false); return; }
+    document.getElementById('zalo-chatid').value = chatId;
+    notify('✓ Đã tự động điền Chat ID: '+chatId);
+  }catch(e){ notify('Lỗi khi lấy Chat ID: '+e.message, false); }
+}
+
 function addLog(e){tgLog.unshift(e);if(tgLog.length>100)tgLog.pop();renderLog();}
 function renderLog(){
   const el=document.getElementById('tg-log');if(!el)return;
