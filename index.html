@@ -8532,15 +8532,25 @@ async function zaloGetChatId(){
   if(!t){notify('Nhập Bot Token trước!',false);return;}
   notify('Đang tìm Chat ID — đảm bảo đã nhắn tin cho bot trên Zalo...');
   try{
+    // getUpdates và webhook xung khắc nhau (theo tài liệu Zalo) — nếu bot đã có
+    // webhook được đăng ký sẵn (VD: qua Zalo Bot Manager), getUpdates sẽ luôn rỗng.
+    // Chủ động xóa webhook trước để đảm bảo getUpdates hoạt động được.
+    try{ await zaloApiCall(t,'deleteWebhook',{}); }catch(e0){ /* bỏ qua nếu lỗi, thử getUpdates tiếp */ }
+
     const d=await zaloApiCall(t,'getUpdates',{});
     const updates = d.result || d.data || [];
-    if(!updates.length){
-      notify('Chưa thấy tin nhắn nào! Vào Zalo, tìm bot vừa tạo, nhắn 1 câu bất kỳ rồi thử lại.', false);
+    if(!updates || !updates.length){
+      console.warn('Zalo getUpdates raw response:', d);
+      notify('Chưa thấy tin nhắn nào! Vào Zalo, tìm bot vừa tạo, nhắn 1 câu bất kỳ rồi thử lại. (Chi tiết lỗi đã ghi ra Console — F12 để xem nếu vẫn không được)', false);
       return;
     }
     const last = updates[updates.length-1];
-    const chatId = last.message?.chat?.id || last.chat_id || last.chat?.id;
-    if(!chatId){ notify('Không đọc được Chat ID từ phản hồi, thử nhắn lại cho bot.', false); return; }
+    const chatId = last.message?.chat?.id || last.chat_id || last.chat?.id || last.chatId;
+    if(!chatId){
+      console.warn('Zalo update object (không tìm thấy chat id):', last);
+      notify('Không đọc được Chat ID từ phản hồi — xem chi tiết trong Console (F12).', false);
+      return;
+    }
     document.getElementById('zalo-chatid').value = chatId;
     notify('✓ Đã tự động điền Chat ID: '+chatId);
   }catch(e){ notify('Lỗi khi lấy Chat ID: '+e.message, false); }
