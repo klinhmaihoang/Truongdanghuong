@@ -8538,17 +8538,29 @@ async function zaloGetChatId(){
     try{ await zaloApiCall(t,'deleteWebhook',{}); }catch(e0){ /* bỏ qua nếu lỗi, thử getUpdates tiếp */ }
 
     const d=await zaloApiCall(t,'getUpdates',{});
-    const updates = d.result || d.data || [];
-    if(!updates || !updates.length){
-      console.warn('Zalo getUpdates raw response:', d);
-      notify('Chưa thấy tin nhắn nào! Vào Zalo, tìm bot vừa tạo, nhắn 1 câu bất kỳ rồi thử lại. (Chi tiết lỗi đã ghi ra Console — F12 để xem nếu vẫn không được)', false);
+    console.log('Zalo getUpdates raw response:', d);
+
+    if(d.ok===false){
+      notify('Zalo báo lỗi: '+(d.description||d.error_code||'không rõ')+' — xem chi tiết Console (F12)', false);
       return;
     }
+
+    // Cấu trúc trả về của Zalo khác Telegram: result có thể là 1 object đơn
+    // (chứa thẳng "message"), hoặc 1 mảng nhiều update — xử lý cả 2 trường hợp.
+    let raw = d.result || d.data;
+    let updates = Array.isArray(raw) ? raw : (raw ? [raw] : []);
+    if(!updates.length){
+      notify('Chưa thấy tin nhắn nào! Vào Zalo, tìm bot vừa tạo, nhắn 1 câu bất kỳ rồi thử lại.', false);
+      return;
+    }
+
     const last = updates[updates.length-1];
-    const chatId = last.message?.chat?.id || last.chat_id || last.chat?.id || last.chatId;
+    const msg = last.message || last;
+    const chatId = msg.chat?.id || msg.chat_id || last.chat_id || msg.from?.id || last.chatId;
+
     if(!chatId){
       console.warn('Zalo update object (không tìm thấy chat id):', last);
-      notify('Không đọc được Chat ID từ phản hồi — xem chi tiết trong Console (F12).', false);
+      notify('Không đọc được Chat ID từ phản hồi — xem chi tiết trong Console (F12), gửi mình phần "message: {...}" mở rộng ra.', false);
       return;
     }
     document.getElementById('zalo-chatid').value = chatId;
