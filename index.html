@@ -3915,6 +3915,10 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       <div class="fg"><label>Học phí (₫)</label><input id="es-fee" type="number" placeholder="2500000"/></div>
     </div>
     <div class="form-row">
+      <div class="fg"><label>Số lượng học viên đăng ký chung</label><input id="es-student-count" type="number" min="1" value="1" placeholder="1"/></div>
+      <div class="fg"></div>
+    </div>
+    <div class="form-row">
       <div class="fg"><label>Ngày đăng ký</label><input id="es-start" type="date"/></div>
       <div class="fg"><label>📅 Ngày học (Offline)</label><input id="es-class-date" type="date"/></div>
       <div class="fg"><label>🕐 Giờ học (VD: 8:00 - 10:00)</label><input id="es-class-time" placeholder="8:00 - 10:00"/></div>
@@ -3960,7 +3964,11 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Email</label><input id="fs-email" placeholder="email@example.com"/></div>
-      <div class="fg"><label>Học phí gốc (₫)</label><input id="fs-fee" type="number" placeholder="2500000" oninput="calcDiscountedFee()"/></div>
+      <div class="fg"></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Đơn giá học phí (₫/học viên)</label><input id="fs-fee" type="number" placeholder="2500000" oninput="calcDiscountedFee()"/></div>
+      <div class="fg"><label>Số lượng học viên</label><input id="fs-student-count" type="number" min="1" value="1" placeholder="1" oninput="calcDiscountedFee()"/></div>
     </div>
     <div class="form-row" style="align-items:flex-end">
       <div class="fg">
@@ -4927,29 +4935,32 @@ async function boot(){
     // ── NHÓM 2: Data phụ — load ngầm sau khi UI đã hiện ──
     setTimeout(async()=>{
       try{
-        // Bulk request nhóm 2 — 2 request thay vì 19
-        const _bulk2a = await sbGetBulk([
-          {table:'inventory',       order:{col:'created_at',dir:'asc'}},
-          {table:'products',        order:{col:'created_at',dir:'asc'}},
-          {table:'courses',         order:{col:'created_at',dir:'asc'}},
-          {table:'customers',       order:{col:'created_at',dir:'asc'}},
-          {table:'stock_log',       order:{col:'created_at',dir:'desc'}, limit:200},
-          {table:'recipes',         order:{col:'created_at',dir:'asc'}},
-          {table:'employees',       order:{col:'created_at',dir:'asc'}},
-          {table:'suppliers',       order:{col:'created_at',dir:'asc'}},
-          {table:'purchase_orders', order:{col:'created_at',dir:'desc'}, limit:100},
-          {table:'approval_queue',  order:{col:'created_at',dir:'desc'}, limit:50},
-        ]);
-        const _bulk2b = await sbGetBulk([
-          {table:'crm_tasks',         order:{col:'created_at',dir:'desc'}, limit:100},
-          {table:'crm_stages',        order:{col:'created_at',dir:'desc'}, limit:20},
-          {table:'journal_entries',   order:{col:'created_at',dir:'desc'}, limit:200},
-          {table:'salary_records',    order:{col:'month',dir:'desc'}, limit:200},
-          {table:'attendance',        order:{col:'month',dir:'asc'}},
-          {table:'production_orders', order:{col:'created',dir:'desc'}, limit:100},
-          {table:'quotations',        order:{col:'created_at',dir:'desc'}, limit:100},
-          {table:'sales_orders',      order:{col:'created_at',dir:'desc'}, limit:100},
-          {table:'so_activities',     order:{col:'created_at',dir:'desc'}, limit:200},
+        // Bulk request nhóm 2 — 2 request chạy SONG SONG (Promise.all) thay vì
+        // tuần tự, giảm gần một nửa thời gian chờ vì 2 request này độc lập nhau.
+        const [_bulk2a, _bulk2b] = await Promise.all([
+          sbGetBulk([
+            {table:'inventory',       order:{col:'created_at',dir:'asc'}},
+            {table:'products',        order:{col:'created_at',dir:'asc'}},
+            {table:'courses',         order:{col:'created_at',dir:'asc'}},
+            {table:'customers',       order:{col:'created_at',dir:'asc'}},
+            {table:'stock_log',       order:{col:'created_at',dir:'desc'}, limit:200},
+            {table:'recipes',         order:{col:'created_at',dir:'asc'}},
+            {table:'employees',       order:{col:'created_at',dir:'asc'}},
+            {table:'suppliers',       order:{col:'created_at',dir:'asc'}},
+            {table:'purchase_orders', order:{col:'created_at',dir:'desc'}, limit:100},
+            {table:'approval_queue',  order:{col:'created_at',dir:'desc'}, limit:50},
+          ]),
+          sbGetBulk([
+            {table:'crm_tasks',         order:{col:'created_at',dir:'desc'}, limit:100},
+            {table:'crm_stages',        order:{col:'created_at',dir:'desc'}, limit:20},
+            {table:'journal_entries',   order:{col:'created_at',dir:'desc'}, limit:200},
+            {table:'salary_records',    order:{col:'month',dir:'desc'}, limit:200},
+            {table:'attendance',        order:{col:'month',dir:'asc'}},
+            {table:'production_orders', order:{col:'created',dir:'desc'}, limit:100},
+            {table:'quotations',        order:{col:'created_at',dir:'desc'}, limit:100},
+            {table:'sales_orders',      order:{col:'created_at',dir:'desc'}, limit:100},
+            {table:'so_activities',     order:{col:'created_at',dir:'desc'}, limit:200},
+          ]),
         ]);
         const inventory       = _bulk2a.inventory       || [];
         const products        = _bulk2a.products        || [];
@@ -6755,7 +6766,7 @@ function renderStudents(){
         :`<span style="font-size:11px;color:var(--muted)">${s.class_date}</span>`;
     }
     return`<tr style="cursor:pointer" onclick="openStDetail('${s.id}')">
-      <td><strong>${s.name}</strong><br><span style="font-size:11px;color:var(--muted)">${s.phone||''}</span></td>
+      <td><strong>${s.name}</strong><br><span style="font-size:11px;color:var(--muted)">${s.phone||''}${s.student_count>1?` · 👥 ${s.student_count} học viên`:''}</span></td>
       <td class="hide-mobile" style="font-size:12px">${courseName}</td>
       <td class="hide-mobile" style="font-size:12px;white-space:nowrap">${s.contact_channel?`<span style="background:${{Zalo:'#0068ff',Messenger:'#0099ff',TikTok:'#010101'}[s.contact_channel]||'#888'};color:#fff;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600">${s.contact_channel}</span>`:'<span style="color:var(--muted)">—</span>'}</td>
       <td style="color:var(--brand);font-weight:700">${fee===0?'<span class="tag t-paid">Miễn phí</span>':fmt(fee)}</td>
@@ -6852,7 +6863,7 @@ function openStDetail(id){
   document.getElementById('student-detail-content').innerHTML=`
     <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">
       <div class="detail-avatar">${s.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase()}</div>
-      <div><div style="font-size:18px;font-weight:700">${s.name}</div>
+      <div><div style="font-size:18px;font-weight:700">${s.name}${s.student_count>1?` <span style="font-size:12px;font-weight:600;color:var(--brand);background:var(--brand-light);border-radius:20px;padding:2px 8px;margin-left:4px">👥 ${s.student_count} học viên</span>`:''}</div>
       <div style="font-size:13px;color:var(--muted);margin-top:2px">${courseName} · ${s.type}</div></div>
       <span class="tag ${s.status==='Đang học'?'t-paid':s.status==='Hoàn thành'?'t-done':'t-pending'}" style="margin-left:auto">${s.status}</span>
     </div>
@@ -6863,7 +6874,7 @@ function openStDetail(id){
     <div class="detail-row"><span class="detail-label">Ngày đăng ký</span><span>${s.start||'—'}</span></div>
     ${s.class_date?`<div class="detail-row"><span class="detail-label">📅 Ngày học</span><span style="font-weight:700;color:var(--brand)">${s.class_date}</span></div>`:''}
     ${s.end_date?`<div class="detail-row"><span class="detail-label">🏁 Kết thúc học</span><span style="color:var(--muted)">${s.end_date}</span></div>`:''}
-    <div class="detail-row"><span class="detail-label">Học phí</span><span style="color:var(--brand);font-weight:700">${fee===0?'Miễn phí':fmt(fee)}${s.discount_saved>0?`<span style="color:var(--green);font-size:11px;margin-left:6px;font-weight:400">(CK ${s.discount_type==='pct'?s.discount_value+'%':fmt(s.discount_value)} — tiết kiệm ${fmt(s.discount_saved)})</span>`:''}</span></div>
+    <div class="detail-row"><span class="detail-label">Học phí</span><span style="color:var(--brand);font-weight:700">${fee===0?'Miễn phí':fmt(fee)}${s.discount_saved>0?`<span style="color:var(--green);font-size:11px;margin-left:6px;font-weight:400">(CK ${s.discount_type==='pct'?s.discount_value+'%':fmt(s.discount_value)} — tiết kiệm ${fmt(s.discount_saved)})</span>`:''}${s.student_count>1&&s.fee_unit?`<span style="color:var(--muted);font-size:11px;margin-left:6px;font-weight:400">(${fmt(s.fee_unit)} × ${s.student_count})</span>`:''}</span></div>
     ${s.fee_original&&s.discount_saved>0?`<div class="detail-row"><span class="detail-label" style="color:var(--muted)">Học phí gốc</span><span style="text-decoration:line-through;color:var(--muted)">${fmt(s.fee_original)}</span></div>`:''}
     ${s.discount_note?`<div class="detail-row"><span class="detail-label">🏷️ Lý do CK</span><span style="color:var(--green)">${s.discount_note}</span></div>`:''}
     ${s.class_time?`<div class="detail-row"><span class="detail-label">🕐 Giờ học</span><span style="font-weight:700;color:var(--brand)">${s.class_time}</span></div>`:''}
@@ -6987,6 +6998,8 @@ function openEditStudent(){
   document.getElementById('es-type').value=s.type||'Offline';
   document.getElementById('es-email').value=s.email||'';
   document.getElementById('es-fee').value=s.fee||'';
+  const esCount=document.getElementById('es-student-count');
+  if(esCount) esCount.value=s.student_count||1;
   document.getElementById('es-note').value=s.note||'';
   // Xử lý date
   if(s.start){
@@ -7061,6 +7074,7 @@ async function saveEditStudent(){
     course:course?course.name:document.getElementById('es-course-id').selectedOptions[0]?.text||s.course||'',
     email:document.getElementById('es-email').value,
     fee:+document.getElementById('es-fee').value||s.fee||0,
+    student_count:Math.max(1,+document.getElementById('es-student-count')?.value||s.student_count||1),
     start:startFmt,
     class_date:document.getElementById('es-class-date').value||null,
     end_date:document.getElementById('es-end-date').value||null,
@@ -7113,19 +7127,22 @@ function toggleChannelOther() {
 }
 
 function calcDiscountedFee() {
-  const fee = +document.getElementById('fs-fee')?.value || 0;
+  const unitFee = +document.getElementById('fs-fee')?.value || 0;
+  const count = Math.max(1, +document.getElementById('fs-student-count')?.value || 1);
+  const fee = unitFee * count;
   const dType = document.getElementById('fs-discount-type')?.value || 'pct';
   const dVal = +document.getElementById('fs-discount-val')?.value || 0;
   const preview = document.getElementById('fs-fee-preview');
   const finalEl = document.getElementById('fs-fee-final');
   const savedEl = document.getElementById('fs-fee-saved');
   if (!preview) return;
-  if (fee <= 0 || dVal <= 0) { preview.style.display = 'none'; return; }
-  const saved = dType === 'pct' ? Math.round(fee * dVal / 100) : Math.min(dVal, fee);
+  if (fee <= 0) { preview.style.display = 'none'; return; }
+  const saved = dVal>0 ? (dType === 'pct' ? Math.round(fee * dVal / 100) : Math.min(dVal, fee)) : 0;
   const final = fee - saved;
   preview.style.display = '';
-  finalEl.textContent = fmtVND ? fmtVND(final) : final.toLocaleString('vi-VN') + 'đ';
-  savedEl.textContent = `(tiết kiệm ${fmtVND ? fmtVND(saved) : saved.toLocaleString('vi-VN')+'đ'})`;
+  const countNote = count>1 ? ` (${fmtVND?fmtVND(unitFee):unitFee.toLocaleString('vi-VN')+'đ'} × ${count} học viên)` : '';
+  finalEl.textContent = (fmtVND ? fmtVND(final) : final.toLocaleString('vi-VN') + 'đ') + countNote;
+  savedEl.textContent = saved>0 ? `(tiết kiệm ${fmtVND ? fmtVND(saved) : saved.toLocaleString('vi-VN')+'đ'})` : '';
 }
 
 async function addStudent(){
@@ -7134,7 +7151,9 @@ async function addStudent(){
   const courseId=document.getElementById('fs-course-id').value;
   const course=D.courses.find(c=>c.id===courseId);
   const type=document.getElementById('fs-type').value;
-  const feeOrig=+document.getElementById('fs-fee').value||(course&&!course.is_free?course.fee:0);
+  const unitFee=+document.getElementById('fs-fee').value||(course&&!course.is_free?course.fee:0);
+  const studentCount=Math.max(1,+document.getElementById('fs-student-count')?.value||1);
+  const feeOrig=unitFee*studentCount; // Tổng học phí gốc = đơn giá × số lượng học viên
   const discType = document.getElementById('fs-discount-type')?.value||'pct';
   const discVal = +document.getElementById('fs-discount-val')?.value||0;
   const discSaved = discVal>0 ? (discType==='pct' ? Math.round(feeOrig*discVal/100) : Math.min(discVal,feeOrig)) : 0;
@@ -7146,6 +7165,7 @@ async function addStudent(){
   const s={id:uid(),name:n,phone:document.getElementById('fs-phone').value,
     type,course_id:courseId,course:course?course.name:'',
     email:document.getElementById('fs-email').value,fee:feeVal,
+    fee_unit:unitFee,student_count:studentCount,
     start:document.getElementById('fs-start').value||todayStr(),
     class_date:type==='Offline'?(document.getElementById('fs-class-date').value||null):null,
     class_time:type==='Offline'?(document.getElementById('fs-class-time').value||''):'',
@@ -7163,10 +7183,10 @@ async function addStudent(){
     await sbUpsert('students',s);
     D.students.push(s);
     closeM('modal-add-student');
-    ['fs-name','fs-phone','fs-email','fs-fee','fs-start','fs-class-date','fs-end-date','fs-note','fs-channel-other','fs-discount-val','fs-discount-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const fsDT=document.getElementById('fs-discount-type');if(fsDT)fsDT.value='pct';const fsPrev=document.getElementById('fs-fee-preview');if(fsPrev)fsPrev.style.display='none';;const fsCh=document.getElementById('fs-channel');if(fsCh)fsCh.value='Zalo';const fgOt=document.getElementById('fg-channel-other');if(fgOt)fgOt.style.display='none';
+    ['fs-name','fs-phone','fs-email','fs-fee','fs-student-count','fs-start','fs-class-date','fs-end-date','fs-note','fs-channel-other','fs-discount-val','fs-discount-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const fsDT=document.getElementById('fs-discount-type');if(fsDT)fsDT.value='pct';const fsPrev=document.getElementById('fs-fee-preview');if(fsPrev)fsPrev.style.display='none';;const fsCh=document.getElementById('fs-channel');if(fsCh)fsCh.value='Zalo';const fgOt=document.getElementById('fg-channel-other');if(fgOt)fgOt.style.display='none';
     renderStudents();renderDash();notify('Đã thêm: '+n);
     if(document.getElementById('at-student').checked)
-      tgMsg(`🎓 *Học viên mới!*\n\n👤 ${n}\n📱 ${type}\n📚 ${course?course.name:'—'}\n💰 ${feeVal===0?'Miễn phí':fmt(feeVal)}\n${s.class_date?`🗓 Ngày học: ${s.class_date}\n`:''}\n_Trương Dáng Hương Academy_`);
+      tgMsg(`🎓 *Học viên mới!*\n\n👤 ${n}${studentCount>1?` (đăng ký cho ${studentCount} học viên)`:''}\n📱 ${type}\n📚 ${course?course.name:'—'}\n💰 ${feeVal===0?'Miễn phí':fmt(feeVal)}\n${s.class_date?`🗓 Ngày học: ${s.class_date}\n`:''}\n_Trương Dáng Hương Academy_`);
     gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
   }catch(e){notify('Lưu thất bại: '+e.message,false);}
 }
