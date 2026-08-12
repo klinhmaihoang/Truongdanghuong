@@ -4694,11 +4694,13 @@ function getGasUrl() {
 }
 
 // Gọi Apps Script (GET với payload vì GAS không hỗ trợ POST CORS)
+// Luôn thêm timestamp để URL không bao giờ trùng lặp — tránh bị cache bởi
+// trình duyệt, CDN hoặc mạng di động (nhà mạng VN hay cache GET theo URL).
 async function gasCall(payload) {
   const url = getGasUrl();
   if (!url) throw new Error('Chưa cấu hình Apps Script URL');
   const qs = encodeURIComponent(JSON.stringify(payload));
-  const res = await fetch(`${url}?payload=${qs}`, { method: 'GET' });
+  const res = await fetch(`${url}?payload=${qs}&_t=${Date.now()}`, { method: 'GET', cache: 'no-store' });
   if (!res.ok) throw new Error(`GAS HTTP ${res.status}`);
   const data = await res.json();
   if (data.status === 'error') throw new Error(data.error || 'GAS error');
