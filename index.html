@@ -5330,7 +5330,7 @@ async function handleCourseCSVImport(evt){
           console.error(`Import CSV khóa học — lỗi ở ${rowLabel}:`, e);
         }
 
-        await new Promise(res => setTimeout(res, 350));
+        await new Promise(res => setTimeout(res, 700));
 
         if(summaryEl && (i % 3 === 0 || i === rows.length-1)){
           summaryEl.innerHTML = `<div style="padding:8px 4px;color:var(--muted);font-size:12px">⏳ Đang import ${i+1}/${rows.length}...</div>`;
@@ -5430,7 +5430,7 @@ async function handleCustomerCSVImport(evt){
           console.error(`Import CSV khách hàng — lỗi ở ${rowLabel}:`, e);
         }
 
-        await new Promise(res => setTimeout(res, 350));
+        await new Promise(res => setTimeout(res, 700));
 
         if(summaryEl && (i % 3 === 0 || i === rows.length-1)){
           summaryEl.innerHTML = `<div style="padding:8px 4px;color:var(--muted);font-size:12px">⏳ Đang import ${i+1}/${rows.length}...</div>`;
@@ -7316,6 +7316,10 @@ async function sbUpsertWithRetry(table, record, maxRetries = 2) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       await sbUpsert(table, record);
+      // Đợi 1 nhịp trước khi đọc lại — tránh đọc quá sớm ngay sau khi ghi,
+      // lúc Google Sheets có thể chưa kịp cập nhật xong ở lần đọc kế tiếp
+      // (đặc biệt khi nhiều request dồn dập liên tiếp).
+      await new Promise(res => setTimeout(res, 400));
       // Xác minh: đọc lại đúng record vừa ghi
       const check = await sbGet(table, `?id=eq.${encodeURIComponent(record.id)}`);
       const saved = check && check[0];
@@ -7323,7 +7327,8 @@ async function sbUpsertWithRetry(table, record, maxRetries = 2) {
       throw new Error('Ghi thành công nhưng dữ liệu đọc lại bị rỗng (data trống)');
     } catch (e) {
       lastErr = e;
-      if (attempt < maxRetries) await new Promise(res => setTimeout(res, 600 * (attempt + 1)));
+      console.warn(`sbUpsertWithRetry lỗi (lần ${attempt+1}/${maxRetries+1}) cho ${table} id=${record.id}:`, e);
+      if (attempt < maxRetries) await new Promise(res => setTimeout(res, 1000 * (attempt + 1)));
     }
   }
   throw lastErr;
@@ -7448,7 +7453,7 @@ async function handleProductCSVImport(evt){
 
         // Giãn cách nhẹ giữa các lần ghi để tránh dồn request (tránh ERR_INSUFFICIENT_RESOURCES
         // khi trình duyệt đang mở nhiều tab cùng poll Apps Script)
-        await new Promise(res => setTimeout(res, 350));
+        await new Promise(res => setTimeout(res, 700));
 
         if(summaryEl && (i % 3 === 0 || i === rows.length-1)){
           summaryEl.innerHTML = `<div style="padding:8px 4px;color:var(--muted);font-size:12px">⏳ Đang import ${i+1}/${rows.length}...</div>`;
