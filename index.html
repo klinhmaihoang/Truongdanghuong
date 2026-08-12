@@ -5035,13 +5035,15 @@ async function pollUpdates(){
     const courses      = _poll.courses      || [];
     const customers    = _poll.customers    || [];
     const transactions = _poll.transactions || [];
-    D.students=students||D.students;
+    // An toàn: chỉ ghi đè khi có dữ liệu thật trả về — tránh 1 lần đồng bộ lỗi/rỗng
+    // xóa sạch dữ liệu đang hiển thị (dù dữ liệu thật trên server vẫn còn nguyên).
+    D.students=students&&students.length?students:D.students;
     D.inventory=inventory&&inventory.length?inventory:D.inventory;
     D.products=products&&products.length?products:D.products;
-    D.orders=orders||D.orders;
-    D.courses=courses||D.courses;
-    D.customers=customers||D.customers;
-    D.transactions=transactions||D.transactions;
+    D.orders=orders&&orders.length?orders:D.orders;
+    D.courses=courses&&courses.length?courses:D.courses;
+    D.customers=customers&&customers.length?customers:D.customers;
+    D.transactions=transactions&&transactions.length?transactions:D.transactions;
     // Reset lỗi khi kết nối lại
     if(_pollFailCount>0){
       _pollFailCount=0;
