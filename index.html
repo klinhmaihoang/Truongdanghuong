@@ -5053,6 +5053,7 @@ async function pollUpdates(){
     if(!modalOpen) render();
     else { renderDash(); renderOrders(); }
   }catch(e){
+    console.error('pollUpdates lỗi (lần '+(_pollFailCount+1)+'):', e);
     _pollFailCount++;
     if(_pollFailCount===1){
       // Lần đầu mất kết nối
