@@ -4703,7 +4703,18 @@ async function gasCall(payload) {
   const url = getGasUrl();
   if (!url) throw new Error('Chưa cấu hình Apps Script URL');
   const qs = encodeURIComponent(JSON.stringify(payload));
-  const res = await fetch(`${url}?payload=${qs}&_t=${Date.now()}`, { method: 'GET', cache: 'no-store' });
+  // Tự hủy sau 20s nếu không có phản hồi — tránh treo vô thời hạn khi GAS quá tải/chậm
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  let res;
+  try{
+    res = await fetch(`${url}?payload=${qs}&_t=${Date.now()}`, { method: 'GET', cache: 'no-store', signal: controller.signal });
+  }catch(e){
+    if(e.name === 'AbortError') throw new Error('Hết thời gian chờ (20s) — server phản hồi quá chậm hoặc mất mạng');
+    throw e;
+  }finally{
+    clearTimeout(timeoutId);
+  }
   if (!res.ok) throw new Error(`GAS HTTP ${res.status}`);
   const data = await res.json();
   if (data.status === 'error') throw new Error(data.error || 'GAS error');
