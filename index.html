@@ -1001,10 +1001,13 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <div class="btn-group">
         <button class="btn btn-sm" onclick="openAddCustomer()">+ Thêm khách</button>
         <button class="btn btn-green btn-sm" onclick="syncCustomersFromOrders()" id="btn-sync-customers">🔄 Sync từ đơn hàng</button>
+        <button class="btn btn-green btn-sm" onclick="document.getElementById('customer-csv-input').click()">📥 Import CSV</button>
+        <input id="customer-csv-input" type="file" accept=".csv" style="display:none" onchange="handleCustomerCSVImport(event)"/>
         <button class="btn btn-excel btn-sm" onclick="xlExport('customers')">📊 Excel</button>
         <button class="btn btn-ghost btn-sm" onclick="exportAds()" style="color:var(--blue)">📤 Xuất Ads</button>
       </div>
     </div>
+    <div id="customer-import-summary"></div>
     <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
       <input id="customer-search" placeholder="🔍 Tìm tên, SĐT, email, tag..." oninput="renderCustomers()"
         style="flex:1;min-width:180px;padding:9px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit"/>
@@ -5324,6 +5327,106 @@ async function handleCourseCSVImport(evt){
       }
 
       renderCourses();fillCourseSelects();
+      const msg = `✅ Import xong: ${added} thêm mới, ${updated} cập nhật${failed?`, ${failed} lỗi`:''}`;
+      if(summaryEl){
+        const errList = errorDetails.length
+          ? `<ul style="margin:6px 0 0;padding-left:18px;font-size:11.5px;color:var(--red)">${errorDetails.map(e=>`<li>${e}</li>`).join('')}</ul>`
+          : '';
+        summaryEl.innerHTML = `<div style="padding:8px 4px;color:${failed?'var(--red)':'var(--teal)'};font-size:12px;font-weight:600">${msg}${errList}</div>`;
+      }
+      notify(msg, !failed);
+    }
+  );
+}
+
+// ── IMPORT KHÁCH HÀNG TỪ CSV ──────────────────────────────────
+async function handleCustomerCSVImport(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  evt.target.value = '';
+
+  const summaryEl = document.getElementById('customer-import-summary');
+  const text = await file.text();
+  let rows;
+  try{ rows = parseCSVText(text); }
+  catch(e){ notify('Không đọc được file CSV: '+e.message, false); return; }
+
+  if(!rows.length){ notify('File CSV trống hoặc không đúng định dạng!', false); return; }
+
+  const first = rows[0];
+  if(!('name' in first)){
+    notify('File CSV thiếu cột "name" — kiểm tra lại header!', false);
+    return;
+  }
+
+  const cleanStr = (v) => {
+    const s = (v ?? '').toString().trim();
+    return (s.toLowerCase() === 'undefined' || s.toLowerCase() === 'null') ? '' : s;
+  };
+  const cleanNum = (v) => {
+    const s = cleanStr(v);
+    const n = parseFloat(s);
+    return isNaN(n) ? 0 : n;
+  };
+
+  confirmAct(
+    `Import ${rows.length} khách hàng từ CSV?`,
+    'Khách hàng trùng mã (id) sẽ được cập nhật đè, khách mới sẽ được thêm mới.',
+    async () => {
+      if(summaryEl) summaryEl.innerHTML = `<div style="padding:8px 4px;color:var(--muted);font-size:12px">⏳ Đang import 0/${rows.length}...</div>`;
+
+      let added = 0, updated = 0, failed = 0;
+      const errorDetails = [];
+      for(let i=0;i<rows.length;i++){
+        const r = rows[i];
+        const rowLabel = `Dòng ${i+2}`;
+
+        const name = cleanStr(r.name);
+        if(!name){
+          failed++;
+          errorDetails.push(`${rowLabel}: thiếu tên khách hàng (giá trị gốc: "${r.name ?? ''}")`);
+          continue;
+        }
+
+        const id = cleanStr(r.id) || uid();
+        const customer = {
+          id,
+          name,
+          phone: cleanStr(r.phone),
+          email: cleanStr(r.email),
+          gender: cleanStr(r.gender),
+          birthday: cleanStr(r.birthday),
+          address: cleanStr(r.address),
+          source: cleanStr(r.source),
+          segment: cleanStr(r.segment),
+          tags: cleanStr(r.tags),
+          points: cleanNum(r.points),
+          total_spent: cleanNum(r.total_spent),
+          visit_count: cleanNum(r.visit_count),
+          last_visit: cleanStr(r.last_visit),
+          note: cleanStr(r.note),
+          created_at: cleanStr(r.created_at) ? (parseInt(cleanStr(r.created_at)) || Date.now()) : Date.now()
+        };
+
+        try{
+          const existing = D.customers.find(x => x.id === id);
+          await sbUpsertWithRetry('customers', customer);
+          if(existing){ Object.assign(existing, customer); updated++; }
+          else { D.customers.push(customer); added++; }
+        }catch(e){
+          failed++;
+          errorDetails.push(`${rowLabel} (${name}): ${e.message || 'lỗi không xác định'}`);
+          console.error(`Import CSV khách hàng — lỗi ở ${rowLabel}:`, e);
+        }
+
+        await new Promise(res => setTimeout(res, 350));
+
+        if(summaryEl && (i % 3 === 0 || i === rows.length-1)){
+          summaryEl.innerHTML = `<div style="padding:8px 4px;color:var(--muted);font-size:12px">⏳ Đang import ${i+1}/${rows.length}...</div>`;
+        }
+      }
+
+      renderCustomers();
       const msg = `✅ Import xong: ${added} thêm mới, ${updated} cập nhật${failed?`, ${failed} lỗi`:''}`;
       if(summaryEl){
         const errList = errorDetails.length
@@ -13698,10 +13801,16 @@ async function syncCustomersFromOrders() {
     const key = (o.phone ? o.phone : o.customer).trim();
     if(!map[key]) {
       map[key] = {
-        name: o.customer, phone: o.phone||'', email: o.email||'',
+        name: o.customer, phone: o.phone||'', email: o.email||'', address: '',
         total_spent: 0, visit_count: 0, last_visit: '',
         last_ts: 0, orders: []
       };
+    }
+    // Địa chỉ: ưu tiên cột address riêng, nếu đơn cũ chưa có thì thử trích từ note
+    // (dạng "ĐC: ... | ..." — đơn cũ trước khi có cột address riêng)
+    if(!map[key].address){
+      const addrFromNote = (o.note||'').match(/ĐC:\s*([^|]+)/);
+      map[key].address = o.address || (addrFromNote ? addrFromNote[1].trim() : '');
     }
     map[key].total_spent += (o.total||0);
     map[key].visit_count += 1;
@@ -13727,7 +13836,7 @@ async function syncCustomersFromOrders() {
         id: uid(), name: d.name, phone: d.phone, email: d.email,
         points: pts, total_spent: d.total_spent,
         visit_count: d.visit_count, last_visit: d.last_visit,
-        birthday:'', gender:'', address:'', source:'', segment:'', tags:'', note:'',
+        birthday:'', gender:'', address:d.address||'', source:'', segment:'', tags:'', note:'',
         created_at: Date.now()
       };
       try { await sbUpsert('customers', c); D.customers.push(c); created++; }
@@ -13740,9 +13849,10 @@ async function syncCustomersFromOrders() {
         visit_count: Math.max(existing.visit_count||0, d.visit_count),
         last_visit: d.last_visit || existing.last_visit || ''
       };
-      // Bổ sung phone/email nếu KH cũ chưa có
+      // Bổ sung phone/email/address nếu KH cũ chưa có
       if(!existing.phone && d.phone) upd.phone = d.phone;
       if(!existing.email && d.email) upd.email = d.email;
+      if(!existing.address && d.address) upd.address = d.address;
       Object.assign(existing, upd);
       try { await sbPatch('customers', upd, `?id=eq.${existing.id}`); updated++; }
       catch(e) { console.warn('sync update skip:', existing.name, e.message); }
