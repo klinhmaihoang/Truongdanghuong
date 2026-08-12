@@ -8191,7 +8191,8 @@ function renderStockLog(){
 
 // ── STOCK LOG EDIT ──
 function openEditLog(id){
-  const l=D.stockLog.find(x=>x.id===id);if(!l)return;
+  const l=D.stockLog.find(x=>String(x.id)===String(id));
+  if(!l){notify('Không tìm thấy dòng lịch sử này — thử tải lại trang.',false);return;}
   document.getElementById('el-id').value=id;
   document.getElementById('el-name').value=l.name;
   document.getElementById('el-type-show').value=l.type;
@@ -8215,7 +8216,21 @@ async function saveEditLog(){
 
 function deleteLog(){
   const id=document.getElementById('el-id').value;
-  const l=D.stockLog.find(x=>x.id===id);if(!l)return;
+  const l=D.stockLog.find(x=>String(x.id)===String(id));
+  if(!l){
+    // Không tìm thấy trong bộ nhớ tạm (dữ liệu có thể vừa được đồng bộ lại) —
+    // vẫn cho xóa thẳng theo ID, chỉ là không tính được phần hoàn/trừ tồn kho tự động.
+    confirmAct('Xóa dòng lịch sử này?',
+      '⚠️ Không xác định được nguyên liệu liên quan — sẽ KHÔNG tự hoàn/trừ tồn kho. Kiểm tra lại tồn kho thủ công sau khi xóa nếu cần.',
+      async()=>{
+        try{
+          await sbDel('stock_log',`?id=eq.${id}`);
+          D.stockLog=D.stockLog.filter(x=>String(x.id)!==String(id));
+          closeM('modal-edit-log');renderStockLog();notify('✓ Đã xóa dòng lịch sử');
+        }catch(e){notify('Lỗi khi xóa: '+e.message,false);}
+      });
+    return;
+  }
   const isExport=l.type==='Xuất'||l.type==='Xuất thủ công'||l.type==='Xuất dạy học';
   const isImport=l.type==='Nhập';
   const matQty=l.mat_qty||parseFloat((l.qty||'0').replace(/[^0-9.]/g,''))||0;
@@ -8228,7 +8243,7 @@ function deleteLog(){
     async()=>{
       try{
         await sbDel('stock_log',`?id=eq.${id}`);
-        D.stockLog=D.stockLog.filter(x=>x.id!==id);
+        D.stockLog=D.stockLog.filter(x=>String(x.id)!==String(id));
         // Hoàn lại tồn kho nếu có thể
         if(mat&&matQty>0){
           if(isExport){
@@ -8246,8 +8261,8 @@ function deleteLog(){
           notify('Đã xóa dòng lịch sử');
         }
         closeM('modal-edit-log');render();
-        gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
-      }catch(e){notify('Lỗi: '+e.message,false);}
+        try{ await gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()}); }catch(e2){ console.warn('gsSend legacy sync lỗi (bỏ qua):', e2); }
+      }catch(e){notify('Lỗi khi xóa: '+e.message,false);}
     });
 }
 
