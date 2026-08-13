@@ -3912,11 +3912,11 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Email</label><input id="es-email" placeholder="email@example.com"/></div>
-      <div class="fg"><label>Học phí (₫)</label><input id="es-fee" type="number" placeholder="2500000"/></div>
+      <div class="fg"><label>Đơn giá học phí (₫/học viên)</label><input id="es-fee-unit" type="number" placeholder="2500000" oninput="calcEditFee()"/></div>
     </div>
     <div class="form-row">
-      <div class="fg"><label>Số lượng học viên đăng ký chung</label><input id="es-student-count" type="number" min="1" value="1" placeholder="1"/></div>
-      <div class="fg"></div>
+      <div class="fg"><label>Số lượng học viên đăng ký chung</label><input id="es-student-count" type="number" min="1" value="1" placeholder="1" oninput="calcEditFee()"/></div>
+      <div class="fg"><label>Tổng học phí (₫) — tự tính, có thể sửa tay nếu cần</label><input id="es-fee" type="number" placeholder="2500000"/></div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Ngày đăng ký</label><input id="es-start" type="date"/></div>
@@ -4707,18 +4707,25 @@ function getGasUrl() {
 // Gọi Apps Script (GET với payload vì GAS không hỗ trợ POST CORS)
 // Luôn thêm timestamp để URL không bao giờ trùng lặp — tránh bị cache bởi
 // trình duyệt, CDN hoặc mạng di động (nhà mạng VN hay cache GET theo URL).
-async function gasCall(payload) {
+async function gasCall(payload, _isRetry) {
   const url = getGasUrl();
   if (!url) throw new Error('Chưa cấu hình Apps Script URL');
   const qs = encodeURIComponent(JSON.stringify(payload));
-  // Tự hủy sau 20s nếu không có phản hồi — tránh treo vô thời hạn khi GAS quá tải/chậm
+  // Tự hủy sau 25s nếu không có phản hồi — tránh treo vô thời hạn khi GAS quá tải/chậm
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 20000);
+  const timeoutId = setTimeout(() => controller.abort(), 25000);
   let res;
   try{
     res = await fetch(`${url}?payload=${qs}&_t=${Date.now()}`, { method: 'GET', cache: 'no-store', signal: controller.signal });
   }catch(e){
-    if(e.name === 'AbortError') throw new Error('Hết thời gian chờ (20s) — server phản hồi quá chậm hoặc mất mạng');
+    clearTimeout(timeoutId);
+    // Tự động thử lại NGAY 1 lần nếu bị timeout/mất mạng — phục hồi nhanh hơn khi
+    // server chỉ chậm thoáng qua, tránh phải đợi cơ chế retry ở tầng ngoài (chậm hơn).
+    if(!_isRetry && (e.name === 'AbortError' || e.message?.includes('fetch'))){
+      console.warn('gasCall timeout, tự thử lại 1 lần:', payload.action || payload.table);
+      return gasCall(payload, true);
+    }
+    if(e.name === 'AbortError') throw new Error('Hết thời gian chờ (25s) — server phản hồi quá chậm hoặc mất mạng');
     throw e;
   }finally{
     clearTimeout(timeoutId);
@@ -7000,6 +7007,9 @@ function openEditStudent(){
   document.getElementById('es-fee').value=s.fee||'';
   const esCount=document.getElementById('es-student-count');
   if(esCount) esCount.value=s.student_count||1;
+  const esUnit=document.getElementById('es-fee-unit');
+  // Học viên cũ chưa có fee_unit riêng → suy ra từ fee/số lượng hiện có (mặc định coi như đang đúng)
+  if(esUnit) esUnit.value = s.fee_unit || (s.student_count>1 ? Math.round((s.fee||0)/s.student_count) : (s.fee||''));
   document.getElementById('es-note').value=s.note||'';
   // Xử lý date
   if(s.start){
@@ -7040,6 +7050,13 @@ function openEditStudent(){
   setTimeout(()=>showM('modal-edit-student'),150);
 }
 
+function calcEditFee(){
+  const unit = +document.getElementById('es-fee-unit')?.value || 0;
+  const count = Math.max(1, +document.getElementById('es-student-count')?.value || 1);
+  const feeEl = document.getElementById('es-fee');
+  if(feeEl && unit>0) feeEl.value = unit * count;
+}
+
 function toggleEditChannelOther() {
   const sel = document.getElementById('es-channel');
   const box = document.getElementById('fg-es-channel-other');
@@ -7075,6 +7092,7 @@ async function saveEditStudent(){
     email:document.getElementById('es-email').value,
     fee:+document.getElementById('es-fee').value||s.fee||0,
     student_count:Math.max(1,+document.getElementById('es-student-count')?.value||s.student_count||1),
+    fee_unit:+document.getElementById('es-fee-unit')?.value||s.fee_unit||0,
     start:startFmt,
     class_date:document.getElementById('es-class-date').value||null,
     end_date:document.getElementById('es-end-date').value||null,
