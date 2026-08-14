@@ -19200,7 +19200,9 @@ function renderCEODashboard() {
 
   // ── Data calculations ──
   const orders = D.orders||[];
-  const students = D.students||[];
+  // ★ FIX: lọc bỏ học viên đã xóa (deleted_at) — trước đây tính thẳng D.students nên
+  // học viên đã xóa vẫn bị đếm vào "học viên mới", "chưa cọc"... làm sai số liệu.
+  const students = (D.students||[]).filter(s=>!s.deleted_at&&s.status!=='Đã xóa');
   const txs = D.transactions||[];
   const inv = D.inventory||[];
 
@@ -19225,8 +19227,8 @@ function renderCEODashboard() {
   const activeStudents = students.filter(s=>s.status==='Đang học');
   const newStudentsThisMonth = students.filter(s=>getMonthKey(s.start||s.created_at||'')===thisMonth);
   const newStudentsLastMonth = students.filter(s=>getMonthKey(s.start||s.created_at||'')===lastMonthKey);
-  const churnedStudents = students.filter(s=>['Nghỉ học','Bảo lưu'].includes(s.status)&&getMonthKey(s.updated_at||'')===thisMonth);
-  const churnRate = activeStudents.length>0 ? (churnedStudents.length/activeStudents.length*100).toFixed(1) : 0;
+  const churnedStudents = students.filter(s=>['Nghỉ học','Bảo lưu'].includes(s.status));
+  const churnRate = activeStudents.length>0 ? (churnedStudents.length/(activeStudents.length+churnedStudents.length)*100).toFixed(1) : 0;
   const unpaidStudents = students.filter(s=>s.fee>0&&!s.paid2&&!s.paid1);
   const unpaidAmt = unpaidStudents.reduce((s,st)=>{
     const dep = st.paid1_amount||Math.round((st.fee||0)*0.3);
