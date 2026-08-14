@@ -5654,9 +5654,14 @@ async function autoUpdateStudentStatus(){
   const today=new Date(); today.setHours(0,0,0,0);
   const updates=[];
   const unpaidReminders=[];
+  // Chỉ tự động tính lại cho các trạng thái "theo lịch học" — không đụng tới các
+  // trạng thái đã được chọn TAY (Nghỉ học, Bảo lưu, Đã xóa...), tránh ghi đè mất
+  // lựa chọn thủ công của nhân viên.
+  const AUTO_MANAGED_STATUSES = ['Chưa học','Đang học','Học xong'];
 
   for(const s of D.students){
     if(s.deleted_at) continue;
+    if(!AUTO_MANAGED_STATUSES.includes(s.status)) continue; // bỏ qua trạng thái đã chọn tay
 
     // Chỉ dùng ngày học (class_date) để xác định trạng thái
     const refDateStr=s.class_date||null;
