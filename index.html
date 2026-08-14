@@ -4408,6 +4408,22 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     <div class="modal-title">🧪 Công thức pha chế</div>
     <div class="modal-sub" id="recipe-prod-name"></div>
     <input type="hidden" id="recipe-prod-id"/>
+    <div style="background:#fff8ec;border:1px solid var(--brand);border-radius:8px;padding:12px;margin-bottom:12px">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px;font-weight:600">
+        <input type="checkbox" id="recipe-track-stock" onchange="toggleRecipeTrackStock()" style="width:16px;height:16px"/>
+        📦 Trộn sẵn theo mẻ — theo dõi tồn kho thành phẩm riêng
+      </label>
+      <div style="font-size:11.5px;color:var(--muted);margin-top:4px">Bật nếu sản phẩm này được pha trộn sẵn hàng loạt (VD: Trà mix), không phải pha từng ly khi bán. Khi bật, dùng "🏭 Sản xuất → + Lệnh sản xuất" để trộn 1 mẻ — hệ thống sẽ tự trừ nguyên liệu gốc & cộng vào tồn kho thành phẩm dưới đây.</div>
+      <div id="recipe-stock-row" style="display:none;margin-top:10px">
+        <label style="font-size:12px;font-weight:600">Tồn kho thành phẩm hiện tại</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="recipe-current-qty" type="number" step="0.01" placeholder="0" style="max-width:150px"/>
+          <span id="recipe-stock-unit" style="font-size:12px;color:var(--muted)"></span>
+          <button class="btn btn-sm" onclick="saveRecipeStockQty()">💾 Lưu</button>
+        </div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px">Sửa tay ở đây nếu cần điều chỉnh (VD: nhập tồn đầu kỳ) — bình thường số này tự tăng khi hoàn thành Lệnh sản xuất, tự giảm khi bán.</div>
+      </div>
+    </div>
     <div id="recipe-rows" style="margin-bottom:12px"></div>
     <div style="background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
       <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:8px">Thêm nguyên liệu</div>
@@ -7429,18 +7445,23 @@ async function addStudent(){
 // ── PRODUCTS ──
 function renderProducts(){
   document.getElementById('prod-grid').innerHTML=D.products.filter(p=>p.price>0).map(p=>{
-    // Ưu tiên tính từ recipe nếu có
-    const recipeRows=D.recipes.filter(r=>r.product_id===p.id);
     let stock=null;
-    if(recipeRows.length>0){
-      // Số phần = min của tất cả nguyên liệu trong recipe
-      stock=Math.min(...recipeRows.map(r=>{
-        const mat=D.inventory.find(i=>i.id===r.mat_id);
-        return mat&&r.mat_use>0?Math.floor(mat.qty/r.mat_use):99999;
-      }));
-    } else if(p.mat_id&&p.mat_use>0){
-      const mat=D.inventory.find(i=>i.id===p.mat_id);
-      stock=mat?Math.floor(mat.qty/p.mat_use):null;
+    if(p.track_stock){
+      // Sản phẩm trộn sẵn theo mẻ — hiện thẳng tồn kho thành phẩm thật, không tính theo công thức
+      stock=p.qty||0;
+    } else {
+      // Ưu tiên tính từ recipe nếu có
+      const recipeRows=D.recipes.filter(r=>r.product_id===p.id);
+      if(recipeRows.length>0){
+        // Số phần = min của tất cả nguyên liệu trong recipe
+        stock=Math.min(...recipeRows.map(r=>{
+          const mat=D.inventory.find(i=>i.id===r.mat_id);
+          return mat&&r.mat_use>0?Math.floor(mat.qty/r.mat_use):99999;
+        }));
+      } else if(p.mat_id&&p.mat_use>0){
+        const mat=D.inventory.find(i=>i.id===p.mat_id);
+        stock=mat?Math.floor(mat.qty/p.mat_use):null;
+      }
     }
     const low=stock!==null&&stock<5;
     return`<div class="prod-card" onclick="addToCart('${p.id}')" style="${low?'border-color:rgba(192,57,43,.4)':''}">
@@ -7448,7 +7469,7 @@ function renderProducts(){
       <div class="prod-name">${p.name}</div>
       <div class="prod-price">${fmt(p.price)}</div>
       ${p.vat?`<div style="font-size:10px;color:#2980b9;font-weight:500">Gồm VAT ${p.vat}%: ${fmt(Math.round(p.price*(1+(p.vat||0)/100)))}</div>`:''}
-      <div class="prod-stock" style="color:${low?'var(--red)':stock===0?'var(--red)':'inherit'}">${stock!==null?stock+' phần':'Không giới hạn'}</div>
+      <div class="prod-stock" style="color:${low?'var(--red)':stock===0?'var(--red)':'inherit'}">${stock!==null?stock+(p.track_stock?(p.unit||''):' phần'):'Không giới hạn'}</div>
     </div>`;
   }).join('');
 }
@@ -7462,7 +7483,7 @@ function renderProductList(){
     const profitColor=profit===null?'var(--muted)':profit>0?'var(--teal)':'var(--red)';
     return`<tr>
       <td style="font-size:22px">${p.icon||'📦'}</td>
-      <td><strong>${p.name}</strong></td>
+      <td><strong>${p.name}</strong>${p.track_stock?`<br><span style="font-size:11px;font-weight:600;color:${(p.qty||0)>0?'var(--teal)':'var(--red)'}">📦 Tồn: ${p.qty||0}${p.unit||''}</span>`:''}</td>
       <td style="color:var(--gold2);font-weight:700">${fmt(p.price)}</td>
       <td class="hide-mobile" style="font-weight:600">${cost>0?fmt(cost):'<span style="color:var(--muted)">—</span>'}</td>
       <td class="hide-mobile" style="font-weight:700;color:${profitColor}">${profit===null?'—':fmt(profit)}</td>
@@ -8650,7 +8671,40 @@ function openRecipe(pid){
   const matOpts=D.inventory.map(i=>`<option value="${i.id}">${i.name} (${i.unit})</option>`).join('');
   document.getElementById('recipe-mat').innerHTML=matOpts;
   renderRecipeRows(pid);
+  // Trạng thái theo dõi tồn kho riêng
+  const cb=document.getElementById('recipe-track-stock');
+  const stockRow=document.getElementById('recipe-stock-row');
+  const qtyEl=document.getElementById('recipe-current-qty');
+  const unitEl=document.getElementById('recipe-stock-unit');
+  if(cb) cb.checked = !!p.track_stock;
+  if(stockRow) stockRow.style.display = p.track_stock ? '' : 'none';
+  if(qtyEl) qtyEl.value = p.qty||0;
+  if(unitEl) unitEl.textContent = p.unit||'';
   showM('modal-recipe');
+}
+
+async function toggleRecipeTrackStock(){
+  const pid=document.getElementById('recipe-prod-id').value;
+  const p=D.products.find(x=>x.id===pid);if(!p)return;
+  const checked=document.getElementById('recipe-track-stock').checked;
+  document.getElementById('recipe-stock-row').style.display = checked ? '' : 'none';
+  try{
+    p.track_stock=checked;
+    await sbPatch('products',{track_stock:checked},`?id=eq.${pid}`);
+    notify(checked?'✓ Đã bật theo dõi tồn kho riêng cho '+p.name:'✓ Đã tắt theo dõi tồn kho riêng');
+  }catch(e){notify('Lỗi: '+e.message,false);}
+}
+
+async function saveRecipeStockQty(){
+  const pid=document.getElementById('recipe-prod-id').value;
+  const p=D.products.find(x=>x.id===pid);if(!p)return;
+  const qty=+document.getElementById('recipe-current-qty').value||0;
+  try{
+    p.qty=qty;
+    await sbPatch('products',{qty},`?id=eq.${pid}`);
+    notify(`✓ Đã cập nhật tồn kho ${p.name}: ${qty}${p.unit||''}`);
+    renderProductList?.();
+  }catch(e){notify('Lỗi: '+e.message,false);}
 }
 
 function renderRecipeRows(pid){
@@ -13582,6 +13636,14 @@ function checkStockForOrder(o) {
     // Tìm product theo tên
     const prod = D.products.find(p => p.name === name);
     if(!prod) return;
+    // Sản phẩm trộn sẵn theo mẻ (track_stock) → kiểm tra thẳng tồn kho thành phẩm,
+    // KHÔNG kiểm tra lại nguyên liệu gốc (đã tiêu hao lúc sản xuất rồi)
+    if(prod.track_stock){
+      if((prod.qty||0) < qty){
+        warnings.push(`⚠️ ${prod.name}: cần ${qty}${prod.unit||''}, tồn kho thành phẩm chỉ còn ${prod.qty||0}${prod.unit||''}`);
+      }
+      return;
+    }
     // Tìm recipe
     const recipeRows = D.recipes.filter(r => r.product_id === prod.id);
     if(recipeRows.length > 0) {
@@ -13612,6 +13674,16 @@ async function deductStockForOrder(o) {
     const {name, qty} = parseItemStr(itemStr);
     const prod = D.products.find(p => p.name === name);
     if(!prod) continue;
+
+    // ★ Sản phẩm trộn sẵn theo mẻ (VD: Trà mix) — trừ THẲNG tồn kho thành phẩm,
+    // KHÔNG trừ lại nguyên liệu gốc (đã trừ 1 lần duy nhất lúc hoàn thành sản xuất).
+    if(prod.track_stock){
+      prod.qty = Math.max(0, Math.round(((prod.qty||0) - qty) * 100) / 100);
+      await sbPatch('products', {qty: prod.qty}, `?id=eq.${prod.id}`);
+      logs.push(`-${qty}${prod.unit||''} ${prod.name} (kho thành phẩm)`);
+      continue;
+    }
+
     const recipeRows = D.recipes.filter(r => r.product_id === prod.id);
     if(recipeRows.length > 0) {
       for(const r of recipeRows) {
@@ -17303,8 +17375,18 @@ async function prodComplete(id) {
       sbPatch('inventory',{qty:mat.qty},'?id=eq.'+mat.id);
     }
   });
+  // ★ Cộng kho thành phẩm — chỉ áp dụng cho sản phẩm có bật "Theo dõi tồn kho riêng"
+  // (VD: Trà mix trộn sẵn theo mẻ). Sản phẩm thường (pha theo công thức mỗi lần bán)
+  // không cần bước này.
+  const prod=D.products?.find(p=>p.id===o.product_id);
+  if(prod&&prod.track_stock){
+    prod.qty=Math.round(((prod.qty||0)+o.qty)*100)/100;
+    await sbPatch('products',{qty:prod.qty},'?id=eq.'+prod.id);
+    notify(`✅ Hoàn thành sản xuất: ${o.product_name} × ${o.qty} — Tồn kho thành phẩm: ${prod.qty}${prod.unit||''}`);
+  } else {
+    notify('✅ Hoàn thành sản xuất: '+o.product_name+' × '+o.qty);
+  }
   renderProduction();
-  notify('✅ Hoàn thành sản xuất: '+o.product_name+' × '+o.qty);
 }
 
 async function prodDeleteOrder(id) {
