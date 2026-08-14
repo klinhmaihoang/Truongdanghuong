@@ -319,7 +319,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <span style="font-size:18px">💳</span>
       <span style="font-size:13px;font-weight:700;color:#7d4f00">Có <span id="dash-unpaid-count">0</span> học viên chưa thanh toán</span>
     </div>
-    <button class="btn btn-sm" style="background:#e67e22;font-size:12px;padding:5px 12px" onclick="go('students',document.querySelector('.nav button'));stTab(document.querySelector('#page-students .tab'),'all')">Xem ngay →</button>
+    <button class="btn btn-sm" style="background:#e67e22;font-size:12px;padding:5px 12px" onclick="goToUnpaidStudents()">Xem ngay →</button>
   </div>
   <!-- 2 cột: học viên gần đây + đơn bán lẻ gần đây -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
@@ -397,10 +397,10 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <!-- Tìm kiếm -->
       <div style="margin-bottom:12px;display:flex;gap:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:200px;position:relative">
-          <input id="student-search" placeholder="🔍 Tìm theo tên, SĐT, khóa học..." oninput="renderStudents()"
+          <input id="student-search" placeholder="🔍 Tìm theo tên, SĐT, khóa học..." oninput="unpaidOnlyFilter=false;renderStudents()"
             style="width:100%;padding:9px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit"/>
         </div>
-        <select id="student-status-filter" onchange="renderStudents()"
+        <select id="student-status-filter" onchange="unpaidOnlyFilter=false;renderStudents()"
           style="padding:9px 14px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;outline:none;font-family:inherit;background:var(--bg)">
           <option value="">Tất cả trạng thái</option>
           <option value="Chưa học">Chưa học</option>
@@ -409,6 +409,12 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
           <option value="Bảo lưu">Bảo lưu</option>
           <option value="Nghỉ học">Nghỉ học</option>
         </select>
+      </div>
+      <div id="student-unpaid-filter-chip" style="display:none;margin-bottom:10px">
+        <span style="background:#fff3cd;border:1.5px solid #e67e22;color:#7d4f00;font-size:12px;font-weight:600;padding:6px 12px;border-radius:20px;display:inline-flex;align-items:center;gap:8px">
+          💳 Đang lọc: Chưa thanh toán đợt 1
+          <span onclick="clearUnpaidFilter()" style="cursor:pointer;font-weight:700;color:#e67e22">✕ Bỏ lọc</span>
+        </span>
       </div>
       <table><thead><tr><th>Họ tên</th><th class="hide-mobile">Khóa học</th><th class="hide-mobile" style="min-width:80px">Kênh LL</th><th>Học phí</th><th class="hide-mobile">Ngày học</th><th class="hide-mobile">Thanh toán</th><th class="hide-mobile">Trạng thái</th><th></th></tr></thead>
       <tbody id="student-list"></tbody></table>
@@ -5650,9 +5656,14 @@ async function checkReminders(){
       msgs.push(`💸 *Nhắc thanh toán đợt 2!*\n\n👤 ${s.name}\n📚 ${courseName}\n✅ Đã thu đợt 1: ${fmt(dep)}\n⏳ Còn lại đợt 2 (70%): ${fmt(rest)}\n\n_Trương Dáng Hương Academy_`);
   });
 
-  if(msgs.length===0){notify('✓ Không có nhắc nhở nào hôm nay');return;}
-  for(const m of msgs)await tgMsg(m);
-  notify(`✓ Đã gửi ${msgs.length} nhắc nhở lên Telegram`);
+  if(msgs.length===0){notify('✓ Không có nhắc nhở nào hôm nay');}
+  else{
+    for(const m of msgs)await tgMsg(m);
+    notify(`✓ Đã gửi ${msgs.length} nhắc nhở lên Telegram`);
+  }
+  // Gộp luôn nhắc nợ nguyên vật liệu (trước đây bị tách ra 1 hàm checkReminders thứ 2
+  // định nghĩa trùng tên, gây đệ quy vô hạn khi gọi — đã gộp lại đây cho an toàn)
+  if(typeof checkNvlDebtReminders==='function') await checkNvlDebtReminders();
 }
 
 // ══════════════════════════════════════════════════
@@ -6820,13 +6831,30 @@ function renderDash(){
   </tr>`).join(''):'<tr><td colspan="4" style="color:var(--teal);text-align:center;padding:14px;font-size:12px">✓ Tất cả nguyên liệu đủ hàng</td></tr>';
 }
 
+let unpaidOnlyFilter = false;
+function goToUnpaidStudents(){
+  unpaidOnlyFilter = true;
+  go('students',document.querySelector('.nav button'));
+  stTab(document.querySelector('#page-students .tab'),'all');
+  const sf=document.getElementById('student-status-filter'); if(sf) sf.value='';
+  const sq=document.getElementById('student-search'); if(sq) sq.value='';
+  renderStudents();
+}
+function clearUnpaidFilter(){
+  unpaidOnlyFilter = false;
+  renderStudents();
+}
+
 function renderStudents(){
   const q=(document.getElementById('student-search')?.value||'').toLowerCase().trim();
   const statusFilter=document.getElementById('student-status-filter')?.value||'';
+  const chip=document.getElementById('student-unpaid-filter-chip');
+  if(chip) chip.style.display = unpaidOnlyFilter ? '' : 'none';
   const list=D.students.filter(s=>{
     if(s.deleted_at) return false; // ẩn soft-deleted
     if(stFilter!=='all'&&stFilter!=='courses'&&s.type.toLowerCase()!==stFilter)return false;
     if(statusFilter&&s.status!==statusFilter)return false;
+    if(unpaidOnlyFilter&&(s.paid1||!(s.fee>0)||s.status==='Đã xóa'))return false;
     if(!q)return true;
     const course=D.courses.find(c=>c.id===s.course_id);
     const courseName=(course?course.name:(s.course||'')).toLowerCase();
@@ -11819,12 +11847,9 @@ async function checkNvlDebtReminders() {
   notify(`✅ Đã gửi nhắc nợ NVL (${Object.keys(byCustomer).length} khách)`);
 }
 
-// Patch checkReminders để thêm nhắc NVL
-const _origCheckReminders = checkReminders;
-async function checkReminders() {
-  await _origCheckReminders();
-  await checkNvlDebtReminders();
-}
+// ★ FIX: đã bỏ định nghĩa trùng tên checkReminders() ở đây (trước đây gây đệ quy vô
+// hạn do tự gọi chính nó — xem giải thích ở định nghĩa gốc phía trên đầu file).
+// Phần gọi checkNvlDebtReminders() đã được gộp thẳng vào cuối hàm checkReminders() gốc.
 
 // NVL summary inline (patch removed to fix recursion)
 // Thêm nút nhắc nợ NVL vào Cài đặt
