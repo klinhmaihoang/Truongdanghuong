@@ -11526,9 +11526,10 @@ function renderSchedule() {
   }
   const filterCourse = cSel?.value||'';
 
-  // Students with class_date
+  // Students with class_date (bỏ các học viên đã xóa)
   const studs = D.students.filter(s=>{
     if(!s.class_date) return false;
+    if(s.deleted_at || s.status==='Đã xóa') return false;
     if(filterCourse && s.course_id!==filterCourse) return false;
     return true;
   });
