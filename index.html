@@ -11536,11 +11536,19 @@ function renderSchedule() {
 
   // Stats
   const todayStr = dateStr(today);
-  setEl('sched-stat-today',  studs.filter(s=>s.class_date===todayStr).length);
+  // Danh sách ngày học của 1 học viên: từ class_date tới end_date (nếu có), bao gồm cả 2 đầu
+  const getClassDates = (s) => {
+    if(!s.class_date) return [];
+    if(!s.end_date || s.end_date < s.class_date) return [s.class_date];
+    const dates = [];
+    for(let d=new Date(s.class_date); dateStr(d)<=s.end_date; d.setDate(d.getDate()+1)) dates.push(dateStr(d));
+    return dates;
+  };
+  setEl('sched-stat-today',  studs.filter(s=>getClassDates(s).includes(todayStr)).length);
   // This week
   const weekStart = new Date(today); weekStart.setDate(today.getDate()-today.getDay()+1);
   const weekEnd   = new Date(weekStart); weekEnd.setDate(weekStart.getDate()+6);
-  setEl('sched-stat-week', studs.filter(s=>{const d=new Date(s.class_date);return d>=weekStart&&d<=weekEnd;}).length);
+  setEl('sched-stat-week', studs.filter(s=>getClassDates(s).some(ds=>{const d=new Date(ds);return d>=weekStart&&d<=weekEnd;})).length);
   setEl('sched-stat-active', D.students.filter(s=>s.status==='Đang học').length);
   setEl('sched-stat-unpaid', D.students.filter(s=>s.status==='Đang học'&&s.fee>0&&!s.paid1).length);
 
@@ -11560,12 +11568,14 @@ function renderSchedule() {
   }
   setEl('sched-list-title', 'Lịch học — '+document.getElementById('sched-title').textContent);
 
-  // Build event map
+  // Build event map — trải đều qua tất cả các ngày trong khoảng [class_date, end_date]
   const eventMap = {};
   studs.forEach(s=>{
-    if(!eventMap[s.class_date]) eventMap[s.class_date] = [];
     const course = D.courses.find(c=>c.id===s.course_id);
-    eventMap[s.class_date].push({name:s.name, course:course?.name||s.course||'—', paid:!!(s.paid1), status:s.status});
+    getClassDates(s).forEach(ds=>{
+      if(!eventMap[ds]) eventMap[ds] = [];
+      eventMap[ds].push({name:s.name, course:course?.name||s.course||'—', paid:!!(s.paid1), status:s.status});
+    });
   });
 
   // Render grid
@@ -11604,8 +11614,7 @@ function renderSchedule() {
 
   // Render list below calendar
   const listStuds = studs.filter(s=>{
-    const d = new Date(s.class_date);
-    return d>=startDate && d<=endDate;
+    return getClassDates(s).some(ds=>{const d=new Date(ds);return d>=startDate && d<=endDate;});
   }).sort((a,b)=>a.class_date.localeCompare(b.class_date));
   const tbody = document.getElementById('sched-student-list');
   if(!tbody) return;
