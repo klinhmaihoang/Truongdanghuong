@@ -2597,6 +2597,18 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div id="tomorrow-report-debug" style="display:none;margin-top:10px;padding:10px;background:#0d1117;border-radius:8px;font-family:monospace;font-size:11px;color:#9fdb9f;white-space:pre-wrap;word-break:break-all;max-height:220px;overflow:auto"></div>
   </div>
 
+  <!-- Báo cáo sáng 8h tự động -->
+  <div class="card" style="margin-bottom:14px;background:#fff8ec;border:1px solid var(--brand)">
+    <div class="card-head">
+      <span class="card-title">🌅 Báo cáo sáng 8h (Telegram + Zalo)</span>
+      <button class="btn btn-tg btn-sm" onclick="testMorningReport()">📤 Gửi thử ngay</button>
+    </div>
+    <div class="guide" style="margin-bottom:0">
+      Báo cáo này chạy <b>tự động phía server</b> mỗi sáng, tổng hợp: học viên đang học, đơn hàng chờ thu tiền, kho nguyên liệu sắp hết — gửi cùng lúc lên cả Telegram và Zalo. Để bật chạy tự động: vào <b>Apps Script → Trình kích hoạt (⏰) → + Thêm trình kích hoạt → chọn hàm <code>sendMorningReport</code> → Time-driven → Day timer → chọn khung giờ (VD 8:00–9:00)</b>. Nút bên phải để gửi thử ngay, kiểm tra nội dung trước khi bật lịch tự động.
+    </div>
+    <div id="morning-report-debug" style="display:none;margin-top:10px;padding:10px;background:#0d1117;border-radius:8px;font-family:monospace;font-size:11px;color:#9fdb9f;white-space:pre-wrap;word-break:break-all;max-height:220px;overflow:auto"></div>
+  </div>
+
   <!-- Calendar grid -->
   <div class="card" style="padding:0;overflow:hidden">
     <!-- Header ngày trong tuần -->
@@ -5540,6 +5552,28 @@ async function testTomorrowReport(){
       notify(`Gửi xong nhưng có kênh lỗi — Telegram: ${tgOk?'OK':'lỗi'}, Zalo: ${zaloOk?'OK':'lỗi'}. Xem chi tiết khung bên dưới.`, false);
     }
     console.log('Nội dung báo cáo đã gửi:\n' + res.preview);
+  }catch(e){
+    notify('Lỗi: '+e.message, false);
+  }
+}
+
+async function testMorningReport(){
+  notify('Đang tổng hợp báo cáo sáng...');
+  const dbg=document.getElementById('morning-report-debug');
+  try{
+    const res = await gasCall({action:'send_morning_report'});
+    const sr = res.sendResult || {};
+    if(dbg){
+      dbg.style.display='block';
+      dbg.textContent = 'Nội dung đã gửi:\n\n'+res.preview+'\n\n---\nKết quả gửi từng kênh:\n'+JSON.stringify(sr, null, 2);
+    }
+    const tgOk = sr.tg && !sr.tg.error && !sr.tg.skipped && sr.tg.httpCode===200;
+    const zaloOk = sr.zalo && !sr.zalo.error && !sr.zalo.skipped && sr.zalo.httpCode===200;
+    if(tgOk && zaloOk){
+      notify('✓ Đã gửi báo cáo sáng lên cả Telegram + Zalo!');
+    } else {
+      notify(`Gửi xong nhưng có kênh lỗi — Telegram: ${tgOk?'OK':'lỗi'}, Zalo: ${zaloOk?'OK':'lỗi'}. Xem chi tiết khung bên dưới.`, false);
+    }
   }catch(e){
     notify('Lỗi: '+e.message, false);
   }
