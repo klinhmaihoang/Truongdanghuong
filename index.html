@@ -4426,12 +4426,18 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     </div>
     <div id="recipe-rows" style="margin-bottom:12px"></div>
     <div style="background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
-      <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:8px">Thêm nguyên liệu</div>
-      <div class="form-row" style="margin-bottom:0">
+      <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:8px">Thêm nguyên liệu — tính theo mẻ mẫu cho dễ hình dung</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">VD: "Mẻ này dùng 20kg Hồng trà cám + 10kg Trà bá tước, ra 30kg Trà mix" → nhập từng nguyên liệu 1 dòng, cùng 1 số "ra thành phẩm".</div>
+      <div class="form-row">
         <div class="fg"><label>Nguyên liệu</label><select id="recipe-mat"></select></div>
-        <div class="fg"><label>Lượng dùng/lần</label><input id="recipe-use" type="number" step="0.001" placeholder="0.1"/></div>
+        <div class="fg"><label>Dùng bao nhiêu trong mẻ này</label><input id="recipe-use" type="number" step="0.001" placeholder="20" oninput="updateRecipeRatioPreview()"/></div>
       </div>
-      <button class="btn btn-green btn-sm" style="margin-top:8px" onclick="addRecipeRow()">+ Thêm</button>
+      <div class="fg" style="margin-bottom:0">
+        <label>Mẻ này ra bao nhiêu thành phẩm (<span id="recipe-output-unit-label">đơn vị sản phẩm</span>)</label>
+        <input id="recipe-output-qty" type="number" step="0.001" placeholder="30" oninput="updateRecipeRatioPreview()"/>
+        <div id="recipe-ratio-preview" style="font-size:11.5px;color:var(--teal);margin-top:4px"></div>
+      </div>
+      <button class="btn btn-green btn-sm" style="margin-top:10px" onclick="addRecipeRow()">+ Thêm</button>
     </div>
     <div class="btn-group">
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-recipe')">Đóng</button>
@@ -8680,7 +8686,26 @@ function openRecipe(pid){
   if(stockRow) stockRow.style.display = p.track_stock ? '' : 'none';
   if(qtyEl) qtyEl.value = p.qty||0;
   if(unitEl) unitEl.textContent = p.unit||'';
+  const outUnitEl=document.getElementById('recipe-output-unit-label');
+  if(outUnitEl) outUnitEl.textContent = p.unit||'đơn vị sản phẩm';
+  const outQtyEl=document.getElementById('recipe-output-qty');
+  if(outQtyEl) outQtyEl.value='';
+  const previewEl=document.getElementById('recipe-ratio-preview');
+  if(previewEl) previewEl.textContent='';
   showM('modal-recipe');
+}
+
+function updateRecipeRatioPreview(){
+  const use=+document.getElementById('recipe-use')?.value||0;
+  const out=+document.getElementById('recipe-output-qty')?.value||0;
+  const el=document.getElementById('recipe-ratio-preview');
+  if(!el) return;
+  if(use>0&&out>0){
+    const ratio=use/out;
+    el.textContent=`→ Tỉ lệ: mỗi 1 đơn vị thành phẩm cần ${ratio.toFixed(4)} nguyên liệu này`;
+  } else {
+    el.textContent='';
+  }
 }
 
 async function toggleRecipeTrackStock(){
@@ -8727,14 +8752,20 @@ function renderRecipeRows(pid){
 async function addRecipeRow(){
   const pid=document.getElementById('recipe-prod-id').value;
   const matId=document.getElementById('recipe-mat').value;
-  const use=+document.getElementById('recipe-use').value;
-  if(!matId||!use||use<=0){notify('Chọn nguyên liệu và nhập lượng dùng!',false);return;}
+  const useInBatch=+document.getElementById('recipe-use').value;
+  const outputQty=+document.getElementById('recipe-output-qty').value;
+  if(!matId||!useInBatch||useInBatch<=0){notify('Chọn nguyên liệu và nhập lượng dùng trong mẻ!',false);return;}
+  if(!outputQty||outputQty<=0){notify('Nhập "Mẻ này ra bao nhiêu thành phẩm"!',false);return;}
   if(D.recipes.find(r=>r.product_id===pid&&r.mat_id===matId)){notify('Nguyên liệu này đã có trong công thức!',false);return;}
+  // Lưu dạng tỉ lệ/1 đơn vị thành phẩm — để hệ thống tự nhân theo số lượng thực tế
+  // khi bán hàng hoặc tạo lệnh sản xuất.
+  const use = useInBatch / outputQty;
   const row={id:uid(),product_id:pid,mat_id:matId,mat_use:use,created_at:Date.now()};
   try{
     await sbUpsert('recipes',row);
     D.recipes.push(row);
     document.getElementById('recipe-use').value='';
+    document.getElementById('recipe-ratio-preview').textContent='';
     renderRecipeRows(pid);notify('Đã thêm nguyên liệu vào công thức');
   }catch(e){notify('Lỗi: '+e.message,false);}
 }
