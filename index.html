@@ -8045,8 +8045,7 @@ function ordTab(el,type){
 function renderOrders(){
   const retailOrders=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&o.status!=='Đã hủy');
   const tuitionOrders=D.orders.filter(o=>(o.id||'').startsWith('HP')&&o.status!=='Đã hủy');
-  const ACTIVE2=typeof ACTIVE_STATUSES!=='undefined'?ACTIVE_STATUSES:['Chờ xác nhận','Đã xác nhận','Đang chuẩn bị','Đã book ship','Đang giao','Đã giao','Chờ thu tiền','Chờ thanh toán'];
-  const pending=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&ACTIVE2.includes(o.status)).length;
+  const pending=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&odIsPendingPayment(o)).length;
 
   // Update badge
   const badge=document.getElementById('pending-badge');
@@ -8109,8 +8108,7 @@ function renderOrders(){
 
 function renderPendingOrders(){
   const el=document.getElementById('pending-orders');if(!el)return;
-  const ACTIVE = typeof ACTIVE_STATUSES!=='undefined' ? ACTIVE_STATUSES : ['Chờ xác nhận','Đã xác nhận','Đang chuẩn bị','Đã book ship','Đang giao','Đã giao','Chờ thu tiền','Chờ thanh toán'];
-  const pending=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&ACTIVE.includes(o.status)).slice().reverse();
+  const pending=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&odIsPendingPayment(o)).slice().reverse();
   const badge=document.getElementById('pending-badge');
   if(badge) badge.textContent=pending.length||'';
   if(!pending.length){
@@ -8237,8 +8235,7 @@ function cancelOrderFromPending(id){
 }
 
 function remindAllPending(){
-  const ACTIVE3=typeof ACTIVE_STATUSES!=='undefined'?ACTIVE_STATUSES:['Chờ xác nhận','Đã xác nhận','Đang chuẩn bị','Đã book ship','Đang giao','Đã giao','Chờ thu tiền','Chờ thanh toán'];
-  const pending=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&ACTIVE3.includes(o.status));
+  const pending=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&odIsPendingPayment(o));
   if(!pending.length){notify('Không có đơn nào đang chờ!');return;}
   const lines=pending.map(o=>{
     const h=o.created_at?Math.round((Date.now()-o.created_at)/3600000):0;
@@ -9248,7 +9245,7 @@ function confirmAct(title,msg,cb){
 function sendDailyReport(){
   const active=D.students.filter(s=>s.status==='Đang học'&&!s.deleted_at);
   const unpaid=D.students.filter(s=>!s.deleted_at&&(s.fee||0)>0&&!s.paid1);
-  const pending=D.orders.filter(o=>typeof ACTIVE_STATUSES!=='undefined'?(!(o.id||'').startsWith('HP')&&ACTIVE_STATUSES.includes(o.status)):(o.status==='Chờ thanh toán'&&!(o.id||'').startsWith('HP')));
+  const pending=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&odIsPendingPayment(o));
   const low=D.inventory.filter(i=>i.qty<=i.min);
   const today=todayStr();
   const todayOrders=D.orders.filter(o=>o.status==='Đã thanh toán'&&!(o.id||'').startsWith('HP')&&(o.time||'').includes(today));
@@ -13370,6 +13367,25 @@ const ACTIVE_STATUSES = ['Chờ xác nhận','Đã xác nhận','Đang chuẩn b
 function odNormalizePayment(payment) {
   if (payment === 'Chuyển khoản') return 'Chuyển khoản trước';
   return payment || 'Chuyển khoản trước';
+}
+
+// ★ FIX: kiểm tra "đơn này còn CHỜ THU TIỀN hay không" — phải hiểu đúng theo từng
+// luồng thanh toán, KHÔNG chỉ dựa vào "trạng thái có nằm trong ACTIVE_STATUSES".
+//  - COD: chưa thu tiền cho tới khi status = "Đã thanh toán" (thu tiền ở bước cuối).
+//  - Thanh toán trước: chỉ "chờ thu tiền" khi còn ở bước "Chờ xác nhận"/"Đã xác nhận"
+//    (trước khi tới bước "Đã thanh toán" trong luồng) — các bước SAU đó (Đang chuẩn
+//    bị/Đã book ship/Đang giao/Đã giao) đã thu tiền từ trước rồi, không còn "chờ" nữa.
+function odIsPendingPayment(o) {
+  if (!o || o.status === 'Đã hủy' || o.status === 'Đã thanh toán') return false;
+  const legacyMap = {'Chờ thanh toán':'Chờ thu tiền','Đã lên đơn':'Chờ xác nhận','Chờ lấy hàng':'Đã book ship'};
+  const status = legacyMap[o.status] || o.status || 'Chờ xác nhận';
+  const isCOD = odNormalizePayment(o.payment) === 'COD';
+  if (isCOD) {
+    // COD: mọi bước trước "Đã thanh toán" đều còn chờ thu tiền
+    return odGetFlowKeysForPayment(o.payment).includes(status);
+  }
+  // Thanh toán trước: chỉ "Chờ xác nhận"/"Đã xác nhận" mới còn chờ thu tiền
+  return status === 'Chờ xác nhận' || status === 'Đã xác nhận';
 }
 
 function odGetFlowKeysForPayment(payment) {
