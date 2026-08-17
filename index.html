@@ -13293,7 +13293,9 @@ async function odSaveEdit() {
   }
   const discAmt = Math.round(subtotal*disc/100);
   const total   = subtotal - discAmt + shipFee;
-  const newStatus = document.getElementById('od-edit-status').value;
+  // ★ FIX: không bao giờ lưu status rỗng — nếu vì lý do gì đó dropdown bị trống lúc
+  // lưu, giữ nguyên trạng thái đang có của đơn thay vì ghi đè mất trạng thái thật.
+  const newStatus = document.getElementById('od-edit-status').value || o.status || 'Chờ xác nhận';
   // Update order object
   const updates = {
     customer,
@@ -13436,10 +13438,16 @@ function odUpdateStatusOptionsForPayment(payment) {
     if(!sel) return;
     const curVal = sel.value;
     const isQuick = id==='od-status-select';
+    let keys = orderedKeys;
+    // ★ FIX QUAN TRỌNG: nếu giá trị đang chọn (VD do dữ liệu cũ/không chuẩn) không
+    // khớp bất kỳ mục nào trong luồng mới, TUYỆT ĐỐI không được âm thầm nhảy về
+    // "Chờ xác nhận" — trước đây làm vậy khiến trạng thái thật của đơn (VD "Đang
+    // giao") bị mất khi chỉ sửa 1 trường khác (VD Giao hàng) rồi bấm Lưu. Thay vào
+    // đó, thêm thẳng giá trị đó vào danh sách để giữ nguyên, không suy đoán/reset.
+    if(!isQuick && curVal && !orderedKeys.includes(curVal)) keys = [...orderedKeys, curVal];
     sel.innerHTML = (isQuick ? '<option value="">— Chọn trạng thái mới —</option>' : '')
-      + orderedKeys.map(k=>`<option value="${k}">${ODD_STATUS_ICONS_[k]||''} ${k}${k==='Chờ thu tiền'?' (COD)':''}</option>`).join('');
-    // Giữ lại lựa chọn hiện tại nếu vẫn còn hợp lệ trong luồng mới, không thì reset
-    if(orderedKeys.includes(curVal) || (isQuick && curVal==='')) sel.value = curVal;
+      + keys.map(k=>`<option value="${k}">${ODD_STATUS_ICONS_[k]||''} ${k}${k==='Chờ thu tiền'?' (COD)':''}</option>`).join('');
+    if(keys.includes(curVal) || (isQuick && curVal==='')) sel.value = curVal;
     else sel.value = isQuick ? '' : (flowKeys[0]||'Chờ xác nhận');
   });
 }
