@@ -13864,7 +13864,23 @@ ${warnings.join('\n')}\n\nVẫn xác nhận đơn?`;
   // Render ngay trước khi await để UI update nhanh
   renderOrders(); renderDash(); renderPendingOrders();
   try {
+    // ★ FIX: chỉ rollback nếu chính bước LƯU này lỗi thật sự — các bước phía dưới
+    // (thông báo, đồng bộ phụ, render lại modal) trước đây nằm chung 1 try/catch,
+    // nên chỉ cần 1 bước phụ lỗi là toàn bộ bị rollback về trạng thái cũ dù đã lưu
+    // thành công trên server, khiến giao diện hiển thị sai trạng thái.
     await sbPatch('orders', {status: newStatus}, `?id=eq.${o.id}`);
+  } catch(e) {
+    o.status = oldStatus; // rollback — CHỈ khi bước lưu chính thật sự lỗi
+    if(_oi>=0) D.orders[_oi].status = oldStatus;
+    renderOrders(); renderDash(); renderPendingOrders();
+    notify('Lỗi cập nhật: ' + e.message, false);
+    const selElErr = document.getElementById('od-status-select');
+    if(selElErr) selElErr.value = '';
+    return;
+  }
+  // Lưu thành công — các bước dưới đây chỉ là phụ trợ (thông báo, đồng bộ, render lại
+  // modal), lỗi ở đây KHÔNG được phép làm mất trạng thái đã lưu đúng.
+  try {
     renderPendingOrders();
     renderOrders();
     renderDash();
@@ -13888,10 +13904,10 @@ ${warnings.join('\n')}\n\nVẫn xác nhận đơn?`;
     const trkUrl = o.tracking_url||'';
     const pv = trkUrl&&odDetectProvider ? odDetectProvider(trkUrl) : null;
     tgMsg(`${_icon} *${newStatus}!*\n\n📋 Đơn: \`${o.id}\`\n👤 ${o.customer}\n💰 ${fmt(o.total||0)}`+(trkUrl?`\n\n🔗 Tracking${pv?' ('+pv.name+')':''}:\n${trkUrl}`:'')+`\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
-  } catch(e) {
-    o.status = oldStatus; // rollback
-    notify('Lỗi cập nhật: ' + e.message, false);
-    document.getElementById('od-status-select').value = '';
+  } catch(e2) {
+    // Đã lưu thành công rồi — chỉ báo nhẹ, KHÔNG rollback trạng thái
+    console.warn('Lỗi ở bước phụ sau khi cập nhật trạng thái (đã lưu OK):', e2);
+    notify(`✅ Đã chuyển: ${oldStatus} → ${newStatus} (có lỗi nhỏ ở bước phụ, xem Console)`);
   }
 }
 
