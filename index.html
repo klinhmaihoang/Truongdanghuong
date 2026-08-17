@@ -13117,8 +13117,17 @@ function odEnterEdit() {
   // Load payment/shipping (inlined)
   const payEl2 = document.getElementById('od-edit-payment');
   if(payEl2) payEl2.value = odNormalizePayment(o.payment);
+  // ★ FIX: gán trực tiếp .value có thể không khớp option nào nếu dữ liệu lưu có dư
+  // khoảng trắng/khác hoa-thường (select sẽ âm thầm rơi về option đầu tiên, không
+  // báo lỗi gì) — dò khớp linh hoạt (bỏ khoảng trắng thừa, không phân biệt hoa/thường)
+  // để tìm đúng option thay vì so khớp tuyệt đối.
   const shipEl = document.getElementById('od-edit-shipping');
-  if(shipEl) shipEl.value = o.shipping||'Grab Express';
+  if(shipEl) {
+    const wantShip = (o.shipping||'').trim();
+    const matchOpt = Array.from(shipEl.options).find(op => op.value.trim().toLowerCase() === wantShip.toLowerCase());
+    if(wantShip && !matchOpt) console.warn('Giao hàng lưu trong đơn không khớp option nào:', JSON.stringify(wantShip));
+    shipEl.value = matchOpt ? matchOpt.value : (wantShip || 'Khách tới lấy');
+  }
   // Load tracking (inlined)
   const trkInp = document.getElementById('od-edit-tracking');
   if(trkInp) { trkInp.value = o.tracking_url||''; odTrackingPreview && odTrackingPreview(); }
