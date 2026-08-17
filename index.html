@@ -13077,7 +13077,8 @@ function showOrderDetail(id) {
   // Map legacy status cho progress bar
   const legacyMap = {'Chờ thanh toán':'Chờ thu tiền','Đã lên đơn':'Chờ xác nhận','Chờ lấy hàng':'Đã book ship'};
   const displayStatus = legacyMap[o.status] || o.status || 'Chờ xác nhận';
-  odRenderProgressBar(displayStatus);
+  odRenderProgressBar(displayStatus, o.payment);
+  odUpdateStatusOptionsForPayment(o.payment);
   const trackView = document.getElementById('od-tracking-view');
   if(trackView) {
     if(o.tracking_url) {
@@ -13125,7 +13126,8 @@ function odEnterEdit() {
   const trkInp = document.getElementById('od-edit-tracking');
   if(trkInp) { trkInp.value = o.tracking_url||''; odTrackingPreview && odTrackingPreview(); }
   odStatusChange && odStatusChange();
-  odRenderProgressBar(o.status||'Chờ xác nhận');
+  odRenderProgressBar(o.status||'Chờ xác nhận', o.payment);
+  odUpdateStatusOptionsForPayment(o.payment);
   // Build item rows — dùng parseItemStr để lấy đúng thành tiền đã lưu
   const itemsContainer = document.getElementById('od-edit-items');
   itemsContainer.innerHTML = '';
@@ -13364,8 +13366,22 @@ function odGetStatusInfo(key) {
   return ORDER_STATUSES.find(s=>s.key===mappedKey) || ORDER_STATUSES.find(s=>s.key===key) || {key,icon:'⬤',color:'var(--muted)',bg:'var(--bg)',step:0};
 }
 
+// ★ FIX: ẩn tùy chọn "Chờ thu tiền (COD)" khỏi 2 dropdown trạng thái khi đơn không
+// phải COD — tránh nhân viên chọn nhầm bước chỉ dành riêng cho COD.
+function odUpdateStatusOptionsForPayment(payment) {
+  const isCOD = payment==='COD';
+  ['od-status-select','od-edit-status'].forEach(id=>{
+    const sel = document.getElementById(id);
+    if(!sel) return;
+    const opt = Array.from(sel.options).find(o=>o.value==='Chờ thu tiền');
+    if(opt) opt.style.display = isCOD ? '' : 'none';
+    // Nếu đang chọn đúng option vừa ẩn (do đổi payment sau khi đã chọn) → reset về rỗng/trạng thái hợp lệ gần nhất
+    if(!isCOD && sel.value==='Chờ thu tiền') sel.value = id==='od-status-select' ? '' : 'Đã thanh toán';
+  });
+}
+
 // ── PROGRESS BAR ───────────────────────────────────────────────
-function odRenderProgressBar(status) {
+function odRenderProgressBar(status, payment) {
   const el = document.getElementById('od-status-progress');
   if(!el) return;
   // Map legacy status
@@ -13375,7 +13391,11 @@ function odRenderProgressBar(status) {
     el.innerHTML=`<div style="background:rgba(192,57,43,.1);border:1px solid rgba(192,57,43,.3);border-radius:8px;padding:8px 12px;text-align:center;font-size:13px;font-weight:700;color:#c0392b">✕ Đơn hàng đã hủy</div>`;
     return;
   }
-  const flow = ORDER_STATUSES.filter(s=>s.step>0).sort((a,b)=>a.step-b.step);
+  // ★ FIX: đơn không phải COD (đã chuyển khoản trước / tiền mặt / QR) thì bỏ hẳn
+  // bước "Chờ thu tiền" ra khỏi luồng hiển thị — bước đó chỉ có ý nghĩa với COD
+  // (thu tiền lúc giao hàng), gây hiểu nhầm nếu hiện cho đơn đã thanh toán trước.
+  const isCOD = payment==='COD';
+  const flow = ORDER_STATUSES.filter(s=>s.step>0 && (isCOD || s.key!=='Chờ thu tiền')).sort((a,b)=>a.step-b.step);
   const curStep = ORDER_STATUSES.find(s=>s.key===mappedStatus)?.step || 0;
   el.innerHTML = `<div style="display:flex;align-items:center;gap:0;min-width:${flow.length*58}px;padding:4px 0">
     ${flow.map((s,i)=>{
@@ -13456,6 +13476,11 @@ function odStatusChange() {
   const trackingSection = document.getElementById('od-tracking-section');
   const payGuide        = document.getElementById('od-payment-guide');
 
+  // Cập nhật dropdown + thanh tiến trình theo đúng phương thức thanh toán hiện tại
+  // (đổi phương thức thanh toán trực tiếp trong lúc sửa đơn cũng phải cập nhật ngay)
+  odUpdateStatusOptionsForPayment(payment);
+  odRenderProgressBar(status, payment);
+
   // Tracking chỉ hiện khi đã book ship trở đi
   if(trackingSection) trackingSection.style.display = DELIVERY_STATUSES.includes(status) ? '' : 'none';
 
@@ -13477,6 +13502,20 @@ function odStatusChange() {
       if(status==='Chờ xác nhận') {
         guide='🏦 Chuyển khoản trước: Xác nhận đã nhận tiền trước khi xử lý đơn.';
         guideStyle='background:rgba(41,128,185,.08);color:#2980b9;border:1px solid rgba(41,128,185,.2)';
+      } else if(['Đang chuẩn bị','Đã book ship','Đang giao'].includes(status)) {
+        guide='✅ Khách đã thanh toán trước — không cần thu thêm tiền lúc giao hàng.';
+        guideStyle='background:rgba(41,128,185,.08);color:#2980b9;border:1px solid rgba(41,128,185,.2)';
+      } else if(status==='Đã giao') {
+        guide='🏠 Đã giao xong! Vì đã thanh toán trước, cập nhật thẳng sang "Đã thanh toán" (không có bước chờ thu COD).';
+        guideStyle='background:rgba(39,174,96,.08);color:#27ae60;border:1px solid rgba(39,174,96,.2)';
+      }
+    } else if(payment==='Tiền mặt'||payment==='QR VietQR') {
+      if(status==='Chờ xác nhận') {
+        guide=(payment==='Tiền mặt'?'💵 Tiền mặt':'📱 QR VietQR')+': Xác nhận đã nhận đủ tiền trước khi xử lý đơn.';
+        guideStyle='background:rgba(41,128,185,.08);color:#2980b9;border:1px solid rgba(41,128,185,.2)';
+      } else if(status==='Đã giao') {
+        guide='🏠 Đã giao xong! Đã thu tiền trước rồi — cập nhật thẳng sang "Đã thanh toán".';
+        guideStyle='background:rgba(39,174,96,.08);color:#27ae60;border:1px solid rgba(39,174,96,.2)';
       }
     }
     if(guide) { payGuide.innerHTML=guide; payGuide.style.cssText=guideStyle+';font-size:12px;border-radius:8px;padding:8px 12px'; payGuide.style.display=''; }
