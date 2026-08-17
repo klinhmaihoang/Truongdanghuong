@@ -497,7 +497,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
         <div class="fg"><label>Hình thức thanh toán</label>
           <select id="c-payment" onchange="updateCartTotal()">
             <option value="Tiền mặt">💵 Tiền mặt</option>
-            <option value="Chuyển khoản">🏦 Chuyển khoản</option>
+            <option value="Chuyển khoản trước">🏦 Chuyển khoản</option>
             <option value="QR VietQR">📱 QR VietQR</option>
             <option value="COD">📦 COD</option>
           </select>
@@ -13119,7 +13119,7 @@ function odEnterEdit() {
   document.getElementById('od-edit-status').value = currentStatus;
   // Load payment/shipping (inlined)
   const payEl2 = document.getElementById('od-edit-payment');
-  if(payEl2) payEl2.value = o.payment||'Chuyển khoản trước';
+  if(payEl2) payEl2.value = odNormalizePayment(o.payment);
   const shipEl = document.getElementById('od-edit-shipping');
   if(shipEl) shipEl.value = o.shipping||'Grab Express';
   // Load tracking (inlined)
@@ -13363,8 +13363,17 @@ const ACTIVE_STATUSES = ['Chờ xác nhận','Đã xác nhận','Đang chuẩn b
 //  - COD: thu tiền SAU KHI giao hàng → "Đã thanh toán" nằm CUỐI luồng.
 //  - Thanh toán trước (Chuyển khoản/Tiền mặt/QR): khách đã trả tiền TRƯỚC khi giao
 //    → "Đã thanh toán" nằm NGAY SAU "Đã xác nhận", trước khi chuẩn bị/giao hàng.
+// ★ FIX: chuẩn hóa giá trị "phương thức thanh toán" — đơn tạo ở Bán hàng lưu là
+// "Chuyển khoản" (không có "trước"), còn ô Sửa đơn dùng "Chuyển khoản trước" — 2 giá
+// trị khác nhau cho cùng 1 ý nghĩa khiến đơn cũ không khớp được option nào, làm hỏng
+// toàn bộ logic thanh tiến trình/dropdown phụ thuộc payment method.
+function odNormalizePayment(payment) {
+  if (payment === 'Chuyển khoản') return 'Chuyển khoản trước';
+  return payment || 'Chuyển khoản trước';
+}
+
 function odGetFlowKeysForPayment(payment) {
-  if (payment === 'COD') {
+  if (odNormalizePayment(payment) === 'COD') {
     return ['Chờ xác nhận','Đã xác nhận','Đang chuẩn bị','Đã book ship','Đang giao','Đã giao','Chờ thu tiền','Đã thanh toán'];
   }
   return ['Chờ xác nhận','Đã xác nhận','Đã thanh toán','Đang chuẩn bị','Đã book ship','Đang giao','Đã giao'];
