@@ -13386,17 +13386,25 @@ function odGetStatusInfo(key) {
   return ORDER_STATUSES.find(s=>s.key===mappedKey) || ORDER_STATUSES.find(s=>s.key===key) || {key,icon:'⬤',color:'var(--muted)',bg:'var(--bg)',step:0};
 }
 
-// ★ FIX: ẩn tùy chọn "Chờ thu tiền (COD)" khỏi 2 dropdown trạng thái khi đơn không
-// phải COD — tránh nhân viên chọn nhầm bước chỉ dành riêng cho COD.
+// ★ FIX: dropdown chọn trạng thái giờ tự SẮP XẾP LẠI đúng theo thứ tự luồng thật
+// (khớp thanh tiến trình phía trên) — không còn cố định 1 thứ tự HTML tĩnh nữa.
+const ODD_STATUS_ICONS_ = {'Báo giá':'📋','Chờ xác nhận':'🕐','Đã xác nhận':'✅','Đang chuẩn bị':'🧺',
+  'Đã book ship':'📦','Đang giao':'🚚','Đã giao':'🏠','Chờ thu tiền':'💳','Đã thanh toán':'💰','Đã hủy':'✕'};
+
 function odUpdateStatusOptionsForPayment(payment) {
-  const isCOD = payment==='COD';
+  const flowKeys = odGetFlowKeysForPayment(payment);
+  // "Báo giá" đứng đầu (trước khi vào luồng), "Đã hủy" luôn ở cuối
+  const orderedKeys = ['Báo giá', ...flowKeys, 'Đã hủy'];
   ['od-status-select','od-edit-status'].forEach(id=>{
     const sel = document.getElementById(id);
     if(!sel) return;
-    const opt = Array.from(sel.options).find(o=>o.value==='Chờ thu tiền');
-    if(opt) opt.style.display = isCOD ? '' : 'none';
-    // Nếu đang chọn đúng option vừa ẩn (do đổi payment sau khi đã chọn) → reset về rỗng/trạng thái hợp lệ gần nhất
-    if(!isCOD && sel.value==='Chờ thu tiền') sel.value = id==='od-status-select' ? '' : 'Đã thanh toán';
+    const curVal = sel.value;
+    const isQuick = id==='od-status-select';
+    sel.innerHTML = (isQuick ? '<option value="">— Chọn trạng thái mới —</option>' : '')
+      + orderedKeys.map(k=>`<option value="${k}">${ODD_STATUS_ICONS_[k]||''} ${k}${k==='Chờ thu tiền'?' (COD)':''}</option>`).join('');
+    // Giữ lại lựa chọn hiện tại nếu vẫn còn hợp lệ trong luồng mới, không thì reset
+    if(orderedKeys.includes(curVal) || (isQuick && curVal==='')) sel.value = curVal;
+    else sel.value = isQuick ? '' : (flowKeys[0]||'Chờ xác nhận');
   });
 }
 
