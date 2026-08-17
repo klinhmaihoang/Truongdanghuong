@@ -13359,6 +13359,17 @@ const ACTIVE_STATUSES = ['Chờ xác nhận','Đã xác nhận','Đang chuẩn b
 
 // Các trạng thái liên quan đến giao hàng (hiện tracking)
 
+// ★ FIX: 2 luồng trạng thái KHÁC NHAU tùy phương thức thanh toán:
+//  - COD: thu tiền SAU KHI giao hàng → "Đã thanh toán" nằm CUỐI luồng.
+//  - Thanh toán trước (Chuyển khoản/Tiền mặt/QR): khách đã trả tiền TRƯỚC khi giao
+//    → "Đã thanh toán" nằm NGAY SAU "Đã xác nhận", trước khi chuẩn bị/giao hàng.
+function odGetFlowKeysForPayment(payment) {
+  if (payment === 'COD') {
+    return ['Chờ xác nhận','Đã xác nhận','Đang chuẩn bị','Đã book ship','Đang giao','Đã giao','Chờ thu tiền','Đã thanh toán'];
+  }
+  return ['Chờ xác nhận','Đã xác nhận','Đã thanh toán','Đang chuẩn bị','Đã book ship','Đang giao','Đã giao'];
+}
+
 function odGetStatusInfo(key) {
   // Map trạng thái cũ → mới để backward compat
   const legacyMap = {'Chờ thanh toán':'Chờ thu tiền','Đã lên đơn':'Chờ xác nhận','Chờ lấy hàng':'Đã book ship'};
@@ -13391,17 +13402,18 @@ function odRenderProgressBar(status, payment) {
     el.innerHTML=`<div style="background:rgba(192,57,43,.1);border:1px solid rgba(192,57,43,.3);border-radius:8px;padding:8px 12px;text-align:center;font-size:13px;font-weight:700;color:#c0392b">✕ Đơn hàng đã hủy</div>`;
     return;
   }
-  // ★ FIX: đơn không phải COD (đã chuyển khoản trước / tiền mặt / QR) thì bỏ hẳn
-  // bước "Chờ thu tiền" ra khỏi luồng hiển thị — bước đó chỉ có ý nghĩa với COD
-  // (thu tiền lúc giao hàng), gây hiểu nhầm nếu hiện cho đơn đã thanh toán trước.
-  const isCOD = payment==='COD';
-  const flow = ORDER_STATUSES.filter(s=>s.step>0 && (isCOD || s.key!=='Chờ thu tiền')).sort((a,b)=>a.step-b.step);
-  const curStep = ORDER_STATUSES.find(s=>s.key===mappedStatus)?.step || 0;
+  // ★ FIX: dùng đúng luồng theo phương thức thanh toán (xem odGetFlowKeysForPayment) —
+  // COD thu tiền cuối, thanh toán trước thì "Đã thanh toán" nằm ngay đầu luồng.
+  const flowKeys = odGetFlowKeysForPayment(payment);
+  const flow = flowKeys.map(k => ORDER_STATUSES.find(s=>s.key===k)).filter(Boolean);
+  let curStep = flowKeys.indexOf(mappedStatus) + 1; // 1-based, vị trí trong ĐÚNG luồng hiện tại
+  if(curStep <= 0) curStep = 0; // trạng thái không thuộc luồng này (VD dữ liệu cũ) → coi như chưa bắt đầu
   el.innerHTML = `<div style="display:flex;align-items:center;gap:0;min-width:${flow.length*58}px;padding:4px 0">
     ${flow.map((s,i)=>{
-      const done   = s.step < curStep;   // bước trước: đã xong
+      const posStep = i+1; // vị trí (1-based) của bước này trong luồng hiện tại
+      const done   = posStep < curStep;   // bước trước: đã xong
       const active = s.key === mappedStatus; // bước hiện tại
-      const future = s.step > curStep;   // bước sau: chưa tới
+      const future = posStep > curStep;   // bước sau: chưa tới
       return `
         <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;position:relative;min-width:0">
           ${i<flow.length-1?`<div style="position:absolute;top:13px;left:50%;width:100%;height:2px;z-index:0;background:${done?s.color:'var(--border)'}"></div>`:''}
@@ -13500,21 +13512,24 @@ function odStatusChange() {
       }
     } else if(payment==='Chuyển khoản trước') {
       if(status==='Chờ xác nhận') {
-        guide='🏦 Chuyển khoản trước: Xác nhận đã nhận tiền trước khi xử lý đơn.';
+        guide='🏦 Chuyển khoản trước: Xác nhận đã nhận tiền, rồi cập nhật sang "Đã thanh toán" trước khi chuẩn bị hàng.';
         guideStyle='background:rgba(41,128,185,.08);color:#2980b9;border:1px solid rgba(41,128,185,.2)';
-      } else if(['Đang chuẩn bị','Đã book ship','Đang giao'].includes(status)) {
+      } else if(status==='Đã xác nhận') {
+        guide='➡️ Tiếp theo: cập nhật sang "Đã thanh toán" ngay khi nhận được tiền chuyển khoản.';
+        guideStyle='background:rgba(41,128,185,.08);color:#2980b9;border:1px solid rgba(41,128,185,.2)';
+      } else if(['Đã thanh toán','Đang chuẩn bị','Đã book ship','Đang giao'].includes(status)) {
         guide='✅ Khách đã thanh toán trước — không cần thu thêm tiền lúc giao hàng.';
         guideStyle='background:rgba(41,128,185,.08);color:#2980b9;border:1px solid rgba(41,128,185,.2)';
       } else if(status==='Đã giao') {
-        guide='🏠 Đã giao xong! Vì đã thanh toán trước, cập nhật thẳng sang "Đã thanh toán" (không có bước chờ thu COD).';
+        guide='🏠 Đã giao xong — hoàn tất đơn hàng (đã thanh toán từ trước, không cần thêm bước nào).';
         guideStyle='background:rgba(39,174,96,.08);color:#27ae60;border:1px solid rgba(39,174,96,.2)';
       }
     } else if(payment==='Tiền mặt'||payment==='QR VietQR') {
       if(status==='Chờ xác nhận') {
-        guide=(payment==='Tiền mặt'?'💵 Tiền mặt':'📱 QR VietQR')+': Xác nhận đã nhận đủ tiền trước khi xử lý đơn.';
+        guide=(payment==='Tiền mặt'?'💵 Tiền mặt':'📱 QR VietQR')+': Xác nhận đã nhận đủ tiền, rồi cập nhật sang "Đã thanh toán" trước khi chuẩn bị hàng.';
         guideStyle='background:rgba(41,128,185,.08);color:#2980b9;border:1px solid rgba(41,128,185,.2)';
       } else if(status==='Đã giao') {
-        guide='🏠 Đã giao xong! Đã thu tiền trước rồi — cập nhật thẳng sang "Đã thanh toán".';
+        guide='🏠 Đã giao xong — hoàn tất đơn hàng (đã thu tiền từ trước).';
         guideStyle='background:rgba(39,174,96,.08);color:#27ae60;border:1px solid rgba(39,174,96,.2)';
       }
     }
@@ -13525,8 +13540,7 @@ function odStatusChange() {
   // Hiện quick-action buttons để nhân viên tự chọn chuyển bước
   const quickActions = document.getElementById('od-quick-actions');
   if(quickActions) {
-    const flow = ['Chờ xác nhận','Đã xác nhận','Đang chuẩn bị','Đã book ship','Đang giao','Đã giao',
-      payment==='COD'?'Chờ thu tiền':'Đã thanh toán'];
+    const flow = odGetFlowKeysForPayment(payment);
     const curIdx = flow.indexOf(status);
     const nextStatus = curIdx >= 0 && curIdx < flow.length-1 ? flow[curIdx+1] : null;
     const icons = {'Đã xác nhận':'✅','Đang chuẩn bị':'🧺','Đã book ship':'📦',
