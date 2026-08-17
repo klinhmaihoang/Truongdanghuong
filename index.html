@@ -13129,11 +13129,18 @@ function odEnterEdit() {
   const itemsContainer = document.getElementById('od-edit-items');
   itemsContainer.innerHTML = '';
   const itemList2 = parseItemsList(o.items);
+  // ★ FIX: bọc try/catch cho TỪNG dòng sản phẩm — nếu 1 dòng bị lỗi khi dựng (VD
+  // format tên lạ), các dòng khác và bước tính tổng vẫn phải chạy tiếp bình thường,
+  // không được để 1 lỗi nhỏ làm "đứng" luôn cả phần Tạm tính/Tổng thanh toán.
   itemList2.forEach(s => {
-    const {name, qty, lineTotal} = parseItemStr(s);
-    odAddItem(name, qty, lineTotal || null);
+    try {
+      const {name, qty, lineTotal} = parseItemStr(s);
+      odAddItem(name, qty, lineTotal || null);
+    } catch(eItem) {
+      console.warn('Lỗi dựng dòng sản phẩm "'+s+'":', eItem);
+    }
   });
-  odCalcLive();
+  try { odCalcLive(); } catch(eCalc) { console.warn('Lỗi tính tổng (odCalcLive):', eCalc); }
 }
 
 function odCancelEdit() {
@@ -13167,8 +13174,12 @@ function odAddItem(name='', qty=1, actualPrice=null) {
   if(actualPrice !== null && actualPrice !== undefined) {
     subtotalInp.value = actualPrice; // actualPrice = thành tiền (đã tính qty×đơn giá)
   } else {
-    const prod = D.products.find(p=>p.name===name);
-    if(prod) subtotalInp.value = Math.round(prod.price * qty0);
+    // ★ FIX: tên lưu trong đơn cũ có thể kèm đơn vị kiểu "Trà mix (kg)" không khớp
+    // đúng tên gốc "Trà mix" trong danh mục — thử khớp lại bỏ phần "(...)" cuối tên.
+    const nameNoUnit = (name||'').replace(/\s*\([^)]*\)\s*$/,'').trim();
+    const prod = D.products.find(p=>p.name===name) || D.products.find(p=>p.name===nameNoUnit);
+    // Luôn gán 1 số cụ thể (kể cả 0) — không để trống, tránh làm hỏng phép tính tổng
+    subtotalInp.value = prod ? Math.round(prod.price * qty0) : 0;
   }
   odCalcLive();
 }
