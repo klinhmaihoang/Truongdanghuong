@@ -6953,8 +6953,20 @@ function renderStudents(){
     const fee=parseFloat(s.fee)||0;
     const isOnlineS = (s.type||'offline').toLowerCase()==='online';
     const dep=isOnlineS ? fee : Math.round(fee*0.3);
-    const paid1Tag=s.paid1?'<span class="tag t-paid" style="font-size:10px">✓'+(isOnlineS?'Đã TT':'Đ1')+'</span>':'<span class="tag t-low" style="font-size:10px">'+(isOnlineS?'Chưa TT':'Đ1')+'</span>';
-    const paid2Tag=fee>0&&!isOnlineS?(s.paid2?'<span class="tag t-paid" style="font-size:10px">✓Đ2</span>':'<span class="tag t-pending" style="font-size:10px">Đ2</span>'):'';
+    // ★ FIX: nếu học viên có kế hoạch đợt thanh toán tùy chỉnh, hiện đúng số lượng
+    // badge Đ1/Đ2/Đ3... theo thực tế thay vì luôn cố định 2 badge Đ1/Đ2.
+    const _plan = getInstallmentPlan(s);
+    let paid1Tag, paid2Tag;
+    if(_plan){
+      paid1Tag = _plan.map((it,i)=>it.paid
+        ?`<span class="tag t-paid" style="font-size:10px">✓Đ${i+1}</span>`
+        :`<span class="tag t-low" style="font-size:10px">Đ${i+1}</span>`
+      ).join(' ');
+      paid2Tag = '';
+    } else {
+      paid1Tag=s.paid1?'<span class="tag t-paid" style="font-size:10px">✓'+(isOnlineS?'Đã TT':'Đ1')+'</span>':'<span class="tag t-low" style="font-size:10px">'+(isOnlineS?'Chưa TT':'Đ1')+'</span>';
+      paid2Tag=fee>0&&!isOnlineS?(s.paid2?'<span class="tag t-paid" style="font-size:10px">✓Đ2</span>':'<span class="tag t-pending" style="font-size:10px">Đ2</span>'):'';
+    }
     const today=new Date();today.setHours(0,0,0,0);
     let classTag='';
     if(s.class_date){
@@ -7076,13 +7088,13 @@ function openStDetail(id){
     ${s.class_date?`<div class="detail-row"><span class="detail-label">📅 Ngày học</span><span style="font-weight:700;color:var(--brand)">${s.class_date}</span></div>`:''}
     ${s.end_date?`<div class="detail-row"><span class="detail-label">🏁 Kết thúc học</span><span style="color:var(--muted)">${s.end_date}</span></div>`:''}
     ${s.first_class_date?`<div class="detail-row"><span class="detail-label">🔄 Dời lịch</span><span>${rescheduleStatusHtml(s)}</span></div>`:''}
-    ${getInstallmentPlan(s)?`<div class="detail-row" style="align-items:flex-start"><span class="detail-label">📅 Đợt thanh toán</span><span>${getInstallmentPlan(s).map((it,i)=>`Đợt ${i+1} (${it.pct}%): ${fmt(it.amount)} ${it.paid?'✅':'⏳'}`).join('<br>')}</span></div>`:''}
+    ${getInstallmentPlan(s)?getInstallmentPlan(s).map((it,i)=>`<div class="detail-row"><span class="detail-label">Đợt ${i+1} (${it.pct}%)</span><span>${it.paid?`<span class="tag t-paid">✓ Đã thu ${fmt(it.amount)}</span> <small style="color:var(--muted)">${it.paid_at||''}</small>`:`<span class="tag t-low">Chưa thu — ${fmt(it.amount)}</span>`}</span></div>`).join(''):''}
     <div class="detail-row"><span class="detail-label">Học phí</span><span style="color:var(--brand);font-weight:700">${fee===0?'Miễn phí':fmt(fee)}${s.discount_saved>0?`<span style="color:var(--green);font-size:11px;margin-left:6px;font-weight:400">(CK ${s.discount_type==='pct'?s.discount_value+'%':fmt(s.discount_value)} — tiết kiệm ${fmt(s.discount_saved)})</span>`:''}${s.student_count>1&&s.fee_unit?`<span style="color:var(--muted);font-size:11px;margin-left:6px;font-weight:400">(${fmt(s.fee_unit)} × ${s.student_count})</span>`:''}</span></div>
     ${s.fee_original&&s.discount_saved>0?`<div class="detail-row"><span class="detail-label" style="color:var(--muted)">Học phí gốc</span><span style="text-decoration:line-through;color:var(--muted)">${fmt(s.fee_original)}</span></div>`:''}
     ${s.discount_note?`<div class="detail-row"><span class="detail-label">🏷️ Lý do CK</span><span style="color:var(--green)">${s.discount_note}</span></div>`:''}
     ${s.class_time?`<div class="detail-row"><span class="detail-label">🕐 Giờ học</span><span style="font-weight:700;color:var(--brand)">${s.class_time}</span></div>`:''}
-    ${fee>0?`<div class="detail-row"><span class="detail-label">${isOnlineSt?'💳 Học phí (1 lần)':'Đợt 1'}</span><span>${s.paid1?`<span class="tag t-paid">✓ Đã thu ${fmt(dep)}</span> <small style="color:var(--muted)">${s.paid1_at||''}</small>`:`<span class="tag t-low">Chưa thu — ${fmt(dep)}</span>`}</span></div>`:''}
-    ${fee>0&&!isOnlineSt?`<div class="detail-row"><span class="detail-label">Đợt 2</span><span>${s.paid2?`<span class="tag t-paid">✓ Đã thu ${fmt(rest)}</span> <small style="color:var(--muted)">${s.paid2_at||''}</small>`:`<span class="tag t-pending">Chưa thu — ${fmt(rest)}</span>`}</span></div>`:''}
+    ${fee>0&&!getInstallmentPlan(s)?`<div class="detail-row"><span class="detail-label">${isOnlineSt?'💳 Học phí (1 lần)':'Đợt 1'}</span><span>${s.paid1?`<span class="tag t-paid">✓ Đã thu ${fmt(dep)}</span> <small style="color:var(--muted)">${s.paid1_at||''}</small>`:`<span class="tag t-low">Chưa thu — ${fmt(dep)}</span>`}</span></div>`:''}
+    ${fee>0&&!isOnlineSt&&!getInstallmentPlan(s)?`<div class="detail-row"><span class="detail-label">Đợt 2</span><span>${s.paid2?`<span class="tag t-paid">✓ Đã thu ${fmt(rest)}</span> <small style="color:var(--muted)">${s.paid2_at||''}</small>`:`<span class="tag t-pending">Chưa thu — ${fmt(rest)}</span>`}</span></div>`:''}
     ${s.contact_channel?`<div class="detail-row"><span class="detail-label">📣 Kênh liên lạc</span><span style="font-weight:700">${s.contact_channel}</span></div>`:''}
     ${s.social_name?`<div class="detail-row"><span class="detail-label">👤 Tên liên hệ MXH</span><span style="font-weight:700">${s.social_name}</span></div>`:''}
     <div class="detail-row"><span class="detail-label">Ghi chú</span><span style="color:var(--muted)">${s.note||'—'}</span></div>
