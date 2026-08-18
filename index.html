@@ -5886,7 +5886,7 @@ function renderCustomers() {
     return `<tr style="cursor:pointer" onclick="openCustomerDetail('${c.id}')">
       <td>
         <div style="font-weight:700">${c.name}</div>
-        <div style="font-size:11px;color:var(--muted)">${c.phone||'—'} ${c.email?'· '+c.email:''}</div>
+        <div style="font-size:11px;color:var(--muted)">${normPhone(c.phone)||'—'} ${c.email?'· '+c.email:''}</div>
         ${tags.length?`<div style="margin-top:3px">${tags.slice(0,3).map(t=>`<span style="font-size:10px;background:var(--dim);color:var(--brown);padding:1px 5px;border-radius:4px;margin-right:3px">${t}</span>`).join('')}</div>`:''}
       </td>
       <td>
@@ -6017,7 +6017,7 @@ function openCustomerDetail(id) {
 
   // Fill edit form
   document.getElementById('cd-edit-name').value     = c.name||'';
-  document.getElementById('cd-edit-phone').value    = c.phone||'';
+  document.getElementById('cd-edit-phone').value    = normPhone(c.phone)||'';
   document.getElementById('cd-edit-email').value    = c.email||'';
   document.getElementById('cd-edit-birthday').value = c.birthday||'';
   document.getElementById('cd-edit-gender').value   = c.gender||'';
@@ -11657,7 +11657,7 @@ function renderNvlDebt() {
     const isOverdue = c.lastDate && (now-c.lastDate)>30*24*60*60*1000;
     return `<tr style="${isOverdue?'background:rgba(192,57,43,.04)':''}">
       <td style="font-weight:700">${c.name}</td>
-      <td style="color:var(--muted)">${c.phone||'—'}</td>
+      <td style="color:var(--muted)">${normPhone(c.phone)||'—'}</td>
       <td style="text-align:right">${Math.round(c.total).toLocaleString('vi-VN')}₫</td>
       <td style="text-align:right;color:var(--green)">${Math.round(c.paid).toLocaleString('vi-VN')}₫</td>
       <td style="text-align:right;font-weight:800;color:var(--red)">${Math.round(debt).toLocaleString('vi-VN')}₫</td>
@@ -14514,12 +14514,13 @@ async function syncSingleCustomerFromOrder(o) {
   if (!o || !o.customer || o.customer === 'Khách lẻ') return;
   const addrFromNote = (o.note||'').match(/ĐC:\s*([^|]+)/);
   const addr = o.address || (addrFromNote ? addrFromNote[1].trim() : '');
-  if (!o.phone && !addr) return; // không có gì mới để bổ sung
+  const phone = normPhone(o.phone); // ★ FIX: phục hồi số 0 đầu bị Sheets làm rớt
+  if (!phone && !addr) return; // không có gì mới để bổ sung
 
-  let existing = D.customers.find(c => (o.phone && String(c.phone||'') === String(o.phone)) || c.name === o.customer);
+  let existing = D.customers.find(c => (phone && normPhone(c.phone) === phone) || c.name === o.customer);
   try {
     if (!existing) {
-      const c = { id: uid(), name: o.customer, phone: o.phone||'', email: o.email||'',
+      const c = { id: uid(), name: o.customer, phone, email: o.email||'',
         points: 0, total_spent: o.total||0, visit_count: 1, last_visit: o.time||'',
         birthday:'', gender:'', address: addr, source:'', segment:'', tags:'', note:'',
         created_at: Date.now() };
@@ -14527,7 +14528,7 @@ async function syncSingleCustomerFromOrder(o) {
       D.customers.push(c);
     } else {
       const upd = {};
-      if (!existing.phone && o.phone) upd.phone = o.phone;
+      if (!normPhone(existing.phone) && phone) upd.phone = phone;
       if (!existing.address && addr) upd.address = addr;
       if (Object.keys(upd).length) {
         await sbPatch('customers', upd, `?id=eq.${existing.id}`);
@@ -14550,10 +14551,11 @@ async function syncCustomersFromOrders() {
   // Gom nhóm theo tên + sđt
   const map = {};
   paidOrders.forEach(o => {
-    const key = String(o.phone ? o.phone : o.customer).trim();
+    const phone = normPhone(o.phone); // ★ FIX: phục hồi số 0 đầu bị Sheets làm rớt
+    const key = (phone ? phone : o.customer).trim();
     if(!map[key]) {
       map[key] = {
-        name: o.customer, phone: o.phone||'', email: o.email||'', address: '',
+        name: o.customer, phone, email: o.email||'', address: '',
         total_spent: 0, visit_count: 0, last_visit: '',
         last_ts: 0, orders: []
       };
@@ -14580,7 +14582,7 @@ async function syncCustomersFromOrders() {
     const _sc = loadPtsConfig(); const pts = Math.floor(d.total_spent / (_sc.perVnd||1000));
     // Tìm KH hiện có theo sđt hoặc tên
     let existing = D.customers.find(c =>
-      (d.phone && String(c.phone||'') === String(d.phone)) || c.name === d.name
+      (d.phone && normPhone(c.phone) === d.phone) || c.name === d.name
     );
     if(!existing) {
       // Tạo mới
@@ -14602,7 +14604,7 @@ async function syncCustomersFromOrders() {
         last_visit: d.last_visit || existing.last_visit || ''
       };
       // Bổ sung phone/email/address nếu KH cũ chưa có
-      if(!existing.phone && d.phone) upd.phone = d.phone;
+      if(!normPhone(existing.phone) && d.phone) upd.phone = d.phone;
       if(!existing.email && d.email) upd.email = d.email;
       if(!existing.address && d.address) upd.address = d.address;
       Object.assign(existing, upd);
@@ -16076,25 +16078,30 @@ function nameAutoComplete(val) {
 
   const q = val.toLowerCase();
   const matches = [];
-  const seen = new Set();
+  const seen = new Set();       // theo id/key gốc — tránh trùng NGUỒN
+  const seenNamePhone = new Set(); // theo tên+SĐT thật — tránh trùng NỘI DUNG (customer + order cùng ra 1 người)
 
-  // Từ D.customers
+  // Từ D.customers — ưu tiên trước vì đây là nguồn "chốt" sau khi sync
   (D.customers||[]).forEach(c => {
     if(c.name && c.name.toLowerCase().includes(q) && !seen.has(c.id)) {
       seen.add(c.id);
-      // ★ FIX: Google Sheets tự nhận diện SĐT toàn chữ số thành kiểu Number — ép
-      // luôn về String ở đây để tránh crash khi gọi .replace()/.includes() sau này.
-      matches.push({ name: c.name, phone: String(c.phone||''), address: c.address||'', source: 'customer' });
+      const phone = normPhone(c.phone);
+      const npKey = c.name+'|'+phone;
+      if(seenNamePhone.has(npKey)) return;
+      seenNamePhone.add(npKey);
+      matches.push({ name: c.name, phone, address: c.address||'', source: 'customer' });
     }
   });
 
-  // Từ D.orders nếu chưa đủ
+  // Từ D.orders nếu chưa đủ — bỏ qua nếu đã có đúng người đó từ D.customers rồi
   if(matches.length < 6) {
     (D.orders||[]).forEach(o => {
-      const key = (o.customer||'')+'|'+String(o.phone||'');
-      if(o.customer && o.customer.toLowerCase().includes(q) && !seen.has(key) && o.customer !== 'Khách lẻ') {
+      const phone = normPhone(o.phone);
+      const key = (o.customer||'')+'|'+phone;
+      if(o.customer && o.customer.toLowerCase().includes(q) && !seen.has(key) && o.customer !== 'Khách lẻ' && !seenNamePhone.has(key)) {
         seen.add(key);
-        matches.push({ name: o.customer, phone: String(o.phone||''), address: o.address||'', source: 'order' });
+        seenNamePhone.add(key);
+        matches.push({ name: o.customer, phone, address: o.address||'', source: 'order' });
       }
     });
   }
@@ -16109,6 +16116,16 @@ function nameAutoComplete(val) {
       <span style="font-size:11px;color:var(--muted)">${m.phone||'Chưa có SĐT'}${m.address?' · '+m.address.substring(0,35):''}</span>
     </div>`).join('');
   dd.style.display = '';
+}
+
+// ★ FIX: Google Sheets tự nhận diện SĐT toàn chữ số thành kiểu Number khi lưu, làm
+// RỚT MẤT số 0 đứng đầu (VD "0962953161" → lưu thành 962953161). Hàm này tự thêm
+// lại số 0 nếu phát hiện đúng dạng SĐT Việt Nam bị thiếu (9 chữ số, bắt đầu bằng
+// 3/5/7/8/9 — đầu số di động VN sau khi bỏ số 0).
+function normPhone(v){
+  const s = String(v||'').trim();
+  if(/^[35789]\d{8}$/.test(s)) return '0'+s; // thiếu đúng 1 số 0 đầu
+  return s;
 }
 
 function selectCustomerFromName(name, phone, address) {
@@ -16444,7 +16461,7 @@ function renderCRMPipeline(customers, orders) {
           <div style="background:#fff;border-radius:8px;padding:8px 10px;margin-bottom:6px;box-shadow:0 1px 4px rgba(0,0,0,.08);cursor:pointer"
             onclick="crmShowCustomer('${c.id||c.phone}')">
             <div style="font-weight:700;font-size:12px">${c.name}</div>
-            <div style="font-size:10px;color:var(--muted)">${c.phone||''}</div>
+            <div style="font-size:10px;color:var(--muted)">${normPhone(c.phone)||''}</div>
             <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">
               ${c.tier==='vip'?'<span style="font-size:9px;background:#F5CBA7;padding:1px 5px;border-radius:6px">⭐ VIP</span>':''}
               <select onchange="crmMoveStage('${c.id||c.phone}',this.value)" onclick="event.stopPropagation()"
