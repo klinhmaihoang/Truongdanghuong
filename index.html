@@ -8317,6 +8317,14 @@ function remindAllPending(){
 // ══════════════════════════════════════════════════
 function getInstallmentPlan(s){
   if(!s.installment_plan) return null;
+  // ★ FIX: dbRead (Apps Script) đã TỰ ĐỘNG parse các cell bắt đầu bằng '[' hoặc '{'
+  // thành mảng/object thật trước khi trả về — nên installment_plan có thể tới đây
+  // dưới dạng mảng CÓ SẴN (không phải chuỗi). Gọi JSON.parse() lên 1 mảng có sẵn sẽ
+  // luôn lỗi (JS tự ép kiểu thành chuỗi dạng "[object Object]" trước khi parse) và
+  // luôn rơi vào catch → trả về null. Xử lý cả 2 trường hợp: đã là mảng thì dùng
+  // luôn, còn là chuỗi thì mới parse.
+  if(Array.isArray(s.installment_plan)) return s.installment_plan.length?s.installment_plan:null;
+  if(typeof s.installment_plan !== 'string') return null;
   try{ const p = JSON.parse(s.installment_plan); return Array.isArray(p)&&p.length?p:null; }
   catch(e){ return null; }
 }
