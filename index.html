@@ -5848,7 +5848,7 @@ function renderCustomers() {
 
   let list = D.customers.filter(c=>{
     if(q && !(c.name||'').toLowerCase().includes(q) &&
-       !(c.phone||'').includes(q) &&
+       !String(c.phone||'').includes(q) &&
        !(c.email||'').toLowerCase().includes(q) &&
        !(c.tags||'').toLowerCase().includes(q)) return false;
     if(fsrc && c.source!==fsrc) return false;
@@ -6108,7 +6108,7 @@ function exportAds() {
     const names = (c.name||'').trim().split(' ');
     const first = names.slice(0,-1).join(' ');
     const last  = names.slice(-1)[0]||'';
-    const phone = (c.phone||'').replace(/\D/g,'');
+    const phone = String(c.phone||'').replace(/\D/g,'');
     const birth = c.birthday ? c.birthday.replace(/-/g,'') : '';
     const gender = c.gender==='Nam'?'m':c.gender==='Nữ'?'f':'';
     fbData.push([c.email||'', phone?'+84'+phone.slice(-9):'', first, last, c.address||'', 'VN', birth, gender]);
@@ -6121,7 +6121,7 @@ function exportAds() {
   const ggData = [['Email Address','Phone Number','First Name','Last Name','Country','Zip']];
   D.customers.forEach(c=>{
     const names=(c.name||'').trim().split(' ');
-    const phone=(c.phone||'').replace(/\D/g,'');
+    const phone=String(c.phone||'').replace(/\D/g,'');
     ggData.push([c.email||'', phone?'+84'+phone.slice(-9):'', names.slice(0,-1).join(' '), names.slice(-1)[0]||'', 'VN', '']);
   });
   const ws2 = XLSX.utils.aoa_to_sheet(ggData);
@@ -14516,7 +14516,7 @@ async function syncSingleCustomerFromOrder(o) {
   const addr = o.address || (addrFromNote ? addrFromNote[1].trim() : '');
   if (!o.phone && !addr) return; // không có gì mới để bổ sung
 
-  let existing = D.customers.find(c => (o.phone && c.phone === o.phone) || c.name === o.customer);
+  let existing = D.customers.find(c => (o.phone && String(c.phone||'') === String(o.phone)) || c.name === o.customer);
   try {
     if (!existing) {
       const c = { id: uid(), name: o.customer, phone: o.phone||'', email: o.email||'',
@@ -14580,7 +14580,7 @@ async function syncCustomersFromOrders() {
     const _sc = loadPtsConfig(); const pts = Math.floor(d.total_spent / (_sc.perVnd||1000));
     // Tìm KH hiện có theo sđt hoặc tên
     let existing = D.customers.find(c =>
-      (d.phone && c.phone === d.phone) || c.name === d.name
+      (d.phone && String(c.phone||'') === String(d.phone)) || c.name === d.name
     );
     if(!existing) {
       // Tạo mới
@@ -16080,17 +16080,19 @@ function nameAutoComplete(val) {
   (D.customers||[]).forEach(c => {
     if(c.name && c.name.toLowerCase().includes(q) && !seen.has(c.id)) {
       seen.add(c.id);
-      matches.push({ name: c.name, phone: c.phone||'', address: c.address||'', source: 'customer' });
+      // ★ FIX: Google Sheets tự nhận diện SĐT toàn chữ số thành kiểu Number — ép
+      // luôn về String ở đây để tránh crash khi gọi .replace()/.includes() sau này.
+      matches.push({ name: c.name, phone: String(c.phone||''), address: c.address||'', source: 'customer' });
     }
   });
 
   // Từ D.orders nếu chưa đủ
   if(matches.length < 6) {
     (D.orders||[]).forEach(o => {
-      const key = (o.customer||'')+'|'+(o.phone||'');
+      const key = (o.customer||'')+'|'+String(o.phone||'');
       if(o.customer && o.customer.toLowerCase().includes(q) && !seen.has(key) && o.customer !== 'Khách lẻ') {
         seen.add(key);
-        matches.push({ name: o.customer, phone: o.phone||'', address: o.address||'', source: 'order' });
+        matches.push({ name: o.customer, phone: String(o.phone||''), address: o.address||'', source: 'order' });
       }
     });
   }
@@ -19519,7 +19521,7 @@ function globalSearch(q) {
   // Search customers
   (D.customers||[]).filter(c =>
     (c.name||'').toLowerCase().includes(q) ||
-    (c.phone||'').toLowerCase().includes(q)
+    String(c.phone||'').toLowerCase().includes(q)
   ).slice(0,3).forEach(c => results.push({
     type:'customer', icon:'👤', label:c.name,
     sub:`${c.phone||''} · ${c.tier||'member'}`,
