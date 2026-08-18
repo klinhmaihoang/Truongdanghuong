@@ -7999,6 +7999,8 @@ async function checkout(){
     address,payment,shipping,discount,ship_fee:shipFee||0,tracking_code:document.getElementById('c-tracking-code')?.value?.trim()||'',subtotal,tracking_url:'',created_at:Date.now()};
   await sbUpsert('orders',pendingOrder);
   D.orders.push(pendingOrder);
+  // ★ Tự động đồng bộ SĐT/địa chỉ khách vào hồ sơ Khách hàng/CRM ngay khi tạo đơn mới
+  syncSingleCustomerFromOrder(pendingOrder).catch(()=>{});
   // Sync đơn mới lên GG Sheets ngay khi tạo
   gsSend({sheet:'DonHang',...pendingOrder, type:'retail'});
   showM('modal-qr');
@@ -13525,6 +13527,9 @@ async function odSaveEdit() {
   try {
     // Dùng sbPatch với filter id để chắc chắn chỉ update đúng đơn này
     await sbPatch('orders', updates, `?id=eq.${o.id}`);
+    // ★ Tự động đồng bộ SĐT/địa chỉ vừa lưu vào hồ sơ Khách hàng/CRM — không cần
+    // bấm "Sync từ đơn hàng" thủ công nữa. Không chặn luồng lưu đơn nếu lỗi.
+    syncSingleCustomerFromOrder(o).catch(()=>{});
     renderOrders();
     renderPendingOrders();
     renderDash();
@@ -14501,6 +14506,37 @@ function cleanItems(items) {
 // ══════════════════════════════════════════════════
 // SYNC KHÁCH HÀNG TỪ ĐƠN HÀNG
 // ══════════════════════════════════════════════════
+// ★ FIX: đồng bộ TỰ ĐỘNG thông tin 1 khách (SĐT/địa chỉ) vào hồ sơ Khách hàng/CRM
+// ngay sau khi lưu đơn hàng — trước đây phải bấm nút "Sync từ đơn hàng" thủ công,
+// nên sửa xong đơn mà quên bấm sync là hồ sơ CRM vẫn còn thiếu/sai, kéo theo cả
+// autocomplete tên khách lúc tạo đơn mới cũng không gợi ý đúng.
+async function syncSingleCustomerFromOrder(o) {
+  if (!o || !o.customer || o.customer === 'Khách lẻ') return;
+  const addrFromNote = (o.note||'').match(/ĐC:\s*([^|]+)/);
+  const addr = o.address || (addrFromNote ? addrFromNote[1].trim() : '');
+  if (!o.phone && !addr) return; // không có gì mới để bổ sung
+
+  let existing = D.customers.find(c => (o.phone && c.phone === o.phone) || c.name === o.customer);
+  try {
+    if (!existing) {
+      const c = { id: uid(), name: o.customer, phone: o.phone||'', email: o.email||'',
+        points: 0, total_spent: o.total||0, visit_count: 1, last_visit: o.time||'',
+        birthday:'', gender:'', address: addr, source:'', segment:'', tags:'', note:'',
+        created_at: Date.now() };
+      await sbUpsert('customers', c);
+      D.customers.push(c);
+    } else {
+      const upd = {};
+      if (!existing.phone && o.phone) upd.phone = o.phone;
+      if (!existing.address && addr) upd.address = addr;
+      if (Object.keys(upd).length) {
+        await sbPatch('customers', upd, `?id=eq.${existing.id}`);
+        Object.assign(existing, upd);
+      }
+    }
+  } catch(e) { console.warn('Đồng bộ khách hàng lỗi (không chặn lưu đơn):', e.message); }
+}
+
 async function syncCustomersFromOrders() {
   const btn = document.getElementById('btn-sync-customers');
   if(btn) { btn.textContent = '⏳ Đang sync...'; btn.disabled = true; }
