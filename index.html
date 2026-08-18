@@ -13159,6 +13159,11 @@ function showOrderDetail(id) {
   }
   // Reset về view mode
   odCancelEdit();
+  // ★ FIX: nạp sẵn dữ liệu vào form Sửa NGAY từ đầu (dù đang ẩn) — trước đây chỉ
+  // nạp khi bấm nút "Sửa", nên nếu vì lý do gì đó form Sửa bị lộ ra (hoặc để phòng
+  // hờ), các trường Giao hàng/Tạm tính/Tổng tiền không còn hiện sai giá trị mặc
+  // định/rỗng nữa — luôn khớp đúng dữ liệu thật của đơn ngay từ lúc mở.
+  odPopulateEditFields(o);
   // Populate header
   document.getElementById('od-id').textContent = o.id;
   document.getElementById('od-total').textContent = fmt(o.total||0);
@@ -13305,6 +13310,13 @@ function odEnterEdit() {
   document.getElementById('od-view').style.display = 'none';
   document.getElementById('od-edit').style.display = '';
   document.getElementById('od-action-buttons').style.display = 'none';
+  // ★ FIX: dữ liệu form Sửa giờ được nạp SẴN ngay khi mở đơn (xem odPopulateEditFields
+  // gọi từ showOrderDetail), không đợi tới lúc bấm nút này nữa — ở đây chỉ còn lo
+  // việc hiện/ẩn 2 khối Xem/Sửa. Vẫn gọi lại 1 lần nữa cho chắc (không hại gì).
+  odPopulateEditFields(o);
+}
+
+function odPopulateEditFields(o) {
   document.getElementById('od-edit-customer').value = o.customer||'';
   document.getElementById('od-edit-phone').value    = o.phone||'';
   document.getElementById('od-edit-address').value  = o.address||'';
