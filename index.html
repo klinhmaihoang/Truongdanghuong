@@ -13501,8 +13501,11 @@ async function odSaveEdit() {
   // Update order object
   const updates = {
     customer,
-    phone:    document.getElementById('od-edit-phone').value||'',
-    address:  document.getElementById('od-edit-address').value||'',
+    // ★ FIX: không lưu đè thành RỖNG nếu nhân viên vô tình để trống ô SĐT/Địa chỉ
+    // lúc lưu (VD chỉ định sửa mỗi phần khác) — giữ lại giá trị cũ của đơn thay vì
+    // xóa mất, cùng nguyên tắc đã áp dụng cho trạng thái đơn hàng.
+    phone:    document.getElementById('od-edit-phone').value.trim()||o.phone||'',
+    address:  document.getElementById('od-edit-address').value.trim()||o.address||'',
     items:    finalItems.join(', '),
     note:     document.getElementById('od-edit-note').value||'',
     payment:  document.getElementById('od-edit-payment')?.value||o.payment||'',
