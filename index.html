@@ -14550,7 +14550,7 @@ async function syncCustomersFromOrders() {
   // Gom nhóm theo tên + sđt
   const map = {};
   paidOrders.forEach(o => {
-    const key = (o.phone ? o.phone : o.customer).trim();
+    const key = String(o.phone ? o.phone : o.customer).trim();
     if(!map[key]) {
       map[key] = {
         name: o.customer, phone: o.phone||'', email: o.email||'', address: '',
@@ -16041,17 +16041,19 @@ function phoneAutoComplete(val) {
 
   // Từ customers
   (D.customers||[]).forEach(c => {
-    if(c.phone && c.phone.includes(val) && !seen.has(c.phone)) {
-      seen.add(c.phone);
-      matches.push({ name: c.name, phone: c.phone, address: c.address||'', source: 'customer' });
+    const cPhone = String(c.phone||'');
+    if(cPhone && cPhone.includes(val) && !seen.has(cPhone)) {
+      seen.add(cPhone);
+      matches.push({ name: c.name, phone: cPhone, address: c.address||'', source: 'customer' });
     }
   });
 
   // Từ orders nếu chưa có
   (D.orders||[]).forEach(o => {
-    if(o.phone && o.phone.includes(val) && !seen.has(o.phone) && o.customer && o.customer !== 'Khách lẻ') {
-      seen.add(o.phone);
-      matches.push({ name: o.customer, phone: o.phone, address: o.address||'', source: 'order' });
+    const oPhone = String(o.phone||'');
+    if(oPhone && oPhone.includes(val) && !seen.has(oPhone) && o.customer && o.customer !== 'Khách lẻ') {
+      seen.add(oPhone);
+      matches.push({ name: o.customer, phone: oPhone, address: o.address||'', source: 'order' });
     }
   });
 
