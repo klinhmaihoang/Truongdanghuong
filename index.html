@@ -5735,7 +5735,7 @@ async function checkReminders(){
     }
 
     // Nhắc chưa thanh toán đợt 1
-    if(fee>0&&!s.paid1)
+    if(fee>0&&isStudentUnpaid(s))
       msgs.push(`💳 *Chưa thanh toán${s.type==='Online'?'':' đợt 1'}!*\n\n👤 ${s.name} (${s.type})\n📚 ${courseName}\n${s.type==='Offline'&&s.class_date?`🗓 Ngày học: ${s.class_date}\n`:''}\n❌ ${s.type==='Online'?fmt(fee)+' (toàn bộ)':'Đợt 1 (30%): '+fmt(dep)}\n\n_Trương Dáng Hương Academy_`);
 
     // Nhắc chưa thanh toán đợt 2 (chỉ Offline)
@@ -6870,7 +6870,7 @@ function renderDash(){
   document.getElementById('s3').textContent=D.inventory.filter(i=>i.qty<=i.min).length;
 
   // Badge chưa thanh toán
-  const unpaid=D.students.filter(s=>s.status!=='Đã xóa'&&(s.fee||0)>0&&!s.paid1);
+  const unpaid=D.students.filter(s=>s.status!=='Đã xóa'&&(s.fee||0)>0&&isStudentUnpaid(s));
   const bar=document.getElementById('dash-unpaid-bar');
   if(bar) bar.style.display=unpaid.length?'flex':'none';
   const uc=document.getElementById('dash-unpaid-count');
@@ -8329,6 +8329,15 @@ function remindAllPending(){
 // Học viên CŨ (chưa có installment_plan) vẫn dùng luồng paid1/paid2 mặc định
 // như trước — không đổi gì, đảm bảo không ảnh hưởng dữ liệu cũ.
 // ══════════════════════════════════════════════════
+// ★ FIX: kiểm tra "học viên chưa thu học phí" — phải hiểu cả kế hoạch đợt thanh
+// toán tùy chỉnh (installment_plan), không chỉ dựa vào field paid1 cũ. Nếu có kế
+// hoạch tùy chỉnh, coi là "chưa thu" khi đợt ĐẦU TIÊN trong kế hoạch chưa thu.
+function isStudentUnpaid(s){
+  const plan = getInstallmentPlan(s);
+  if(plan) return !plan[0]?.paid;
+  return !s.paid1;
+}
+
 function getInstallmentPlan(s){
   if(!s.installment_plan) return null;
   // ★ FIX: dbRead (Apps Script) đã TỰ ĐỘNG parse các cell bắt đầu bằng '[' hoặc '{'
@@ -9334,7 +9343,7 @@ function tgReport(type){
     msg=`📦 *KHO HÀNG*\n━━━━━━━━━\n${D.inventory.map(i=>`${i.qty<=i.min?'⚠️':i.qty<=i.min*1.5?'🟡':'✅'} *${i.name}*: ${i.qty} ${i.unit} (min: ${i.min})`).join('\n')}\n━━━━━━━━━\n🕐 ${nowDT()}\n_Trương Dáng Hương Academy_`;
   }else if(type==='students'){
     const a=D.students.filter(s=>s.status==='Đang học');
-    const unpaid=a.filter(s=>(s.fee||0)>0&&!s.paid1);
+    const unpaid=a.filter(s=>(s.fee||0)>0&&isStudentUnpaid(s));
     const lines=a.map(s=>{
       const c=D.courses.find(x=>x.id===s.course_id);
       const cName=c?c.name:(s.course||'—');
@@ -9448,7 +9457,7 @@ function confirmAct(title,msg,cb){
 // ══════════════════════════════════════════════════
 function sendDailyReport(){
   const active=D.students.filter(s=>s.status==='Đang học'&&!s.deleted_at);
-  const unpaid=D.students.filter(s=>!s.deleted_at&&(s.fee||0)>0&&!s.paid1);
+  const unpaid=D.students.filter(s=>!s.deleted_at&&(s.fee||0)>0&&isStudentUnpaid(s));
   const pending=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&odIsPendingPayment(o));
   const low=D.inventory.filter(i=>i.qty<=i.min);
   const today=todayStr();
@@ -12019,7 +12028,7 @@ function renderSchedule() {
   const weekEnd   = new Date(weekStart); weekEnd.setDate(weekStart.getDate()+6);
   setEl('sched-stat-week', studs.filter(s=>getClassDates(s).some(ds=>{const d=new Date(ds);return d>=weekStart&&d<=weekEnd;})).length);
   setEl('sched-stat-active', D.students.filter(s=>s.status==='Đang học').length);
-  setEl('sched-stat-unpaid', D.students.filter(s=>s.status==='Đang học'&&s.fee>0&&!s.paid1).length);
+  setEl('sched-stat-unpaid', D.students.filter(s=>s.status==='Đang học'&&s.fee>0&&isStudentUnpaid(s)).length);
 
   // Build calendar grid
   let startDate, endDate;
@@ -19759,8 +19768,10 @@ function renderCEODashboard() {
   const newStudentsLastMonth = students.filter(s=>getMonthKey(s.start||s.created_at||'')===lastMonthKey);
   const churnedStudents = students.filter(s=>['Nghỉ học','Bảo lưu'].includes(s.status));
   const churnRate = activeStudents.length>0 ? (churnedStudents.length/(activeStudents.length+churnedStudents.length)*100).toFixed(1) : 0;
-  const unpaidStudents = students.filter(s=>s.fee>0&&!s.paid2&&!s.paid1);
+  const unpaidStudents = students.filter(s=>s.fee>0&&isStudentUnpaid(s));
   const unpaidAmt = unpaidStudents.reduce((s,st)=>{
+    const plan = getInstallmentPlan(st);
+    if(plan) return s + (plan[0]?.amount||0);
     const dep = st.paid1_amount||Math.round((st.fee||0)*0.3);
     return s+(st.paid1?0:dep);
   },0);
