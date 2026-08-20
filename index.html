@@ -9470,10 +9470,10 @@ function sendDailyReport(){
   const tomorrowISO = tomorrow.toISOString().split('T')[0];
   const studentsTomoRow = D.students.filter(s => !s.deleted_at && s.class_date === tomorrowISO);
 
-  let msg='🌅 *BÁO CÁO SÁNG — '+today+'*\\n';
-  msg+='━━━━━━━━━━━━━━━━\\n\\n';
+  let msg='🌅 *BÁO CÁO SÁNG — '+today+'*\n';
+  msg+='━━━━━━━━━━━━━━━━\n\n';
   if(studentsTomoRow.length){
-    msg+='📚 *HỌC VIÊN NGÀY MAI ('+studentsTomoRow.length+' người)*\\n';
+    msg+='📚 *HỌC VIÊN NGÀY MAI ('+studentsTomoRow.length+' người)*\n';
     studentsTomoRow.forEach(s=>{
       const course=D.courses.find(c=>c.id===s.course_id);
       const cName=course?course.name:(s.course||'—');
@@ -9481,31 +9481,31 @@ function sendDailyReport(){
       const dep=s.paid1_amount||Math.round(fee*0.3);
       const rest=s.paid2_amount||(fee-dep);
       const paidStr=s.paid2?'✅ Đã TT đủ':s.paid1?'✅ Đã cọc '+fmt(dep)+' — còn '+fmt(rest):'❌ Chưa cọc — cần thu '+fmt(dep);
-      msg+='• 👤 '+s.name+' — '+cName+' ('+( s.type||'Offline')+')\\n';
-      if(s.class_time) msg+='  🕐 '+s.class_time+'\\n';
-      msg+='  💰 '+paidStr+'\\n';
+      msg+='• 👤 '+s.name+' — '+cName+' ('+( s.type||'Offline')+')\n';
+      if(s.class_time) msg+='  🕐 '+s.class_time+'\n';
+      msg+='  💰 '+paidStr+'\n';
     });
-    msg+='\\n';
+    msg+='\n';
   }
-  msg+='🎓 *HỌC VIÊN*\\n';
-  msg+='• Đang học: '+active.length+' người\\n';
-  if(unpaid.length) msg+='• ⚠️ Chưa thu học phí: '+unpaid.length+' người\\n';
+  msg+='🎓 *HỌC VIÊN*\n';
+  msg+='• Đang học: '+active.length+' người\n';
+  if(unpaid.length) msg+='• ⚠️ Chưa thu học phí: '+unpaid.length+' người\n';
   if(todayRev>0){
-    msg+='\\n🛍️ *HÔM NAY*\\n';
-    msg+='• Đơn bán: '+todayOrders.length+'\\n';
-    msg+='• Doanh thu: '+fmt(todayRev)+'\\n';
+    msg+='\n🛍️ *HÔM NAY*\n';
+    msg+='• Đơn bán: '+todayOrders.length+'\n';
+    msg+='• Doanh thu: '+fmt(todayRev)+'\n';
   }
   if(pending.length){
-    msg+='\\n⏳ *ĐƠN CHỜ THU ('+pending.length+')*\\n';
-    pending.slice(0,5).forEach(o=>{msg+='• '+o.id+' — '+o.customer+' — '+fmt(o.total||0)+'\\n';});
-    if(pending.length>5) msg+='• ...và '+(pending.length-5)+' đơn khác\\n';
+    msg+='\n⏳ *ĐƠN CHỜ THU ('+pending.length+')*\n';
+    pending.slice(0,5).forEach(o=>{msg+='• '+o.id+' — '+o.customer+' — '+fmt(o.total||0)+'\n';});
+    if(pending.length>5) msg+='• ...và '+(pending.length-5)+' đơn khác\n';
   }
   if(low.length){
-    msg+='\\n⚠️ *KHO SẮP HẾT*\\n';
-    low.forEach(i=>{msg+='• '+i.name+': còn '+i.qty+' '+i.unit+'\\n';});
+    msg+='\n⚠️ *KHO SẮP HẾT*\n';
+    low.forEach(i=>{msg+='• '+i.name+': còn '+i.qty+' '+i.unit+'\n';});
   }
-  msg+='\\n━━━━━━━━━━━━━━━━\\n';
-  msg+='🕐 '+nowDT()+'\\n_Trương Dáng Hương Academy_';
+  msg+='\n━━━━━━━━━━━━━━━━\n';
+  msg+='🕐 '+nowDT()+'\n_Trương Dáng Hương Academy_';
   tgMsg(msg);
   notify('Đã gửi báo cáo qua Telegram!');
 }
