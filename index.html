@@ -7406,18 +7406,28 @@ async function saveEditStudent(){
     contact_channel,
     social_name:document.getElementById('es-social-name')?.value.trim()||'',
   };
-
   try{
+    // ★ Chụp lại dữ liệu CŨ trước khi ghi đè, để dựng thông báo trước/sau
+    const oldSnapshot = {...s};
     await sbPatch('students',upd,`?id=eq.${id}`);
     Object.assign(s,upd);
     closeM('modal-edit-student');
     renderStudents();renderDash();
     notify('✅ Đã cập nhật: '+name);
+    const diffLines = buildDiffLines_(oldSnapshot, upd,
+      ['name','phone','type','course','email','fee','student_count','fee_unit','class_date','end_date','class_time','contact_channel','social_name','note'],
+      {fee:v=>fmt(+v||0), fee_unit:v=>fmt(+v||0)}
+    );
     tgMsg(`✏️ *Cập nhật học viên!*
 
 👤 ${name}
 📚 ${upd.course}
-💰 ${fmt(upd.fee)}
+💰 ${fmt(upd.fee)}`+
+      (diffLines.length?`
+
+📝 *Thay đổi:*
+${diffLines.join('\n')}`:'')+
+      `
 🕐 ${nowDT()}
 
 _Trương Dáng Hương Academy_`);
@@ -7518,7 +7528,7 @@ async function addStudent(){
     renderStudents();renderDash();notify('Đã thêm: '+n);
     renderInstallmentConfigUI(); // reset lại về mặc định 2 đợt 30/70 cho lần thêm tiếp theo
     if(document.getElementById('at-student').checked)
-      tgMsg(`🎓 *Học viên mới!*\n\n👤 ${n}${studentCount>1?` (đăng ký cho ${studentCount} học viên)`:''}\n📱 ${type}\n📚 ${course?course.name:'—'}\n💰 ${feeVal===0?'Miễn phí':fmt(feeVal)}\n${s.class_date?`🗓 Ngày học: ${s.class_date}\n`:''}\n_Trương Dáng Hương Academy_`);
+      tgMsg(`🎓 *Học viên mới!*\n\n👤 ${n}${studentCount>1?` (đăng ký cho ${studentCount} học viên)`:''}\n📱 ${type}\n📚 ${course?course.name:'—'}\n💰 ${feeVal===0?'Miễn phí':fmt(feeVal)}\n${s.class_date?`🗓 Ngày học: ${formatClassDateRange_(s)}\n`:''}\n_Trương Dáng Hương Academy_`);
     gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
   }catch(e){notify('Lưu thất bại: '+e.message,false);}
 }
@@ -9558,11 +9568,20 @@ async function saveEditMat(){
     cost:parseFloat(document.getElementById('em-cost').value)||0,
   };
   try{
+    // ★ Chụp lại dữ liệu CŨ trước khi ghi đè, để dựng thông báo trước/sau
+    const oldSnapshot = {...m};
     await sbPatch('inventory',upd,`?id=eq.${id}`);
     Object.assign(m,upd);
     closeM('modal-edit-mat');
     render();
     notify('✓ Đã cập nhật: '+name);
+    const diffLines = buildDiffLines_(oldSnapshot, upd,
+      ['name','sku','unit','supplier','qty','min','cost'],
+      {cost:v=>fmt(+v||0)}
+    );
+    if(diffLines.length){
+      tgMsg(`📦 *Cập nhật kho!*\n\n🏷️ ${name}\n\n📝 *Thay đổi:*\n${diffLines.join('\n')}\n\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+    }
     gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
   }catch(e){notify('Lỗi lưu: '+e.message,false);}
 }
@@ -13540,6 +13559,8 @@ async function odSaveEdit() {
     total,
     status:   newStatus,
   };
+  // ★ Chụp lại dữ liệu CŨ trước khi ghi đè, để dựng thông báo trước/sau
+  const oldOrderSnapshot = {...o};
   Object.assign(o, updates);
   // Lưu tracking_url vào updates và local
   const trkVal = document.getElementById('od-edit-tracking')?.value?.trim()||'';
@@ -13557,14 +13578,21 @@ async function odSaveEdit() {
     // Re-populate edit form với data mới để tránh bị trống lần sau
     document.getElementById('od-edit-customer').value = o.customer||'';
     document.getElementById('od-edit-phone').value    = o.phone||'';
-    // TG notify cho tất cả thay đổi trạng thái
+    // TG notify cho tất cả thay đổi — kèm chi tiết trước/sau cho từng trường đổi
     const newSt = document.getElementById('od-edit-status')?.value;
     if(newSt) {
       const _stIcons2 = {'Đã xác nhận':'✅','Đang chuẩn bị':'🧺','Đã book ship':'📦',
         'Đang giao':'🚚','Đã giao':'🏠','Chờ thu tiền':'💳','Đã thanh toán':'💰','Đã hủy':'✕'};
       const _icon2 = _stIcons2[newSt]||'🔄';
       const pv = trkVal&&odDetectProvider?odDetectProvider(trkVal):null;
-      tgMsg(`${_icon2} *${newSt}!*\n\n📋 Đơn: \`${o.id}\`\n👤 ${o.customer}\n💰 ${fmt(o.total||0)}`+(trkVal?`\n\n🔗 Tracking${pv?' ('+pv.name+')':''}:\n${trkVal}`:'')+`\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+      const orderDiffLines = buildDiffLines_(oldOrderSnapshot, updates,
+        ['customer','phone','address','items','payment','shipping','discount','ship_fee','tracking_code','total','status'],
+        {total:v=>fmt(+v||0), ship_fee:v=>fmt(+v||0)}
+      );
+      tgMsg(`${_icon2} *${newSt}!*\n\n📋 Đơn: \`${o.id}\`\n👤 ${o.customer}\n💰 ${fmt(o.total||0)}`+
+        (orderDiffLines.length?`\n\n📝 *Thay đổi:*\n${orderDiffLines.join('\n')}`:'')+
+        (trkVal?`\n\n🔗 Tracking${pv?' ('+pv.name+')':''}:\n${trkVal}`:'')+
+        `\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
     }
     // Update modal view — quay về view mode
     const editPanel = document.getElementById('od-edit');
@@ -16143,6 +16171,51 @@ function nameAutoComplete(val) {
 // RỚT MẤT số 0 đứng đầu (VD "0962953161" → lưu thành 962953161). Hàm này tự thêm
 // lại số 0 nếu phát hiện đúng dạng SĐT Việt Nam bị thiếu (9 chữ số, bắt đầu bằng
 // 3/5/7/8/9 — đầu số di động VN sau khi bỏ số 0).
+// ══════════════════════════════════════════════════
+// ★ THÔNG BÁO CẬP NHẬT — hiện rõ trước/sau cho từng trường thay đổi
+// Dùng chung cho Học viên / Kho (nguyên liệu) / Đơn hàng, để dễ dò lại lịch sử
+// thay đổi qua Telegram/Zalo thay vì chỉ báo chung chung "đã cập nhật".
+// ══════════════════════════════════════════════════
+const FIELD_LABELS_ = {
+  name:'Tên', phone:'SĐT', type:'Loại hình', course:'Khóa học', email:'Email',
+  fee:'Học phí', student_count:'Số lượng học viên', fee_unit:'Đơn giá học phí',
+  start:'Ngày đăng ký', class_date:'Ngày học', end_date:'Ngày kết thúc học',
+  class_time:'Giờ học', note:'Ghi chú', contact_channel:'Kênh liên lạc', social_name:'Tên MXH liên hệ',
+  qty:'Tồn kho', min:'Tồn tối thiểu', cost:'Giá nhập', unit:'Đơn vị',
+  category:'Danh mục', sku:'Mã HH', supplier:'Nhà cung cấp',
+  customer:'Tên khách', address:'Địa chỉ', payment:'Thanh toán', shipping:'Giao hàng',
+  discount:'Giảm giá (%)', ship_fee:'Phí ship', status:'Trạng thái',
+  tracking_code:'Mã vận đơn', items:'Sản phẩm', total:'Tổng tiền', price:'Giá bán',
+};
+
+// So sánh giá trị CŨ vs MỚI cho từng field, chỉ trả về dòng của field THẬT SỰ đổi.
+// formatters: {field: (v)=>string} — tùy chỉnh cách hiển thị (VD tiền tệ, ngày...).
+function buildDiffLines_(oldObj, newObj, fields, formatters) {
+  formatters = formatters || {};
+  const lines = [];
+  fields.forEach(f => {
+    const oldVal = oldObj ? oldObj[f] : undefined;
+    const newVal = newObj ? newObj[f] : undefined;
+    const oldStr = (oldVal===null||oldVal===undefined) ? '' : String(oldVal).trim();
+    const newStr = (newVal===null||newVal===undefined) ? '' : String(newVal).trim();
+    if(oldStr === newStr) return; // không đổi — bỏ qua, đỡ rối thông báo
+    const label = FIELD_LABELS_[f] || f;
+    const fmtFn = formatters[f] || (v => v || '—');
+    lines.push(`• ${label}: ${fmtFn(oldStr)} → ${fmtFn(newStr)}`);
+  });
+  return lines;
+}
+
+// Ghép "Ngày học" + "Ngày kết thúc học" + "Giờ học" thành 1 dòng dễ đọc:
+// VD: "8/9/2026 - 9/9/2026, 10:00 - 15:00" (nếu chỉ học 1 ngày thì chỉ hiện 1 ngày).
+function formatClassDateRange_(s) {
+  if(!s || !s.class_date) return '';
+  let out = s.class_date;
+  if(s.end_date && s.end_date !== s.class_date) out += ' - ' + s.end_date;
+  if(s.class_time) out += ', ' + s.class_time;
+  return out;
+}
+
 function normPhone(v){
   const s = String(v||'').trim();
   if(/^[35789]\d{8}$/.test(s)) return '0'+s; // thiếu đúng 1 số 0 đầu
