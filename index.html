@@ -6715,7 +6715,7 @@ function svgPie(data, size=200){
 
 // ── Báo cáo Bán hàng ──
 function renderRpSales(){
-  const paid=D.orders.filter(o=>o.status==='Đã thanh toán');
+  const paid=D.orders.filter(isOrderPaid);
   const rev=paid.reduce((a,o)=>a+(o.total||0),0);
   document.getElementById('rp-total-rev').textContent=(rev/1000000).toFixed(1)+'M';
   document.getElementById('rp-total-orders').textContent=paid.length;
@@ -6861,8 +6861,8 @@ function renderDash(){
   const activeStudents=D.students.filter(s=>s.status==='Đang học'&&!s.deleted_at);
   const retailOrders=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&o.status!=='Đã hủy');
   const tuitionOrders=D.orders.filter(o=>(o.id||'').startsWith('HP'));
-  const retailRev=retailOrders.filter(o=>o.status==='Đã thanh toán').reduce((a,o)=>a+(o.total||0),0);
-  const tuitionRev=tuitionOrders.filter(o=>o.status==='Đã thanh toán').reduce((a,o)=>a+(o.total||0),0);
+  const retailRev=retailOrders.filter(isOrderPaid).reduce((a,o)=>a+(o.total||0),0);
+  const tuitionRev=tuitionOrders.filter(isOrderPaid).reduce((a,o)=>a+(o.total||0),0);
 
   document.getElementById('s0').textContent=activeStudents.length;
   document.getElementById('s1').textContent=((retailRev+tuitionRev)/1000000).toFixed(1)+'M';
@@ -6907,7 +6907,7 @@ function renderDash(){
     <td style="font-size:12px">${o.customer}</td>
     <td style="font-size:11px;color:var(--muted)">${(typeof o.items==='string'?o.items:JSON.stringify(o.items||[])).substring(0,20)}${(typeof o.items==='string'?o.items:JSON.stringify(o.items||[])).length>20?'...':''}</td>
     <td style="color:var(--brand);font-weight:700;font-size:12px">${fmt(o.total||0)}</td>
-    <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':'t-pending'}" style="font-size:10px">${o.status==='Đã thanh toán'?'✓':'⏳'}</span></td>
+    <td><span class="tag ${isOrderPaid(o)?'t-paid':'t-pending'}" style="font-size:10px">${isOrderPaid(o)?'✓':'⏳'}</span></td>
   </tr>`).join('') || '<tr><td colspan="4" style="color:var(--muted);text-align:center;padding:14px;font-size:12px">Chưa có đơn bán lẻ</td></tr>';
 
   // Cảnh báo kho
@@ -8094,7 +8094,7 @@ function filterOrders(){
       <td style="font-size:12px;color:var(--muted)">${cleanItems(o.items)}</td>
       <td style="font-weight:700">${fmt(o.total||0)}</td>
       <td style="font-size:12px;color:var(--muted)">${o.time}</td>
-      <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':'t-pending'}">${o.status}</span></td>
+      <td><span class="tag ${isOrderPaid(o)?'t-paid':'t-pending'}">${o.status}</span></td>
       <td><button class="btn btn-pdf btn-sm" onclick="exportPDF('${o.id}')">📄 PDF</button></td>
     </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--muted)">Không tìm thấy kết quả</td></tr>';
   }
@@ -8106,7 +8106,7 @@ function filterOrders(){
       <td style="font-size:12px;color:var(--muted)">${cleanItems(o.items)}</td>
       <td style="font-weight:700">${fmt(o.total||0)}</td>
       <td style="font-size:12px;color:var(--muted)">${o.time}</td>
-      <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':o.status==='Chờ thanh toán'?'t-pending':'t-done'}">${o.status}</span></td>
+      <td><span class="tag ${isOrderPaid(o)?'t-paid':o.status==='Chờ thanh toán'?'t-pending':'t-done'}">${o.status}</span></td>
       <td></td>
     </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--muted)">Không tìm thấy kết quả</td></tr>';
   }
@@ -8142,8 +8142,8 @@ function renderOrders(){
   if(badgePos) badgePos.textContent=pending||'';
 
   // Stats
-  const retailRev=retailOrders.filter(o=>o.status==='Đã thanh toán').reduce((a,o)=>a+(o.total||0),0);
-  const tuitionRev=tuitionOrders.filter(o=>o.status==='Đã thanh toán').reduce((a,o)=>a+(o.total||0),0);
+  const retailRev=retailOrders.filter(isOrderPaid).reduce((a,o)=>a+(o.total||0),0);
+  const tuitionRev=tuitionOrders.filter(isOrderPaid).reduce((a,o)=>a+(o.total||0),0);
   const s0=document.getElementById('ord-retail-rev');
   const s1=document.getElementById('ord-tuition-rev');
   const s2=document.getElementById('ord-pending-count');
@@ -8159,7 +8159,7 @@ function renderOrders(){
     <td style="font-size:12px;color:var(--muted)">${cleanItems(o.items)}</td>
     <td style="font-weight:700">${fmt(o.total||0)}</td>
     <td style="font-size:12px;color:var(--muted)">${o.time}</td>
-    <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':'t-pending'}">${o.status}</span></td>
+    <td><span class="tag ${isOrderPaid(o)?'t-paid':'t-pending'}">${o.status}</span></td>
     <td class="btn-group" style="gap:4px">
       <button class="btn btn-ghost btn-sm" onclick="showOrderDetail('${o.id}')">👁</button>
       <button class="btn btn-pdf btn-sm" onclick="exportPDF('${o.id}')">📄 PDF</button>
@@ -8185,7 +8185,7 @@ function renderOrders(){
     <td style="font-size:12px;color:var(--muted)">${cleanItems(o.items)}</td>
     <td style="font-weight:700">${fmt(o.total||0)}</td>
     <td style="font-size:12px;color:var(--muted)">${o.time}</td>
-    <td><span class="tag ${o.status==='Đã thanh toán'?'t-paid':o.status==='Chờ thanh toán'?'t-pending':'t-done'}">${o.status}</span></td>
+    <td><span class="tag ${isOrderPaid(o)?'t-paid':o.status==='Chờ thanh toán'?'t-pending':'t-done'}">${o.status}</span></td>
     <td class="btn-group" style="gap:4px">
       <button class="btn btn-ghost btn-sm" onclick="showOrderDetail('${o.id}')">👁</button>
       ${o.status==='Chờ thanh toán'?`<button class="btn btn-green btn-sm" onclick="collectPending('${o.id}')">💰 Thu tiền</button>`:''}
@@ -9343,11 +9343,11 @@ function tgReport(type){
   let msg='';
   if(type==='test') msg=`🤖 *Test OK!*\n\n*Trương Dáng Hương Academy*\n🔥 Supabase sync: hoạt động\n🕐 ${nowDT()}\n✅ Hệ thống bình thường`;
   else if(type==='daily'){
-    const paid=D.orders.filter(o=>o.status==='Đã thanh toán');
+    const paid=D.orders.filter(isOrderPaid);
     const rev=paid.reduce((a,o)=>a+(o.total||0),0);
     msg=`📈 *BÁO CÁO NGÀY ${todayStr()}*\n━━━━━━━━━\n💰 Doanh thu: ${fmt(rev)}\n✅ Đơn đã thu: ${paid.length}\n⏳ Đơn chờ: ${D.orders.length-paid.length}\n🎓 HV đang học: ${D.students.filter(s=>s.status==='Đang học').length}\n━━━━━━━━━\n📦 Kho:\n${D.inventory.map(i=>`${i.qty<=i.min?'⚠️':i.qty<=i.min*1.5?'🟡':'✅'} ${i.name}: ${i.qty} ${i.unit}`).join('\n')}\n━━━━━━━━━\n_Trương Dáng Hương Academy_`;
   }else if(type==='orders'){
-    const list=D.orders.slice(-8).reverse().map(o=>`${o.status==='Đã thanh toán'?'✅':'⏳'} \`${o.id}\` ${o.customer} — ${fmt(o.total||0)}`).join('\n');
+    const list=D.orders.slice(-8).reverse().map(o=>`${isOrderPaid(o)?'✅':'⏳'} \`${o.id}\` ${o.customer} — ${fmt(o.total||0)}`).join('\n');
     msg=`📋 *ĐƠN HÀNG GẦN NHẤT*\n━━━━━━━━━\n${list||'(chưa có)'}\n━━━━━━━━━\nTổng: ${D.orders.length}\n_Trương Dáng Hương Academy_`;
   }else if(type==='inventory'){
     msg=`📦 *KHO HÀNG*\n━━━━━━━━━\n${D.inventory.map(i=>`${i.qty<=i.min?'⚠️':i.qty<=i.min*1.5?'🟡':'✅'} *${i.name}*: ${i.qty} ${i.unit} (min: ${i.min})`).join('\n')}\n━━━━━━━━━\n🕐 ${nowDT()}\n_Trương Dáng Hương Academy_`;
@@ -9362,7 +9362,7 @@ function tgReport(type){
     }).join('\n');
     msg=`🎓 *HỌC VIÊN ĐANG HỌC* (${a.length})\n━━━━━━━━━\n${lines||'(chưa có)'}\n━━━━━━━━━\n💳 Chưa thu tiền: ${unpaid.length} người\n🕐 ${nowDT()}\n_Trương Dáng Hương Academy_`;
   }else if(type==='revenue'){
-    const paid=D.orders.filter(o=>o.status==='Đã thanh toán');
+    const paid=D.orders.filter(isOrderPaid);
     msg=`💰 *DOANH THU*\n━━━━━━━━━\n📦 Đã thu: ${fmt(paid.reduce((a,o)=>a+(o.total||0),0))}\n🎓 Học phí (tổng): ${fmt(D.students.reduce((a,s)=>a+(s.fee||0),0))}\n📊 ${D.orders.length} đơn (${paid.length} đã TT)\n━━━━━━━━━\n_Trương Dáng Hương Academy_`;
   }
   if(msg)tgMsg(msg);
@@ -9420,7 +9420,7 @@ function xlExport(type){
     XLSX.utils.book_append_sheet(wb,ws,'Lịch sử kho');
   }
   if(type==='full'){
-    const paid=D.orders.filter(o=>o.status==='Đã thanh toán');
+    const paid=D.orders.filter(isOrderPaid);
     const ws=XLSX.utils.aoa_to_sheet([['TRƯƠNG DÁNG HƯƠNG ACADEMY'],['Ngày xuất',todayStr()],[''],
       ['Chỉ số','Giá trị'],
       ['Doanh thu đã thu',paid.reduce((a,o)=>a+(o.total||0),0)],
@@ -9471,7 +9471,7 @@ function sendDailyReport(){
   const pending=D.orders.filter(o=>!(o.id||'').startsWith('HP')&&odIsPendingPayment(o));
   const low=D.inventory.filter(i=>i.qty<=i.min);
   const today=todayStr();
-  const todayOrders=D.orders.filter(o=>o.status==='Đã thanh toán'&&!(o.id||'').startsWith('HP')&&(o.time||'').includes(today));
+  const todayOrders=D.orders.filter(o=>isOrderPaid(o)&&!(o.id||'').startsWith('HP')&&(o.time||'').includes(today));
   const todayRev=todayOrders.reduce((a,o)=>a+(o.total||0),0);
 
     // Học viên học ngày mai
@@ -9697,7 +9697,7 @@ function buildAutoTxs(filterMonth){
   const autoTxs=[];
 
   // Thu từ bán lẻ (đã thanh toán, không phải HP)
-  D.orders.filter(o=>o.status==='Đã thanh toán'&&!(o.id||'').startsWith('HP')).forEach(o=>{
+  D.orders.filter(o=>isOrderPaid(o)&&!(o.id||'').startsWith('HP')).forEach(o=>{
     const m=getMonthKey(o.time);
     if(filterMonth&&m!==filterMonth) return;
     autoTxs.push({
@@ -9708,7 +9708,7 @@ function buildAutoTxs(filterMonth){
   });
 
   // Thu học phí (đơn HP đã thanh toán)
-  D.orders.filter(o=>o.status==='Đã thanh toán'&&(o.id||'').startsWith('HP')).forEach(o=>{
+  D.orders.filter(o=>isOrderPaid(o)&&(o.id||'').startsWith('HP')).forEach(o=>{
     const m=getMonthKey(o.time);
     if(filterMonth&&m!==filterMonth) return;
     autoTxs.push({
@@ -13669,6 +13669,19 @@ function odIsPendingPayment(o) {
   return status === 'Chờ xác nhận' || status === 'Đã xác nhận';
 }
 
+// ★ FIX: hàm CHUẨN DUY NHẤT để tính "đơn này đã thu tiền/tính vào doanh thu hay chưa"
+// — dùng thay cho kiểu check cũ "o.status==='Đã thanh toán'" ở khắp nơi trong app.
+// Lỗi cũ: đơn THANH TOÁN TRƯỚC sau khi qua bước "Đã thanh toán" sẽ tiến tiếp status
+// (Đang chuẩn bị/Đã book ship/Đang giao/Đã giao...) — lúc đó status KHÔNG còn đúng
+// bằng "Đã thanh toán" nữa dù tiền đã thu rồi, khiến các phép tính doanh thu/LTV/báo
+// cáo... bị HỤT MẤT các đơn này. Đơn học phí ("HP...") không đi qua luồng ship nên
+// vẫn giữ nguyên cách check cũ (chỉ có đúng 1 trạng thái "Đã thanh toán").
+function isOrderPaid(o) {
+  if (!o) return false;
+  if (String(o.id||'').startsWith('HP')) return o.status === 'Đã thanh toán';
+  return !odIsPendingPayment(o) && o.status !== 'Đã hủy';
+}
+
 function odGetFlowKeysForPayment(payment) {
   if (odNormalizePayment(payment) === 'COD') {
     return ['Chờ xác nhận','Đã xác nhận','Đang chuẩn bị','Đã book ship','Đang giao','Đã giao','Chờ thu tiền','Đã thanh toán'];
@@ -14761,12 +14774,12 @@ function gsBaoCaoData() {
   };
 
   // Doanh thu Academy
-  D.orders.filter(o=>(o.id||'').startsWith('HP')&&o.status==='Đã thanh toán').forEach(o=>{
+  D.orders.filter(o=>isOrderPaid(o)&&(o.id||'').startsWith('HP')).forEach(o=>{
     const mo=getMonth(o.time); if(!mo) return;
     ensure(mo); monthMap[mo].acaThu += (o.total||0);
   });
   // Doanh thu Retail
-  D.orders.filter(o=>!(o.id||'').startsWith('HP')&&o.status==='Đã thanh toán').forEach(o=>{
+  D.orders.filter(o=>isOrderPaid(o)&&!(o.id||'').startsWith('HP')).forEach(o=>{
     const mo=getMonth(o.time); if(!mo) return;
     ensure(mo); monthMap[mo].retThu += (o.total||0);
   });
@@ -15229,8 +15242,8 @@ function renderIncomeStatement() {
   };
 
   // ── DOANH THU ──
-  const acaOrders = D.orders.filter(o => (o.id||'').startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
-  const retOrders = D.orders.filter(o => !(o.id||'').startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
+  const acaOrders = D.orders.filter(o => (o.id||'').startsWith('HP') && isOrderPaid(o) && matchMonth(o.time));
+  const retOrders = D.orders.filter(o => !(o.id||'').startsWith('HP') && isOrderPaid(o) && matchMonth(o.time));
   const acaThu = acaOrders.reduce((s,o) => s+(o.total||0), 0);
   const retThu = retOrders.reduce((s,o) => s+(o.total||0), 0);
   const totalThu = acaThu + retThu;
@@ -15444,7 +15457,7 @@ function isDrawTrendChart() {
   }
 
   const dataPoints = months.map(mo => {
-    const thu = D.orders.filter(o=>o.status==='Đã thanh toán'&&getMonthKey(o.time)===mo).reduce((s,o)=>s+(o.total||0),0);
+    const thu = D.orders.filter(o=>isOrderPaid(o)&&getMonthKey(o.time)===mo).reduce((s,o)=>s+(o.total||0),0);
     const chi = (D.transactions||[]).filter(t=>t.type==='chi'&&getMonthKey(t.time)===mo).reduce((s,t)=>s+(t.amount||0),0);
     return { mo, thu, chi, profit: thu-chi };
   });
@@ -15932,8 +15945,8 @@ function exportISPDF() {
   const matchMonth = (t) => !filterMonth || getMonthKey(t) === filterMonth;
 
   // Gather data
-  const acaOrders = D.orders.filter(o => (o.id||'').startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
-  const retOrders = D.orders.filter(o => !(o.id||'').startsWith('HP') && o.status==='Đã thanh toán' && matchMonth(o.time));
+  const acaOrders = D.orders.filter(o => (o.id||'').startsWith('HP') && isOrderPaid(o) && matchMonth(o.time));
+  const retOrders = D.orders.filter(o => !(o.id||'').startsWith('HP') && isOrderPaid(o) && matchMonth(o.time));
   const acaThu = acaOrders.reduce((s,o)=>s+(o.total||0),0);
   const retThu = retOrders.reduce((s,o)=>s+(o.total||0),0);
   const totalThu = acaThu + retThu;
@@ -16282,7 +16295,7 @@ function renderSaleBO() {
   const thisMonth = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
 
   // Tính doanh số
-  const paidOrders = myOrders.filter(o => o.status === 'Đã thanh toán');
+  const paidOrders = myOrders.filter(isOrderPaid);
   const monthOrders = paidOrders.filter(o => getMonthKey(o.time) === thisMonth);
   const totalRev = paidOrders.reduce((s,o)=>s+(o.total||0),0);
   const monthRev = monthOrders.reduce((s,o)=>s+(o.total||0),0);
@@ -16343,7 +16356,7 @@ function renderSaleBO() {
           </tr></thead>
           <tbody>
             ${myOrders.slice(0,20).map(o=>{
-              const stColor = o.status==='Đã thanh toán'?'var(--green)':o.status==='Đã hủy'?'var(--red)':'var(--orange)';
+              const stColor = isOrderPaid(o)?'var(--green)':o.status==='Đã hủy'?'var(--red)':'var(--orange)';
               return `<tr style="border-bottom:1px solid var(--border);cursor:pointer" onclick="showOrderDetail('${o.id}')">
                 <td style="padding:8px 12px;font-size:12px;font-weight:700;color:var(--brand)">${o.id}</td>
                 <td style="padding:8px 12px;font-size:12px">${o.customer||'—'}</td>
@@ -16586,7 +16599,7 @@ function crmShowCustomer(id) {
   const c = (D.customers||[]).find(x=>x.id===id||x.phone===id);
   if(!c) return;
   const myOrders = (D.orders||[]).filter(o=>o.phone===c.phone||o.customer===c.name);
-  const totalSpent = myOrders.filter(o=>o.status==='Đã thanh toán').reduce((s,o)=>s+(o.total||0),0);
+  const totalSpent = myOrders.filter(isOrderPaid).reduce((s,o)=>s+(o.total||0),0);
   notify(`👤 ${c.name} | 📦 ${myOrders.length} đơn | 💰 ${fmt(totalSpent)}`);
 }
 
@@ -16644,7 +16657,7 @@ function renderCRMSegments(customers, orders, inactive, needCare, vips) {
     return Date.now()-t < 30*24*60*60*1000;
   });
   const highValue = customers.filter(c => {
-    const spent = orders.filter(o=>(o.phone===c.phone||o.customer===c.name)&&o.status==='Đã thanh toán').reduce((s,o)=>s+(o.total||0),0);
+    const spent = orders.filter(o=>(o.phone===c.phone||o.customer===c.name)&&isOrderPaid(o)).reduce((s,o)=>s+(o.total||0),0);
     return spent >= 1000000;
   });
 
@@ -16719,7 +16732,7 @@ function renderCRMHistory() {
       <div>
         <div style="font-size:13px;font-weight:700">${o.customer||'Khách lẻ'} — ${fmt(o.total||0)}</div>
         <div style="font-size:11px;color:var(--muted)">${o.items||''} · ${o.time||''}</div>
-        <div style="font-size:11px;color:${o.status==='Đã thanh toán'?'var(--green)':'var(--orange)'};font-weight:700">${o.status}</div>
+        <div style="font-size:11px;color:${isOrderPaid(o)?'var(--green)':'var(--orange)'};font-weight:700">${o.status}</div>
       </div>
     </div>`).join('');
 }
@@ -17996,7 +18009,7 @@ function renderAccounting() {
   const orders=D.orders||[];
   const thu=txs.filter(t=>t.type==='thu').reduce((s,t)=>s+(t.amount||0),0);
   const chi=txs.filter(t=>t.type==='chi').reduce((s,t)=>s+(t.amount||0),0);
-  const revenue=orders.filter(o=>o.status==='Đã thanh toán').reduce((s,o)=>s+(o.total||0),0);
+  const revenue=orders.filter(isOrderPaid).reduce((s,o)=>s+(o.total||0),0);
 
   const se=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
   se('acc-total-assets', fmt(revenue+thu));
@@ -18118,7 +18131,7 @@ function accRenderLedger() {
 function accAutoJournal() {
   // Tự tạo bút toán từ orders và transactions
   const auto=[];
-  (D.orders||[]).filter(o=>o.status==='Đã thanh toán').forEach(o=>{
+  (D.orders||[]).filter(isOrderPaid).forEach(o=>{
     auto.push({id:'auto_'+o.id,date:o.time?.split(' ')[0]||'',ref:o.id,desc:'Doanh thu: '+o.customer,
       entries:[{debit_acc:'112',credit_acc:'511',debit:o.total||0,credit:o.total||0}]});
   });
@@ -18212,7 +18225,7 @@ function accRenderBalance() {
 function accRenderPnL() {
   try {
   const el=document.getElementById('acc-pnl-content'); if(!el) return;
-  const orders=D.orders?.filter(o=>o.status==='Đã thanh toán')||[];
+  const orders=D.orders?.filter(isOrderPaid)||[];
   const txs=D.transactions||[];
   const aca=orders.filter(o=>(o.id||'').startsWith('HP')).reduce((s,o)=>s+(o.total||0),0);
   const ret=orders.filter(o=>!(o.id||'').startsWith('HP')).reduce((s,o)=>s+(o.total||0),0);
@@ -18253,7 +18266,7 @@ function accRenderPnL() {
 function accRenderVAT() {
   try {
   const el=document.getElementById('acc-vat-content'); if(!el) return;
-  const orders=D.orders?.filter(o=>o.status==='Đã thanh toán')||[];
+  const orders=D.orders?.filter(isOrderPaid)||[];
   const txs=D.transactions?.filter(t=>t.type==='chi')||[];
   const totalRev=orders.reduce((s,o)=>s+(o.total||0),0);
   const totalChi=txs.reduce((s,t)=>s+(t.amount||0),0);
@@ -18377,7 +18390,7 @@ function renderCODReconcile() {
   );
 
   const pending = codOrders.filter(o => ['Chờ thu tiền','Đang giao','Shipper đang giữ tiền'].includes(o.status));
-  const collected = codOrders.filter(o => o.status === 'Đã thanh toán');
+  const collected = codOrders.filter(isOrderPaid);
   const totalPending = pending.reduce((s,o)=>s+(o.total||0),0);
   const totalCollected = collected.reduce((s,o)=>s+(o.total||0),0);
   const shipFeeTotal = codOrders.reduce((s,o)=>s+(o.ship_fee||0),0);
@@ -19742,7 +19755,7 @@ async function codMarkShipperHolding(orderId) {
 function renderSalePerformance() {
   const el = document.getElementById('sale-performance');
   if(!el) return;
-  const orders = (D.orders||[]).filter(o=>o.status==='Đã thanh toán'&&o.sale_name);
+  const orders = (D.orders||[]).filter(o=>isOrderPaid(o)&&o.sale_name);
   const now = new Date();
   const thisMonth = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0');
   const monthOrders = orders.filter(o=>getMonthKey(o.time)===thisMonth);
@@ -19819,7 +19832,7 @@ function renderCEODashboard() {
   const inv = D.inventory||[];
 
   // Revenue this month vs last month
-  const paidOrders = o => o.status==='Đã thanh toán';
+  const paidOrders = isOrderPaid;
   const monthRev = (mk) => orders.filter(o=>paidOrders(o)&&getMonthKey(o.time)===mk).reduce((s,o)=>s+(o.total||0),0);
   const thisRev = monthRev(thisMonth);
   const lastRev = monthRev(lastMonthKey);
@@ -20196,7 +20209,7 @@ function sendWeeklyFlash() {
   const orders = D.orders||[];
   const now = Date.now();
   const weekAgo = now - 7*24*60*60*1000;
-  const weekOrders = orders.filter(o=>o.status==='Đã thanh toán'&&(o.created_at||0)>weekAgo);
+  const weekOrders = orders.filter(o=>isOrderPaid(o)&&(o.created_at||0)>weekAgo);
   const weekRev = weekOrders.reduce((s,o)=>s+(o.total||0),0);
   const activeStudents = (D.students||[]).filter(s=>s.status==='Đang học').length;
   const inv = D.inventory||[];
