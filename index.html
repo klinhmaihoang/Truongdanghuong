@@ -2722,16 +2722,28 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div id="od-view">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">
         <div>
-          <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Khách hàng</div>
-          <div style="font-weight:700;font-size:14px" id="od-customer"></div>
-          <div style="font-size:12px;color:var(--muted)" id="od-phone-view"></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+            <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase">Khách hàng</div>
+            <button onclick="copyOrderCustomerInfo()" class="btn btn-ghost btn-sm" style="padding:2px 8px;font-size:10px" title="Copy tên + SĐT + địa chỉ để dán vào app vận chuyển">📋 Copy tất cả</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px">
+            <div style="font-weight:700;font-size:14px" id="od-customer"></div>
+            <button onclick="copyText(document.getElementById('od-customer').textContent,'Tên khách')" class="btn btn-ghost btn-sm" style="padding:1px 5px;font-size:10px" title="Copy tên khách">📋</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:5px">
+            <div style="font-size:12px;color:var(--muted)" id="od-phone-view"></div>
+            <button id="od-phone-copy-btn" onclick="copyText(document.getElementById('od-phone-view').textContent,'SĐT')" class="btn btn-ghost btn-sm" style="padding:1px 5px;font-size:10px;display:none" title="Copy SĐT">📋</button>
+          </div>
         </div>
         <div>
           <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">Thanh toán / Giao hàng</div>
           <div style="font-size:12px" id="od-payment-view"></div>
           <div style="font-size:12px;margin-top:3px" id="od-payment-method-view"></div>
           <div id="od-tracking-code-view" style="display:none;margin-top:5px"></div>
-          <div style="font-size:12px;color:var(--muted)" id="od-address-view"></div>
+          <div style="display:flex;align-items:center;gap:5px">
+            <div style="font-size:12px;color:var(--muted)" id="od-address-view"></div>
+            <button id="od-address-copy-btn" onclick="copyText(document.getElementById('od-address-view').textContent,'Địa chỉ')" class="btn btn-ghost btn-sm" style="padding:1px 5px;font-size:10px;display:none" title="Copy địa chỉ">📋</button>
+          </div>
         </div>
       </div>
       <!-- Sản phẩm -->
@@ -4735,7 +4747,10 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       <div style="display:flex;align-items:center;gap:12px">
         <div id="cd-avatar" style="width:52px;height:52px;border-radius:50%;background:var(--brand);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0"></div>
         <div>
-          <div style="font-size:18px;font-weight:800;color:var(--brown)" id="cd-name"></div>
+          <div style="display:flex;align-items:center;gap:6px">
+            <div style="font-size:18px;font-weight:800;color:var(--brown)" id="cd-name"></div>
+            <button onclick="copyCustomerDetailInfo()" class="btn btn-ghost btn-sm" style="padding:1px 6px;font-size:10px" title="Copy tên + SĐT + địa chỉ để dán vào app vận chuyển">📋 Copy</button>
+          </div>
           <div style="font-size:12px;color:var(--muted)" id="cd-sub"></div>
           <div style="margin-top:4px" id="cd-tags"></div>
         </div>
@@ -13381,6 +13396,8 @@ function showOrderDetail(id) {
   const phoneEl = document.getElementById('od-phone-view');
   phoneEl.textContent = o.phone||'';
   phoneEl.style.display = o.phone?'':'none';
+  const phoneCopyBtn = document.getElementById('od-phone-copy-btn');
+  if(phoneCopyBtn) phoneCopyBtn.style.display = o.phone?'':'none';
   // Payment / shipping
   const payEl = document.getElementById('od-payment-view');
   const payMethodEl = document.getElementById('od-payment-method-view');
@@ -13407,6 +13424,8 @@ function showOrderDetail(id) {
   const addrEl = document.getElementById('od-address-view');
   addrEl.textContent = o.address||'';
   addrEl.style.display = o.address?'':'none';
+  const addrCopyBtn = document.getElementById('od-address-copy-btn');
+  if(addrCopyBtn) addrCopyBtn.style.display = o.address?'':'none';
   // Items — parse "Sản phẩm x3, Sản phẩm2" into tags
   const itemsEl = document.getElementById('od-items-view');
   // items có thể là Array (từ GAS) hoặc string (format cũ)
@@ -16436,6 +16455,47 @@ function getPageSizeCss_(size){
   if(size==='A4') return {pageCss:'@page{size:A4;margin:14mm}', bodyWidth:'190mm', fontScale:1.25};
   if(size==='A5') return {pageCss:'@page{size:A5;margin:8mm}', bodyWidth:'129mm', fontScale:1.1};
   return {pageCss:"@page{size:80mm auto;margin:0}", bodyWidth:'80mm', fontScale:1};
+}
+
+// ══════════════════════════════════════════════════
+// ★ COPY THÔNG TIN KHÁCH — tiện dán vào app đơn vị vận chuyển (Grab/GHN/GHTK...)
+// đỡ phải gõ tay lại, tránh sai sót.
+// ══════════════════════════════════════════════════
+async function copyText(text, label){
+  text = (text||'').trim();
+  if(!text){notify('Không có gì để copy!',false);return;}
+  try{
+    if(navigator.clipboard && window.isSecureContext){
+      await navigator.clipboard.writeText(text);
+    } else {
+      // Fallback cho trình duyệt cũ / không phải HTTPS
+      const ta=document.createElement('textarea');
+      ta.value=text; ta.style.position='fixed'; ta.style.left='-9999px';
+      document.body.appendChild(ta); ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+    }
+    notify(`✅ Đã copy ${label||'thông tin'}`);
+  }catch(e){
+    notify('Không copy được: '+e.message, false);
+  }
+}
+
+function copyCustomerDetailInfo(){
+  const c = D.customers.find(x=>x.id===selectedCustomerId);
+  if(!c){notify('Không tìm thấy khách hàng!',false);return;}
+  const lines = [c.name, normPhone(c.phone), c.address].filter(Boolean);
+  if(!lines.length){notify('Không có thông tin để copy!',false);return;}
+  copyText(lines.join('\n'), 'thông tin khách hàng');
+}
+
+function copyOrderCustomerInfo(){
+  const name = document.getElementById('od-customer')?.textContent||'';
+  const phone = document.getElementById('od-phone-view')?.textContent||'';
+  const address = document.getElementById('od-address-view')?.textContent||'';
+  const lines = [name, phone, address].filter(v=>v && v!=='—');
+  if(!lines.length){notify('Không có thông tin để copy!',false);return;}
+  copyText(lines.join('\n'), 'thông tin khách hàng');
 }
 
 function normPhone(v){
