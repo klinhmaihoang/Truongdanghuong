@@ -10136,7 +10136,7 @@ function buildRetailInvoiceHTML_(order, opts){
   </div>
   <div class="title">HÓA ĐƠN BÁN HÀNG</div>
   <div class="row"><span class="label">Mã đơn:</span><span class="value">${order.id}</span></div>
-  <div class="row"><span class="label">Khách hàng:</span><span class="value">${order.customer||'Khách lẻ'}${order.phone?' — '+order.phone:''}</span></div>
+  <div class="row"><span class="label">Khách hàng:</span><span class="value">${order.customer||'Khách lẻ'}${order.phone?' — '+normPhone(order.phone):''}</span></div>
   <div class="row"><span class="label">Thời gian:</span><span class="value">${order.time||nowDT()}</span></div>
   <hr class="divider"/>
   <div class="items">
@@ -10174,7 +10174,7 @@ function buildRetailInvoiceHTML_(order, opts){
   ${order.payment?`<div class="row" style="font-size:${11*fs}px"><span class="label">Thanh toán:</span><span class="value">${order.payment}</span></div>`:''}
   ${order.ship_fee>0?`<div class="row" style="font-size:${11*fs}px"><span class="label">Phí ship:</span><span class="value" style="color:#1abc9c;font-weight:600">+${fmt(order.ship_fee)}</span></div>`:''}
   ${order.shipping&&order.shipping!=='Khách tới lấy'?`<div class="row" style="font-size:${11*fs}px"><span class="label">Giao hàng:</span><span class="value">${order.shipping}</span></div>`:''}
-  ${order.phone?`<div class="row" style="font-size:${11*fs}px"><span class="label">SĐT:</span><span class="value">${order.phone}</span></div>`:''}
+  ${order.phone?`<div class="row" style="font-size:${11*fs}px"><span class="label">SĐT:</span><span class="value">${normPhone(order.phone)}</span></div>`:''}
   ${(ps.showAddress&&order.address)?`<div class="row" style="font-size:${11*fs}px"><span class="label">Địa chỉ:</span><span class="value" style="font-size:${10*fs}px">${order.address}</span></div>`:''}
   ${(ps.showTracking&&order.tracking_code)?`<div class="row" style="font-size:${11*fs}px;background:#e8f8f5;border-radius:4px;padding:4px 6px;margin:4px 0"><span class="label">📦 Mã vận đơn:</span><span class="value" style="font-weight:700;color:#1abc9c;font-size:${12*fs}px">${order.tracking_code}</span></div>`:''}
   ${qrUrl?`<div class="qr">
@@ -11790,7 +11790,7 @@ function renderNvlOrders() {
     const sc = statusColor[o.status]||'var(--muted)';
     return `<tr>
       <td style="font-family:monospace;font-size:12px;color:var(--muted)">${o.id?.slice(-6)}</td>
-      <td><div style="font-weight:700">${o.customer}</div>${o.phone?`<div style="font-size:11px;color:var(--muted)">${o.phone}</div>`:''}</td>
+      <td><div style="font-weight:700">${o.customer}</div>${o.phone?`<div style="font-size:11px;color:var(--muted)">${normPhone(o.phone)}</div>`:''}</td>
       <td style="font-size:12px;color:var(--muted);max-width:160px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${items}</td>
       <td style="text-align:right;font-weight:700">${Math.round(o.total||0).toLocaleString('vi-VN')}₫</td>
       <td style="text-align:right;color:var(--green)">${Math.round(o.paid||0).toLocaleString('vi-VN')}₫</td>
@@ -12091,7 +12091,7 @@ function _nvlPrint(o) {
   <div class="sub">ĐƠN HÀNG NGUYÊN VẬT LIỆU</div>
   <div style="font-size:10px;margin-bottom:6px">
     <div>Mã đơn: <b>${(o.id||'').slice(-8)}</b></div>
-    <div>KH: <b>${o.customer}</b>${o.phone?' — '+o.phone:''}</div>
+    <div>KH: <b>${o.customer}</b>${o.phone?' — '+normPhone(o.phone):''}</div>
     ${o.address?`<div>Địa chỉ: ${o.address}</div>`:''}
     <div>Ngày: ${new Date().toLocaleDateString('vi-VN')}</div>
     <div>TT: <b>${o.status||'—'}</b></div>
@@ -12114,7 +12114,7 @@ function xlExportNvl() {
   const data=[['Mã đơn','Khách hàng','SĐT','Sản phẩm','Tổng tiền','Đã trả','Còn nợ','Trạng thái','Ngày']];
   D_nvl.forEach(o=>{
     const items=(o.items||[]).map(i=>i.name+' x'+i.qty+i.unit).join('; ');
-    data.push([o.id,o.customer,o.phone,items,o.total||0,o.paid||0,(o.total||0)-(o.paid||0),o.status,
+    data.push([o.id,o.customer,normPhone(o.phone),items,o.total||0,o.paid||0,(o.total||0)-(o.paid||0),o.status,
       o.created_at?new Date(o.created_at).toLocaleDateString('vi-VN'):'']);
   });
   const ws=XLSX.utils.aoa_to_sheet(data);
@@ -13394,7 +13394,7 @@ function showOrderDetail(id) {
   // Customer info
   document.getElementById('od-customer').textContent = o.customer||'—';
   const phoneEl = document.getElementById('od-phone-view');
-  phoneEl.textContent = o.phone||'';
+  phoneEl.textContent = normPhone(o.phone)||'';
   phoneEl.style.display = o.phone?'':'none';
   const phoneCopyBtn = document.getElementById('od-phone-copy-btn');
   if(phoneCopyBtn) phoneCopyBtn.style.display = o.phone?'':'none';
@@ -18688,7 +18688,7 @@ function renderCODReconcile() {
         <tbody>
           ${pending.map(o=>`<tr style="border-bottom:1px solid var(--border)">
             <td style="padding:7px 12px;font-weight:700;color:var(--brand)">${o.id}</td>
-            <td style="padding:7px">${o.customer||'—'}<br><span style="color:var(--muted);font-size:10px">${o.phone||''}</span></td>
+            <td style="padding:7px">${o.customer||'—'}<br><span style="color:var(--muted);font-size:10px">${normPhone(o.phone)||''}</span></td>
             <td style="padding:7px;text-align:right;font-weight:700;color:var(--green)">${fmt(o.total||0)}</td>
             <td style="padding:7px;text-align:right;color:var(--muted)">${fmt(o.ship_fee||0)}</td>
             <td style="padding:7px;text-align:center;font-size:10px">${o.tracking_code||'—'}</td>
@@ -19895,7 +19895,7 @@ function globalSearch(q) {
   (D.orders||[]).filter(o =>
     (o.id||'').toLowerCase().includes(q) ||
     (o.customer||'').toLowerCase().includes(q) ||
-    (o.phone||'').toLowerCase().includes(q)
+    normPhone(o.phone).toLowerCase().includes(q)
   ).slice(0,5).forEach(o => results.push({
     type:'order', icon:'🛒', label:o.id,
     sub:`${o.customer||'Khách lẻ'} · ${fmt(o.total||0)} · ${o.status}`,
