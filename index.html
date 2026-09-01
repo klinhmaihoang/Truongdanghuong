@@ -18,6 +18,7 @@
 <meta name="theme-color" content="#F0A319">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -2685,6 +2686,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
           <button class="btn btn-ghost btn-sm" onclick="odRecalcTotal()" style="font-size:11px" title="Tính lại tổng tiền từ thành tiền các dòng sản phẩm">🔄 Tính lại tổng</button>
           <button class="btn btn-green btn-sm" id="od-collect-btn" style="display:none" onclick="odCollect()">💰 Thu tiền</button>
           <button class="btn btn-pdf btn-sm" onclick="exportPDF(document.getElementById('od-id').textContent)">📄 PDF</button>
+          <button id="od-save-img-btn" class="btn btn-sm" style="background:#8e44ad;color:#fff" onclick="saveInvoiceAsImage(document.getElementById('od-id').textContent)">🖼️ Lưu ảnh</button>
         </div>
       </div>
     </div>
@@ -3309,6 +3311,17 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
 
 <!-- TELEGRAM & CÀI ĐẶT -->
 <div class="page" id="page-telegram">
+  <!-- ★ MỚI: Cài đặt mẫu in (khổ giấy + tùy chỉnh nội dung hóa đơn/phiếu thu) -->
+  <div class="card" style="margin-bottom:14px">
+    <div class="card-head">
+      <span class="card-title">🖨️ Cài đặt mẫu in (Hóa đơn / Phiếu thu)</span>
+      <button class="btn btn-sm" onclick="openPrintSettingsModal()">⚙️ Chỉnh mẫu in</button>
+    </div>
+    <div class="guide" style="margin-bottom:0">
+      Chọn khổ giấy in (nhiệt 80mm / A5 / A4) riêng cho Hóa đơn bán hàng và Phiếu thu học phí, ẩn/hiện các phần nội dung (QR chuyển khoản, mã vận đơn, địa chỉ...), và tùy chỉnh dòng chân trang. Cài đặt được lưu lại tự động cho các lần in sau.
+    </div>
+  </div>
+
   <div class="tg-box">
     <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
       <div style="width:42px;height:42px;background:#229ED9;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">✈</div>
@@ -4558,6 +4571,84 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     <div class="btn-group" style="margin-top:4px">
       <button class="btn btn-pdf btn-sm" style="flex:1" onclick="printFeeReceipt()">📄 In phiếu thu</button>
       <button class="btn btn-ghost btn-sm" style="flex:1" onclick="closeM('modal-collect-fee')">Đóng</button>
+    </div>
+  </div>
+</div>
+
+<!-- ★ MỚI: Cài đặt mẫu in (khổ giấy + tùy chỉnh nội dung) -->
+<div class="overlay" id="modal-print-settings">
+  <div class="modal wide">
+    <div class="modal-title">🖨️ Cài đặt mẫu in</div>
+    <div class="modal-sub">Áp dụng cho các lần in Hóa đơn bán hàng và Phiếu thu học phí sau này — lưu tự động trên trình duyệt này.</div>
+
+    <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:14px">
+      <div style="font-weight:700;color:var(--brown);margin-bottom:10px">🧾 Hóa đơn bán hàng</div>
+      <div class="form-row">
+        <div class="fg">
+          <label>Khổ giấy</label>
+          <select id="ps-invoice-size">
+            <option value="80mm">Máy in nhiệt 80mm (mặc định)</option>
+            <option value="A5">A5</option>
+            <option value="A4">A4</option>
+          </select>
+        </div>
+        <div class="fg"></div>
+      </div>
+    </div>
+
+    <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:14px">
+      <div style="font-weight:700;color:var(--brown);margin-bottom:10px">🎓 Phiếu thu học phí</div>
+      <div class="form-row">
+        <div class="fg">
+          <label>Khổ giấy</label>
+          <select id="ps-receipt-size">
+            <option value="80mm">Máy in nhiệt 80mm (mặc định)</option>
+            <option value="A5">A5</option>
+            <option value="A4">A4</option>
+          </select>
+        </div>
+        <div class="fg"></div>
+      </div>
+    </div>
+
+    <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:14px">
+      <div style="font-weight:700;color:var(--brown);margin-bottom:10px">👁️ Hiện / ẩn nội dung</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+          <input type="checkbox" id="ps-show-qr" checked style="width:16px;height:16px"/> Mã QR chuyển khoản
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+          <input type="checkbox" id="ps-show-address" checked style="width:16px;height:16px"/> Địa chỉ giao hàng
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+          <input type="checkbox" id="ps-show-tracking" checked style="width:16px;height:16px"/> Mã vận đơn
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:13px">
+          <input type="checkbox" id="ps-show-note" checked style="width:16px;height:16px"/> Ghi chú đơn hàng
+        </label>
+      </div>
+    </div>
+
+    <div style="background:var(--bg);border-radius:10px;padding:14px;margin-bottom:14px">
+      <div style="font-weight:700;color:var(--brown);margin-bottom:10px">✏️ Nội dung tùy chỉnh</div>
+      <div class="fg" style="margin-bottom:10px">
+        <label>Tiêu đề (tên cửa hàng)</label>
+        <input id="ps-header-title" placeholder="TRƯƠNG DÁNG HƯƠNG ACADEMY"/>
+      </div>
+      <div class="fg" style="margin-bottom:10px">
+        <label>Dòng phụ đề (SĐT/địa chỉ cửa hàng)</label>
+        <input id="ps-header-sub" placeholder="Chuyên gia F&B | ĐT: 0984830303"/>
+      </div>
+      <div class="fg" style="margin-bottom:0">
+        <label>Chân trang</label>
+        <input id="ps-footer-text" placeholder="Cảm ơn quý khách đã mua hàng!"/>
+      </div>
+    </div>
+
+    <div class="btn-group">
+      <button class="btn btn-green btn-sm" onclick="savePrintSettings()">💾 Lưu cài đặt</button>
+      <button class="btn btn-ghost btn-sm" onclick="resetPrintSettings()">↩️ Về mặc định</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-print-settings')">Đóng</button>
     </div>
   </div>
 </div>
@@ -9988,39 +10079,45 @@ function exportPDF(orderId){
   }
 }
 
-function printRetailPDF(order){
-  const student=null;
-  const qrUrl=cfg.bankAcc&&cfg.bankId
+// ★ Xây nội dung hóa đơn bán hàng — dùng CHUNG cho cả in giấy lẫn xuất ảnh, đọc
+// theo cài đặt mẫu in (khổ giấy, ẩn/hiện nội dung, tiêu đề/chân trang tùy chỉnh).
+function buildRetailInvoiceHTML_(order, opts){
+  opts = opts || {};
+  const ps = getPrintSettings();
+  const size = getPageSizeCss_(ps.invoiceSize);
+  const fs = size.fontScale;
+  const qrUrl=(ps.showQr&&cfg.bankAcc&&cfg.bankId)
     ?`https://img.vietqr.io/image/${cfg.bankId}-${cfg.bankAcc}-qr_only.png?amount=${order.total}&addInfo=${encodeURIComponent(order.id+' '+order.customer)}&accountName=${encodeURIComponent(cfg.accName||'TRUONG DANG HUONG')}`
     :'';
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
-  <title>Hóa đơn ${order.id}</title>
-  <style>
-    *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:Arial,sans-serif;font-size:11px;color:#222;width:80mm;margin:0 auto;padding:5mm 3mm}
-    .header{background:#FF8C00;color:#fff;text-align:center;padding:10px;border-radius:6px;margin-bottom:14px}
-    .header h1{font-size:13px;font-weight:bold;margin-bottom:2px}
-    .header p{font-size:10px;opacity:.9}
-    .title{text-align:center;font-size:12px;font-weight:bold;color:#FF8C00;margin-bottom:8px;letter-spacing:.5px}
-    .divider{border:none;border-top:1px solid #ddd;margin:8px 0}
-    .row{display:flex;justify-content:space-between;padding:4px 0;font-size:12px}
-    .row .label{color:#888}
-    .row .value{font-weight:500;text-align:right;max-width:60%}
-    .items{background:#f9f9f9;border-radius:6px;padding:10px;margin:10px 0}
-    .items h3{font-size:11px;font-weight:bold;margin-bottom:6px;color:#555}
-    .item{font-size:11px;padding:2px 0;color:#333}
-    .total-box{background:#fff3e0;border:1.5px solid #FF8C00;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin:12px 0}
-    .total-box .label{font-size:13px;font-weight:bold;color:#cc5500}
-    .total-box .amount{font-size:14px;font-weight:bold;color:#cc5500}
-    .qr{text-align:center;margin:14px 0;padding:10px;background:#f9f9f9;border-radius:8px}
-    .qr img{width:160px;height:160px;border-radius:6px;border:2px solid #FF8C00}
-    .qr p{font-size:10px;color:#555;margin-top:6px;font-weight:600}
-    .footer{text-align:center;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:12px}
-    @page{size:80mm auto;margin:0}@media print{body{width:80mm;padding:3mm 3mm}}
-  </style></head><body>
+  const bodyStyle = opts.forImage
+    ? `font-family:Arial,sans-serif;font-size:${11*fs}px;color:#222;width:${size.bodyWidth};margin:0;padding:5mm 3mm;background:#fff`
+    : `font-family:Arial,sans-serif;font-size:${11*fs}px;color:#222;width:${size.bodyWidth};margin:0 auto;padding:5mm 3mm`;
+  const styleBlock = `
+    *{box-sizing:border-box}
+    .tdh-inv{${bodyStyle}}
+    .tdh-inv .header{background:#FF8C00;color:#fff;text-align:center;padding:10px;border-radius:6px;margin-bottom:14px}
+    .tdh-inv .header h1{font-size:${13*fs}px;font-weight:bold;margin-bottom:2px}
+    .tdh-inv .header p{font-size:${10*fs}px;opacity:.9}
+    .tdh-inv .title{text-align:center;font-size:${12*fs}px;font-weight:bold;color:#FF8C00;margin-bottom:8px;letter-spacing:.5px}
+    .tdh-inv .divider{border:none;border-top:1px solid #ddd;margin:8px 0}
+    .tdh-inv .row{display:flex;justify-content:space-between;padding:4px 0;font-size:${12*fs}px}
+    .tdh-inv .row .label{color:#888}
+    .tdh-inv .row .value{font-weight:500;text-align:right;max-width:60%}
+    .tdh-inv .items{background:#f9f9f9;border-radius:6px;padding:10px;margin:10px 0}
+    .tdh-inv .items h3{font-size:${11*fs}px;font-weight:bold;margin-bottom:6px;color:#555}
+    .tdh-inv .total-box{background:#fff3e0;border:1.5px solid #FF8C00;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin:12px 0}
+    .tdh-inv .total-box .label{font-size:${13*fs}px;font-weight:bold;color:#cc5500}
+    .tdh-inv .total-box .amount{font-size:${14*fs}px;font-weight:bold;color:#cc5500}
+    .tdh-inv .qr{text-align:center;margin:14px 0;padding:10px;background:#f9f9f9;border-radius:8px}
+    .tdh-inv .qr img{width:${160*fs}px;height:${160*fs}px;border-radius:6px;border:2px solid #FF8C00}
+    .tdh-inv .qr p{font-size:${10*fs}px;color:#555;margin-top:6px;font-weight:600}
+    .tdh-inv .footer{text-align:center;font-size:${9*fs}px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:12px}
+    ${size.pageCss}@media print{.tdh-inv{width:${size.bodyWidth};padding:3mm 3mm}}
+  `;
+  const bodyHtml = `<div class="tdh-inv">
   <div class="header">
-    <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
-    <p>Chuyên gia F&B | ĐT: ${cfg.accPhone||'0984830303'}</p>
+    <h1>${ps.headerTitle}</h1>
+    <p>${ps.headerSub}</p>
   </div>
   <div class="title">HÓA ĐƠN BÁN HÀNG</div>
   <div class="row"><span class="label">Mã đơn:</span><span class="value">${order.id}</span></div>
@@ -10030,7 +10127,7 @@ function printRetailPDF(order){
   <div class="items">
     <h3>SẢN PHẨM</h3>
     <table style="width:100%;border-collapse:collapse">
-      <tr style="border-bottom:1px solid #eee;font-size:10px;color:#888">
+      <tr style="border-bottom:1px solid #eee;font-size:${10*fs}px;color:#888">
         <td style="padding:3px 0">Tên sản phẩm</td>
         <td style="text-align:center;padding:3px 4px">SL</td>
         <td style="text-align:right;padding:3px 0">Đơn giá</td>
@@ -10042,13 +10139,13 @@ function printRetailPDF(order){
           const {name, qty, unit, lineTotal, unitPrice} = parseItemStr(s);
           const displayQty = Number.isInteger(qty) ? qty : +qty.toFixed(2);
           return `<tr style="border-bottom:1px dashed #f0f0f0">
-            <td style="padding:5px 0;font-size:11px">
+            <td style="padding:5px 0;font-size:${11*fs}px">
               <div style="font-weight:600">${name}</div>
-              ${unit?`<div style="font-size:9px;color:#999">${unit}</div>`:''}
+              ${unit?`<div style="font-size:${9*fs}px;color:#999">${unit}</div>`:''}
             </td>
-            <td style="text-align:center;padding:5px 4px;font-size:11px;color:#555;white-space:nowrap">x${displayQty}</td>
-            <td style="text-align:right;padding:5px 0;font-size:11px;color:#888;white-space:nowrap">${unitPrice>0?fmt(unitPrice):''}</td>
-            <td style="text-align:right;padding:5px 0;font-size:11px;font-weight:700;color:#cc5500;white-space:nowrap">${lineTotal>0?fmt(lineTotal):''}</td>
+            <td style="text-align:center;padding:5px 4px;font-size:${11*fs}px;color:#555;white-space:nowrap">x${displayQty}</td>
+            <td style="text-align:right;padding:5px 0;font-size:${11*fs}px;color:#888;white-space:nowrap">${unitPrice>0?fmt(unitPrice):''}</td>
+            <td style="text-align:right;padding:5px 0;font-size:${11*fs}px;font-weight:700;color:#cc5500;white-space:nowrap">${lineTotal>0?fmt(lineTotal):''}</td>
           </tr>`;
         }).join('');
       })()}
@@ -10058,25 +10155,67 @@ function printRetailPDF(order){
     <span class="label">TỔNG CỘNG:</span>
     <span class="amount">${fmt(order.total||0)}</span>
   </div>
-  ${order.discount>0?`<div class="row" style="font-size:11px"><span class="label">Tạm tính:</span><span class="value">${fmt(order.subtotal||order.total)}</span></div><div class="row" style="font-size:11px;color:#e74c3c"><span class="label">Giảm giá (${order.discount}%):</span><span class="value">-${fmt(Math.round((order.subtotal||order.total)*order.discount/100))}</span></div>`:''}
-  ${order.payment?`<div class="row" style="font-size:11px"><span class="label">Thanh toán:</span><span class="value">${order.payment}</span></div>`:''}
-  ${order.ship_fee>0?`<div class="row" style="font-size:11px"><span class="label">Phí ship:</span><span class="value" style="color:#1abc9c;font-weight:600">+${fmt(order.ship_fee)}</span></div>`:''}
-  ${order.shipping&&order.shipping!=='Khách tới lấy'?`<div class="row" style="font-size:11px"><span class="label">Giao hàng:</span><span class="value">${order.shipping}</span></div>`:''}
-  ${order.phone?`<div class="row" style="font-size:11px"><span class="label">SĐT:</span><span class="value">${order.phone}</span></div>`:''}
-  ${order.address?`<div class="row" style="font-size:11px"><span class="label">Địa chỉ:</span><span class="value" style="font-size:10px">${order.address}</span></div>`:''}
-  ${order.tracking_code?`<div class="row" style="font-size:11px;background:#e8f8f5;border-radius:4px;padding:4px 6px;margin:4px 0"><span class="label">📦 Mã vận đơn:</span><span class="value" style="font-weight:700;color:#1abc9c;font-size:12px">${order.tracking_code}</span></div>`:''}
+  ${order.discount>0?`<div class="row" style="font-size:${11*fs}px"><span class="label">Tạm tính:</span><span class="value">${fmt(order.subtotal||order.total)}</span></div><div class="row" style="font-size:${11*fs}px;color:#e74c3c"><span class="label">Giảm giá (${order.discount}%):</span><span class="value">-${fmt(Math.round((order.subtotal||order.total)*order.discount/100))}</span></div>`:''}
+  ${order.payment?`<div class="row" style="font-size:${11*fs}px"><span class="label">Thanh toán:</span><span class="value">${order.payment}</span></div>`:''}
+  ${order.ship_fee>0?`<div class="row" style="font-size:${11*fs}px"><span class="label">Phí ship:</span><span class="value" style="color:#1abc9c;font-weight:600">+${fmt(order.ship_fee)}</span></div>`:''}
+  ${order.shipping&&order.shipping!=='Khách tới lấy'?`<div class="row" style="font-size:${11*fs}px"><span class="label">Giao hàng:</span><span class="value">${order.shipping}</span></div>`:''}
+  ${order.phone?`<div class="row" style="font-size:${11*fs}px"><span class="label">SĐT:</span><span class="value">${order.phone}</span></div>`:''}
+  ${(ps.showAddress&&order.address)?`<div class="row" style="font-size:${11*fs}px"><span class="label">Địa chỉ:</span><span class="value" style="font-size:${10*fs}px">${order.address}</span></div>`:''}
+  ${(ps.showTracking&&order.tracking_code)?`<div class="row" style="font-size:${11*fs}px;background:#e8f8f5;border-radius:4px;padding:4px 6px;margin:4px 0"><span class="label">📦 Mã vận đơn:</span><span class="value" style="font-weight:700;color:#1abc9c;font-size:${12*fs}px">${order.tracking_code}</span></div>`:''}
   ${qrUrl?`<div class="qr">
-    <div style="font-size:10px;color:#888;margin-bottom:6px">Quét mã QR để chuyển khoản</div>
-    <img src="${qrUrl}" onerror="this.style.display='none'" style="width:160px;height:160px"/>
-    <div style="margin-top:8px;font-size:11px;font-weight:700;color:#cc5500">${fmt(order.total||0)}</div>
-    ${cfg.bankId&&cfg.bankAcc?`<div style="font-size:10px;color:#555;margin-top:3px">${cfg.bankId.toUpperCase()} — ${cfg.bankAcc}</div>`:''}
-    ${cfg.accName?`<div style="font-size:10px;color:#888">${cfg.accName}</div>`:''}
-    <div style="font-size:10px;color:#888;margin-top:2px">Nội dung: ${order.id} ${order.customer||''}</div>
+    <div style="font-size:${10*fs}px;color:#888;margin-bottom:6px">Quét mã QR để chuyển khoản</div>
+    <img src="${qrUrl}" crossorigin="anonymous" onerror="this.style.display='none'" style="width:${160*fs}px;height:${160*fs}px"/>
+    <div style="margin-top:8px;font-size:${11*fs}px;font-weight:700;color:#cc5500">${fmt(order.total||0)}</div>
+    ${cfg.bankId&&cfg.bankAcc?`<div style="font-size:${10*fs}px;color:#555;margin-top:3px">${cfg.bankId.toUpperCase()} — ${cfg.bankAcc}</div>`:''}
+    ${cfg.accName?`<div style="font-size:${10*fs}px;color:#888">${cfg.accName}</div>`:''}
+    <div style="font-size:${10*fs}px;color:#888;margin-top:2px">Nội dung: ${order.id} ${order.customer||''}</div>
   </div>`:''}
-  ${order.note?`<div class="row"><span class="label">Ghi chú:</span><span class="value">${order.note}</span></div>`:''}
-  <div class="footer">Trương Dáng Hương Academy — Phiếu xuất tự động từ hệ thống</div>
-  </body></html>`;
+  ${(ps.showNote&&order.note)?`<div class="row"><span class="label">Ghi chú:</span><span class="value">${order.note}</span></div>`:''}
+  <div class="footer">${ps.footerText || 'Trương Dáng Hương Academy — Phiếu xuất tự động từ hệ thống'}</div>
+  </div>`;
+  return {styleBlock, bodyHtml};
+}
+
+function printRetailPDF(order){
+  const {styleBlock, bodyHtml} = buildRetailInvoiceHTML_(order, {forImage:false});
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
+  <title>Hóa đơn ${order.id}</title>
+  <style>*{margin:0;padding:0}${styleBlock}</style></head><body>${bodyHtml}</body></html>`;
   openPrintWindow(html, 'HoaDon_'+order.id);
+}
+
+// ★ MỚI: xuất hóa đơn bán hàng ra file ẢNH (PNG) — tiện gửi cho khách online xác
+// nhận thanh toán, không chỉ PDF/in giấy như trước.
+async function saveInvoiceAsImage(orderId){
+  const order = D.orders.find(o=>o.id===orderId);
+  if(!order){notify('Không tìm thấy đơn hàng!',false);return;}
+  if(String(order.id||'').startsWith('HP')){notify('Đơn học phí dùng nút "In phiếu thu" nhé!',false);return;}
+  if(typeof html2canvas==='undefined'){notify('Chưa tải được thư viện xuất ảnh, thử lại sau!',false);return;}
+  notify('Đang tạo ảnh hóa đơn...');
+  const {styleBlock, bodyHtml} = buildRetailInvoiceHTML_(order, {forImage:true});
+  const holder = document.createElement('div');
+  holder.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;';
+  const styleEl = document.createElement('style');
+  styleEl.textContent = styleBlock;
+  holder.appendChild(styleEl);
+  holder.innerHTML += bodyHtml;
+  document.body.appendChild(holder);
+  try{
+    // Đợi ảnh QR (nếu có) tải xong trước khi chụp, tránh bị thiếu QR trong ảnh
+    const imgs = holder.querySelectorAll('img');
+    await Promise.all(Array.from(imgs).map(img=>img.complete?Promise.resolve():new Promise(res=>{img.onload=img.onerror=res;})));
+    const target = holder.querySelector('.tdh-inv');
+    const canvas = await html2canvas(target, {backgroundColor:'#fff', scale:2, useCORS:true});
+    const link = document.createElement('a');
+    link.download = 'HoaDon_'+order.id+'.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    notify('✅ Đã lưu ảnh hóa đơn: HoaDon_'+order.id+'.png');
+  }catch(e){
+    notify('Lỗi tạo ảnh: '+e.message, false);
+  }finally{
+    document.body.removeChild(holder);
+  }
 }
 
 function printAllFeeReceipt(s, hpOrders){
@@ -10134,11 +10273,12 @@ function printAllFeeReceipt(s, hpOrders){
       </tr>`;
   }
 
+  const ps_=getPrintSettings(); const sz_=getPageSizeCss_(ps_.receiptSize); const fs_=sz_.fontScale;
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>Phiếu thu học phí - ${s.name}</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:Arial,sans-serif;font-size:11px;color:#222;width:80mm;margin:0 auto;padding:5mm 3mm}
+    body{font-family:Arial,sans-serif;font-size:${11*fs_}px;color:#222;width:${sz_.bodyWidth};margin:0 auto;padding:5mm 3mm}
     .header{background:#FF8C00;color:#fff;text-align:center;padding:12px;border-radius:6px;margin-bottom:16px}
     .header h1{font-size:16px;font-weight:bold;margin-bottom:3px}
     .header p{font-size:10px;opacity:.9}
@@ -10162,7 +10302,7 @@ function printAllFeeReceipt(s, hpOrders){
     .sign-col{width:45%;text-align:center;font-size:11px;color:#555}
     .sign-line{border-top:1px dashed #ccc;margin-top:32px;padding-top:4px;font-size:10px;color:#888}
     .footer{text-align:center;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:14px}
-    @page{size:80mm auto;margin:0}@media print{body{width:80mm;padding:3mm 3mm}}
+    ${sz_.pageCss}@media print{body{width:${sz_.bodyWidth};padding:3mm 3mm}}
   </style></head><body>
   <div class="header">
     <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
@@ -10213,11 +10353,12 @@ function printFeePDF(order){
   const total=s?s.fee||0:0;
   const dep=Math.round(total*0.3);
   const rest=total-dep;
+  const ps2_=getPrintSettings(); const sz2_=getPageSizeCss_(ps2_.receiptSize);
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8">
   <title>Phiếu thu ${order.id}</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:Arial,sans-serif;font-size:11px;color:#222;width:80mm;margin:0 auto;padding:5mm 3mm}
+    body{font-family:Arial,sans-serif;font-size:11px;color:#222;width:${sz2_.bodyWidth};margin:0 auto;padding:5mm 3mm}
     .header{background:#FF8C00;color:#fff;text-align:center;padding:10px;border-radius:6px;margin-bottom:14px}
     .header h1{font-size:13px;font-weight:bold;margin-bottom:2px}
     .header p{font-size:10px;opacity:.9}
@@ -10237,7 +10378,7 @@ function printFeePDF(order){
     .sign-col{width:45%;font-size:11px;color:#555}
     .sign-col .name{margin-top:32px;border-top:1px dashed #ccc;padding-top:4px;font-size:10px;color:#888}
     .footer{text-align:center;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:16px}
-    @page{size:80mm auto;margin:0}@media print{body{width:80mm;padding:3mm 3mm}}
+    ${sz2_.pageCss}@media print{body{width:${sz2_.bodyWidth};padding:3mm 3mm}}
   </style></head><body>
   <div class="header">
     <h1>TRƯƠNG DÁNG HƯƠNG ACADEMY</h1>
@@ -13232,6 +13373,9 @@ function showOrderDetail(id) {
       collectBtn.style.display='none';
     }
   }
+  // ★ Nút "Lưu ảnh" chỉ dành cho hóa đơn bán lẻ, không áp dụng cho đơn học phí
+  const saveImgBtn = document.getElementById('od-save-img-btn');
+  if(saveImgBtn) saveImgBtn.style.display = String(o.id||'').startsWith('HP') ? 'none' : '';
   // Customer info
   document.getElementById('od-customer').textContent = o.customer||'—';
   const phoneEl = document.getElementById('od-phone-view');
@@ -16227,6 +16371,71 @@ function formatClassDateRange_(s) {
   if(s.end_date && s.end_date !== s.class_date) out += ' - ' + s.end_date;
   if(s.class_time) out += ', ' + s.class_time;
   return out;
+}
+
+// ══════════════════════════════════════════════════
+// ★ CÀI ĐẶT MẪU IN — khổ giấy tùy chỉnh + ẩn/hiện nội dung + tiêu đề/chân trang
+// Lưu trên trình duyệt (localStorage), áp dụng cho cả in giấy lẫn xuất ảnh.
+// ══════════════════════════════════════════════════
+const PRINT_SETTINGS_KEY_ = 'tdh_print_settings';
+const PRINT_SETTINGS_DEFAULT_ = {
+  invoiceSize: '80mm', receiptSize: '80mm',
+  showQr: true, showAddress: true, showTracking: true, showNote: true,
+  headerTitle: 'TRƯƠNG DÁNG HƯƠNG ACADEMY',
+  headerSub: 'Chuyên gia F&B | ĐT: 0984830303',
+  footerText: '',
+};
+
+function getPrintSettings(){
+  try{
+    const raw = localStorage.getItem(PRINT_SETTINGS_KEY_);
+    if(!raw) return {...PRINT_SETTINGS_DEFAULT_};
+    return {...PRINT_SETTINGS_DEFAULT_, ...JSON.parse(raw)};
+  }catch(e){ return {...PRINT_SETTINGS_DEFAULT_}; }
+}
+
+function openPrintSettingsModal(){
+  const s = getPrintSettings();
+  document.getElementById('ps-invoice-size').value = s.invoiceSize;
+  document.getElementById('ps-receipt-size').value = s.receiptSize;
+  document.getElementById('ps-show-qr').checked = s.showQr;
+  document.getElementById('ps-show-address').checked = s.showAddress;
+  document.getElementById('ps-show-tracking').checked = s.showTracking;
+  document.getElementById('ps-show-note').checked = s.showNote;
+  document.getElementById('ps-header-title').value = s.headerTitle;
+  document.getElementById('ps-header-sub').value = s.headerSub;
+  document.getElementById('ps-footer-text').value = s.footerText;
+  showM('modal-print-settings');
+}
+
+function savePrintSettings(){
+  const s = {
+    invoiceSize: document.getElementById('ps-invoice-size').value,
+    receiptSize: document.getElementById('ps-receipt-size').value,
+    showQr: document.getElementById('ps-show-qr').checked,
+    showAddress: document.getElementById('ps-show-address').checked,
+    showTracking: document.getElementById('ps-show-tracking').checked,
+    showNote: document.getElementById('ps-show-note').checked,
+    headerTitle: document.getElementById('ps-header-title').value.trim() || PRINT_SETTINGS_DEFAULT_.headerTitle,
+    headerSub: document.getElementById('ps-header-sub').value.trim() || PRINT_SETTINGS_DEFAULT_.headerSub,
+    footerText: document.getElementById('ps-footer-text').value.trim(),
+  };
+  localStorage.setItem(PRINT_SETTINGS_KEY_, JSON.stringify(s));
+  notify('✅ Đã lưu cài đặt mẫu in');
+  closeM('modal-print-settings');
+}
+
+function resetPrintSettings(){
+  localStorage.removeItem(PRINT_SETTINGS_KEY_);
+  notify('↩️ Đã đặt lại mẫu in mặc định');
+  openPrintSettingsModal();
+}
+
+// Kích thước trang in theo khổ giấy đã chọn — trả về {pageCss, bodyWidth}
+function getPageSizeCss_(size){
+  if(size==='A4') return {pageCss:'@page{size:A4;margin:14mm}', bodyWidth:'190mm', fontScale:1.25};
+  if(size==='A5') return {pageCss:'@page{size:A5;margin:8mm}', bodyWidth:'129mm', fontScale:1.1};
+  return {pageCss:"@page{size:80mm auto;margin:0}", bodyWidth:'80mm', fontScale:1};
 }
 
 function normPhone(v){
