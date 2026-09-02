@@ -330,6 +330,14 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
     <button class="btn btn-sm" style="background:#e67e22;font-size:12px;padding:5px 12px" onclick="goToUnpaidStudents()">Xem ngay →</button>
   </div>
+  <!-- ★ MỚI: Checklist chuẩn bị buổi học — đưa lên Tổng quan cho dễ thấy, đỡ quên vào Lịch học -->
+  <div class="card" id="dash-checklist-card" style="margin-bottom:14px;display:none">
+    <div class="card-head">
+      <span class="card-title">✅ Checklist cần chuẩn bị</span>
+      <button class="btn btn-ghost btn-sm" onclick="go('students',document.querySelector('.nav button'));stTab(document.querySelector('#page-students .tab'),'schedule')">Xem tất cả →</button>
+    </div>
+    <div id="dash-checklist-list"></div>
+  </div>
   <!-- 2 cột: học viên gần đây + đơn bán lẻ gần đây -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
     <div class="card" style="margin-bottom:0">
@@ -5979,6 +5987,7 @@ async function saveChecklist(){
     if(idx>=0) D.classChecklists[idx]=record; else D.classChecklists.unshift(record);
     closeM('modal-add-checklist');
     renderChecklists();
+    renderDashChecklist();
     notify(isNew ? '✅ Đã thêm checklist' : '✅ Đã cập nhật checklist');
     // ★ Thông báo #1: lúc thêm checklist mới (không gửi lại khi chỉ sửa, tránh spam)
     if(isNew){
@@ -5998,6 +6007,7 @@ async function toggleChecklistItem(clId, itemIdx){
   try{
     await sbPatch('class_checklists', {items: cl.items}, `?id=eq.${clId}`);
     renderChecklists();
+    renderDashChecklist();
   }catch(e){notify('Lỗi: '+e.message,false);}
 }
 
@@ -6007,6 +6017,7 @@ async function deleteChecklist(clId){
     await sbPatch('class_checklists', {deleted_at: Date.now()}, `?id=eq.${clId}`);
     D.classChecklists = D.classChecklists.filter(x=>x.id!==clId);
     renderChecklists();
+    renderDashChecklist();
     notify('🗑 Đã xóa checklist');
   }catch(e){notify('Lỗi xóa: '+e.message,false);}
 }
@@ -6040,6 +6051,41 @@ function renderChecklists(){
       </div>
       ${items.map((it,i)=>`
         <div style="display:flex;align-items:center;gap:8px;padding:4px 0">
+          <input type="checkbox" ${it.done?'checked':''} onchange="toggleChecklistItem('${cl.id}',${i})" style="width:16px;height:16px;flex-shrink:0"/>
+          <span style="font-size:13px;${it.done?'text-decoration:line-through;color:var(--muted)':''}">${it.text}</span>
+        </div>`).join('')}
+    </div>`;
+  }).join('');
+}
+
+// ★ Bản rút gọn cho Tổng quan — chỉ hiện checklist HIỆN TẠI/SẮP TỚI (không hiện đã
+// qua), ưu tiên buổi gần nhất lên trên, để dễ thấy ngay khi mở app.
+function renderDashChecklist(){
+  const card = document.getElementById('dash-checklist-card');
+  const el = document.getElementById('dash-checklist-list');
+  if(!card || !el) return;
+  const todayStr_ = dateStr(new Date());
+  const list = (D.classChecklists||[]).filter(cl=>!cl.deleted_at && (cl.end_date||cl.class_date) >= todayStr_)
+    .sort((a,b)=>a.class_date.localeCompare(b.class_date))
+    .slice(0,5);
+  if(!list.length){ card.style.display='none'; return; }
+  card.style.display='';
+  el.innerHTML = list.map(cl=>{
+    const items = typeof cl.items==='string' ? JSON.parse(cl.items) : (cl.items||[]);
+    const doneCount = items.filter(it=>it.done).length;
+    let dLabel = formatDateVN_(cl.class_date);
+    if(cl.end_date && cl.end_date!==cl.class_date) dLabel += ' - '+formatDateVN_(cl.end_date);
+    const isToday = cl.class_date<=todayStr_ && (cl.end_date||cl.class_date)>=todayStr_;
+    return `<div style="border:1.5px solid ${isToday?'var(--brand)':'var(--border)'};background:${isToday?'#fff8ec':'#fff'};border-radius:10px;padding:12px 14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div>
+          <div style="font-weight:700;color:var(--brown);font-size:13px">${isToday?'📌 HÔM NAY — ':'📅 '}${dLabel}${cl.class_time?', '+cl.class_time:''}</div>
+          <div style="font-size:11.5px;color:var(--muted)">📚 ${cl.course_name||'—'}</div>
+        </div>
+        <span style="font-size:11px;background:var(--dim);color:var(--brown);padding:3px 8px;border-radius:20px;white-space:nowrap;flex-shrink:0">${doneCount}/${items.length}</span>
+      </div>
+      ${items.map((it,i)=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:3px 0">
           <input type="checkbox" ${it.done?'checked':''} onchange="toggleChecklistItem('${cl.id}',${i})" style="width:16px;height:16px;flex-shrink:0"/>
           <span style="font-size:13px;${it.done?'text-decoration:line-through;color:var(--muted)':''}">${it.text}</span>
         </div>`).join('')}
@@ -7190,6 +7236,7 @@ function renderRpStudents(){
 }
 
 function renderDash(){
+  renderDashChecklist();
   // Show sale performance for admin
   if(AUTH_CURRENT?.role==='admin') {
     const spc = document.getElementById('sale-performance-card');
