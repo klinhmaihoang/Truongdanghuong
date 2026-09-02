@@ -5869,7 +5869,12 @@ let _clCurrentItems = []; // items đang soạn trong modal (chưa lưu)
 // Gom nhóm học viên Offline theo đúng buổi học (ngày+giờ+khóa) — dùng làm dropdown
 function buildClassSessions(){
   const map = {};
+  const todayStr_ = todayStr();
   D.students.filter(s=>s.type==='Offline'&&s.class_date&&!s.deleted_at&&s.status!=='Đã xóa').forEach(s=>{
+    // ★ FIX: chỉ lấy buổi học HIỆN TẠI/TƯƠNG LAI — bỏ qua buổi đã học xong (ngày kết
+    // thúc đã qua), đỡ phải cuộn qua hàng loạt lịch cũ khi tạo checklist mới.
+    const sessionEnd = s.end_date||s.class_date;
+    if(sessionEnd < todayStr_) return;
     const key = [s.class_date, s.end_date||s.class_date, s.class_time||'', s.course_id||s.course||''].join('|');
     if(!map[key]){
       const course = D.courses.find(c=>c.id===s.course_id);
@@ -5884,9 +5889,17 @@ function buildClassSessions(){
   return Object.values(map).sort((a,b)=>a.class_date.localeCompare(b.class_date));
 }
 
+// ★ FIX: đổi định dạng yyyy-MM-dd (máy đọc) sang dd/MM/yyyy (người Việt quen mắt hơn)
+function formatDateVN_(isoDate){
+  if(!isoDate) return '';
+  const m = String(isoDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return isoDate;
+  return `${+m[3]}/${+m[2]}/${m[1]}`;
+}
+
 function sessionLabel_(sess){
-  let d = sess.class_date;
-  if(sess.end_date && sess.end_date!==sess.class_date) d += ' - '+sess.end_date;
+  let d = formatDateVN_(sess.class_date);
+  if(sess.end_date && sess.end_date!==sess.class_date) d += ' - '+formatDateVN_(sess.end_date);
   return `${d}${sess.class_time?', '+sess.class_time:''} — ${sess.course_name} (${sess.studentCount} học viên)`;
 }
 
@@ -5969,8 +5982,8 @@ async function saveChecklist(){
     notify(isNew ? '✅ Đã thêm checklist' : '✅ Đã cập nhật checklist');
     // ★ Thông báo #1: lúc thêm checklist mới (không gửi lại khi chỉ sửa, tránh spam)
     if(isNew){
-      let d = sess.class_date;
-      if(sess.end_date && sess.end_date!==sess.class_date) d += ' - '+sess.end_date;
+      let d = formatDateVN_(sess.class_date);
+      if(sess.end_date && sess.end_date!==sess.class_date) d += ' - '+formatDateVN_(sess.end_date);
       const itemsText = _clCurrentItems.map(it=>`• ${it.text}`).join('\n');
       tgMsg(`✅ *Checklist chuẩn bị mới!*\n\n📅 ${d}${sess.class_time?', '+sess.class_time:''}\n📚 ${sess.course_name} (${sess.studentCount} học viên)\n\n📝 *Cần chuẩn bị:*\n${itemsText}\n\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
     }
@@ -6010,8 +6023,8 @@ function renderChecklists(){
   el.innerHTML = list.map(cl=>{
     const items = typeof cl.items==='string' ? JSON.parse(cl.items) : (cl.items||[]);
     const doneCount = items.filter(it=>it.done).length;
-    let dLabel = cl.class_date;
-    if(cl.end_date && cl.end_date!==cl.class_date) dLabel += ' - '+cl.end_date;
+    let dLabel = formatDateVN_(cl.class_date);
+    if(cl.end_date && cl.end_date!==cl.class_date) dLabel += ' - '+formatDateVN_(cl.end_date);
     const isPast = (cl.end_date||cl.class_date) < todayStr_;
     return `<div style="border:1.5px solid var(--border);border-radius:10px;padding:14px;margin-bottom:10px;${isPast?'opacity:.55':''}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
