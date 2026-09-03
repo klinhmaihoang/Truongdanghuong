@@ -1809,7 +1809,6 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <div class="tab" id="fin-mtab-cod" onclick="finSwitchTab('cod')" style="font-size:13px">🚚 COD</div>
       <div class="tab" id="fin-mtab-auditlog" onclick="finSwitchTab('auditlog')" style="font-size:13px">🔍 Audit</div>
     </div>
-    <button class="btn btn-tg btn-sm" onclick="gsSyncAll()" style="font-size:11px;flex-shrink:0">🔄 Sync GG</button>
   </div>
 
   <!-- SUB PANEL: COD RECONCILE -->
@@ -1838,8 +1837,6 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
   <div class="btn-group" style="margin-bottom:14px">
     <button class="btn btn-green btn-sm" onclick="showM('modal-add-thu')">+ Thêm phiếu thu</button>
     <button class="btn btn-red btn-sm" onclick="showM('modal-add-chi')">− Thêm phiếu chi</button>
-    <button class="btn btn-tg btn-sm" onclick="syncThuChiToSheet()">📊 Sync GG Sheet</button>
-    <button class="btn btn-sm" onclick="syncBaoCao()" style="background:linear-gradient(135deg,#1E8449,#27AE60)">📈 Báo cáo Lãi Lỗ</button>
     <button class="btn btn-excel btn-sm" onclick="xlExport('finance')">📊 Excel</button>
   </div>
   <div class="card">
@@ -3569,7 +3566,6 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <button class="btn btn-tg btn-sm" onclick="tgReport('revenue')">💰 Doanh thu</button>
     </div>
     <div class="btn-group" style="margin-top:10px">
-      <button class="btn btn-excel btn-sm" onclick="gsSyncAll()">📊 Sync toàn bộ → Google Sheet</button>
       <button class="btn btn-tg btn-sm" onclick="checkReminders()">🔔 Kiểm tra nhắc nhở ngay</button>
     </div>
   </div>
@@ -3904,7 +3900,6 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     <div class="guide"><strong style="color:var(--brand)">B1</strong> — Mở Google Apps Script → thay TOÀN BỘ code bằng đoạn trên → điền <code>YOUR_BOT_TOKEN</code> và <code>YOUR_CHAT_ID</code></div>
     <div class="guide"><strong style="color:var(--brand)">B2</strong> — Deploy → <strong>Manage deployments</strong> → chọn deployment cũ → ✏️ Edit → New version → Deploy lại</div>
     <div class="guide"><strong style="color:var(--brand)">B3</strong> — Triggers → Add trigger → hàm <code>sendDailyReminders</code> → Time-driven → Day timer → <strong>8:00–9:00 AM</strong></div>
-    <div class="guide"><strong style="color:var(--brand)">B4</strong> — Quay lại app → Cài đặt → bấm <strong>"Sync toàn bộ → Google Sheet"</strong> để đẩy data lên ngay</div>
   </div>
   <div class="card">
     <div class="card-head"><span class="card-title">Nhật ký gửi</span><button class="btn btn-ghost btn-sm" onclick="clearLog()">Xóa log</button></div>
@@ -9385,7 +9380,17 @@ async function deleteRecipeRow(id,pid){
 // ══════════════════════════════════════════════════
 // GOOGLE SHEET SYNC
 // ══════════════════════════════════════════════════
+// ★ FIX: TẮT hoàn toàn hệ thống sync sang các sheet RAW_ cũ (RAW_DonHang,
+// RAW_HocVien, RAW_KhachHang, RAW_TonKho, RAW_ThuChi, RAW_LichSuKho) và 2 sync bị
+// lỗi từ trước (BaoCaoLaiLo, TomTatKho — Apps Script chưa từng có code xử lý 2 tên
+// này nên trước giờ gửi mà không ghi được gì). Xác nhận với người dùng: các sheet
+// này không dùng để đọc báo cáo nữa, chỉ có DB_... (nguồn dữ liệu thật) mới cần.
+// Giữ nguyên tất cả ~50 lời gọi gsSend() rải rác trong code (an toàn hơn xóa từng
+// chỗ) — chỉ cần vô hiệu hóa TẠI ĐÂY là toàn bộ ngừng gọi API thừa.
 async function gsSend(data){
+  return;
+}
+async function gsSend_DISABLED_(data){
   const url=cfg.gsUrl;
   if(!url)return;
   try{
