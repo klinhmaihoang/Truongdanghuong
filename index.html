@@ -6066,14 +6066,19 @@ function attSessionLabel_(sess){
 function renderAttendancePanel(){
   const sel = document.getElementById('at-session-select');
   if(!sel) return;
-  const sessions = buildAttendanceSessions_();
+  // Dropdown chọn lớp CHỈ hiện lớp đang diễn ra hoặc sắp tới — lớp đã học xong
+  // (end_date đã qua) không cần điểm danh nữa nên ẩn khỏi danh sách chọn, dù
+  // buildAttendanceSessions_() vẫn gom đủ cả quá khứ để dùng cho chỗ khác (gợi ý
+  // sĩ số đông nhất khi Sửa khóa học).
+  const todayStr_ = dateStr(new Date());
+  const sessions = buildAttendanceSessions_().filter(s=>(s.end_date||s.class_date)>=todayStr_);
   const preview = document.getElementById('at-session-preview');
   const dayPicker = document.getElementById('at-day-picker');
   const listEl = document.getElementById('at-student-list');
   if(!sessions.length){
     sel.innerHTML = '<option value="">— Chưa có lớp Offline nào —</option>';
     preview.style.display='none'; dayPicker.style.display='none'; dayPicker.innerHTML='';
-    listEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Chưa có lớp Offline nào để điểm danh — thêm học viên Offline kèm ngày học cụ thể trước đã.</div>';
+    listEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Chưa có lớp Offline nào sắp tới hoặc đang diễn ra để điểm danh — lớp đã học xong sẽ không hiện ở đây nữa.</div>';
     return;
   }
   const prevKey = _atSessionKey;
