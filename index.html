@@ -397,6 +397,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="tab" onclick="stTab(this,'offline')">Offline</div>
     <div class="tab" onclick="stTab(this,'deleted')" style="color:var(--red)">🗑 Đã xóa</div>
     <div class="tab" onclick="stTab(this,'courses')">📚 Khóa học</div>
+    <div class="tab" onclick="stTab(this,'attendance')">✅ Điểm danh</div>
   </div>
 
   <!-- Danh sách học viên -->
@@ -405,7 +406,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <div class="card-head">
         <span class="card-title">Danh sách học viên</span>
         <div class="btn-group">
-          <button class="btn btn-sm" onclick="showM('modal-add-student');renderInstallmentConfigUI();toggleClassDate();">+ Thêm học viên</button>
+          <button class="btn btn-sm" onclick="showM('modal-add-student');renderInstallmentConfigUI();toggleClassDate();updateFsCapacity();">+ Thêm học viên</button>
           <button class="btn btn-tg btn-sm" onclick="tgReport('students')">→ Telegram</button>
           <button class="btn btn-tg btn-sm" onclick="checkReminders()">🔔 Kiểm tra nhắc nhở</button>
           <button class="btn btn-excel btn-sm" onclick="xlExport('students')">📊 Excel</button>
@@ -450,8 +451,31 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
         </div>
       </div>
       <div id="course-import-summary"></div>
-      <table><thead><tr><th>Tên khóa học</th><th>Loại</th><th>Học phí</th><th>Trạng thái</th><th></th></tr></thead>
+      <table><thead><tr><th>Tên khóa học</th><th>Loại</th><th>Học phí</th><th>👥 Sĩ số/lớp</th><th>Trạng thái</th><th></th></tr></thead>
       <tbody id="course-list"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ★ MỚI: Điểm danh học viên theo từng lớp (chỉ Offline) — điểm danh RIÊNG
+       theo TỪNG NGÀY học cụ thể (nếu 1 lớp học nhiều ngày, mỗi ngày điểm danh
+       riêng, không gộp chung cả đợt). -->
+  <div id="panel-attendance" style="display:none">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">✅ Điểm danh học viên (Offline)</span>
+      </div>
+      <div class="form-row">
+        <div class="fg">
+          <label>Chọn lớp (khóa học + ngày giờ học)</label>
+          <select id="at-session-select" onchange="atSessionChanged()">
+            <option value="">— Chọn lớp —</option>
+          </select>
+        </div>
+        <div class="fg"></div>
+      </div>
+      <div id="at-session-preview" style="display:none;margin-bottom:12px;padding:10px 12px;background:var(--brand-light);border-radius:8px;font-size:12.5px"></div>
+      <div id="at-day-picker" style="display:none;margin-bottom:14px"></div>
+      <div id="at-student-list"></div>
     </div>
   </div>
 
@@ -3965,9 +3989,10 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     <div class="modal-title">🔄 Dời lịch học / Bảo lưu</div>
     <div id="reschedule-info" class="guide" style="margin-bottom:14px"></div>
     <div class="form-row">
-      <div class="fg"><label>📅 Ngày học mới</label><input id="rs-class-date" type="date"/></div>
-      <div class="fg"><label>🏁 Ngày kết thúc học mới (nếu có)</label><input id="rs-end-date" type="date"/></div>
+      <div class="fg"><label>📅 Ngày học mới</label><input id="rs-class-date" type="date" onchange="updateRsCapacity()"/></div>
+      <div class="fg"><label>🏁 Ngày kết thúc học mới (nếu có)</label><input id="rs-end-date" type="date" onchange="updateRsCapacity()"/></div>
     </div>
+    <div id="rs-capacity-info" style="display:none"></div>
     <div class="fg"><label>Lý do dời lịch (không bắt buộc)</label><input id="rs-reason" placeholder="VD: học viên bận việc đột xuất"/></div>
     <div class="guide" style="margin-top:10px;background:#fff4e5;border-color:var(--orange)">
       ⚠️ Học phí đặt cọc <b>không được hoàn lại</b>. Học viên được hỗ trợ bảo lưu, dời lịch học trong vòng <b>1 năm</b> kể từ ngày đăng ký lịch học đầu tiên, tối đa <b>2 lần</b>.
@@ -3990,27 +4015,28 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Loại học</label>
-        <select id="es-type"><option>Offline</option><option>Online</option></select></div>
+        <select id="es-type" onchange="updateEsCapacity()"><option>Offline</option><option>Online</option></select></div>
       <div class="fg"><label>Khóa học</label>
-        <select id="es-course-id"></select></div>
+        <select id="es-course-id" onchange="updateEsCapacity()"></select></div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Email</label><input id="es-email" placeholder="email@example.com"/></div>
       <div class="fg"><label>Đơn giá học phí (₫/học viên)</label><input id="es-fee-unit" type="number" placeholder="2500000" oninput="calcEditFee()"/></div>
     </div>
     <div class="form-row">
-      <div class="fg"><label>Số lượng học viên đăng ký chung</label><input id="es-student-count" type="number" min="1" value="1" placeholder="1" oninput="calcEditFee()"/></div>
+      <div class="fg"><label>Số lượng học viên đăng ký chung</label><input id="es-student-count" type="number" min="1" value="1" placeholder="1" oninput="calcEditFee();updateEsCapacity()"/></div>
       <div class="fg"><label>Tổng học phí (₫) — tự tính, có thể sửa tay nếu cần</label><input id="es-fee" type="number" placeholder="2500000"/></div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Ngày đăng ký</label><input id="es-start" type="date"/></div>
-      <div class="fg"><label>📅 Ngày học (Offline)</label><input id="es-class-date" type="date"/></div>
-      <div class="fg"><label>🕐 Giờ học (VD: 8:00 - 10:00)</label><input id="es-class-time" placeholder="8:00 - 10:00"/></div>
+      <div class="fg"><label>📅 Ngày học (Offline)</label><input id="es-class-date" type="date" onchange="updateEsCapacity()"/></div>
+      <div class="fg"><label>🕐 Giờ học (VD: 8:00 - 10:00)</label><input id="es-class-time" placeholder="8:00 - 10:00" oninput="updateEsCapacity()"/></div>
     </div>
     <div class="form-row">
-      <div class="fg"><label>🏁 Ngày kết thúc học</label><input id="es-end-date" type="date"/></div>
+      <div class="fg"><label>🏁 Ngày kết thúc học</label><input id="es-end-date" type="date" onchange="updateEsCapacity()"/></div>
       <div class="fg"></div>
     </div>
+    <div id="es-capacity-info" style="display:none"></div>
     <div class="form-row">
       <div class="fg">
         <label>📣 Kênh liên lạc</label>
@@ -4050,8 +4076,8 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       <div class="fg"><label>Số điện thoại</label><input id="fs-phone" placeholder="090xxxxxxx"/></div>
     </div>
     <div class="form-row">
-      <div class="fg"><label>Loại học</label><select id="fs-type" onchange="toggleClassDate()"><option>Offline</option><option>Online</option></select></div>
-      <div class="fg"><label>Khóa học</label><select id="fs-course-id" onchange="autoFillFee()"></select></div>
+      <div class="fg"><label>Loại học</label><select id="fs-type" onchange="toggleClassDate();updateFsCapacity()"><option>Offline</option><option>Online</option></select></div>
+      <div class="fg"><label>Khóa học</label><select id="fs-course-id" onchange="autoFillFee();updateFsCapacity()"></select></div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Email</label><input id="fs-email" placeholder="email@example.com"/></div>
@@ -4059,7 +4085,7 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Đơn giá học phí (₫/học viên)</label><input id="fs-fee" type="number" placeholder="2500000" oninput="calcDiscountedFee()"/></div>
-      <div class="fg"><label>Số lượng học viên</label><input id="fs-student-count" type="number" min="1" value="1" placeholder="1" oninput="calcDiscountedFee()"/></div>
+      <div class="fg"><label>Số lượng học viên</label><input id="fs-student-count" type="number" min="1" value="1" placeholder="1" oninput="calcDiscountedFee();updateFsCapacity()"/></div>
     </div>
     <!-- ★ MỚI: đợt thanh toán tùy chỉnh (chỉ áp dụng Offline — Online luôn thu 1 lần) -->
     <div class="fg" id="fs-installment-section" style="background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
@@ -4098,13 +4124,14 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Ngày đăng ký</label><input id="fs-start" type="date"/></div>
-      <div class="fg" id="fg-class-date"><label>📅 Ngày học (Offline)</label><input id="fs-class-date" type="date"/></div>
-      <div class="fg" id="fg-class-time"><label>🕐 Giờ học (VD: 8:00 - 10:00)</label><input id="fs-class-time" placeholder="8:00 - 10:00"/></div>
+      <div class="fg" id="fg-class-date"><label>📅 Ngày học (Offline)</label><input id="fs-class-date" type="date" onchange="updateFsCapacity()"/></div>
+      <div class="fg" id="fg-class-time"><label>🕐 Giờ học (VD: 8:00 - 10:00)</label><input id="fs-class-time" placeholder="8:00 - 10:00" oninput="updateFsCapacity()"/></div>
     </div>
     <div class="form-row">
-      <div class="fg"><label>🏁 Ngày kết thúc học</label><input id="fs-end-date" type="date"/></div>
+      <div class="fg"><label>🏁 Ngày kết thúc học</label><input id="fs-end-date" type="date" onchange="updateFsCapacity()"/></div>
       <div class="fg"></div>
     </div>
+    <div id="fs-capacity-info" style="display:none"></div>
     <div class="form-row">
       <div class="fg">
         <label>📣 Kênh liên lạc</label>
@@ -4149,6 +4176,10 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
         </label>
       </div>
     </div>
+    <div class="form-row">
+      <div class="fg"><label>👥 Sĩ số tối đa/lớp (chỉ áp dụng Offline)</label><input id="fc-max-students" type="number" min="1" placeholder="VD: 10 — để trống = không giới hạn"/></div>
+      <div class="fg"></div>
+    </div>
     <div class="btn-group" style="margin-top:8px">
       <button class="btn btn-green btn-sm" onclick="addCourse()">Lưu khóa học</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-course')">Hủy</button>
@@ -4173,6 +4204,10 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
           Miễn phí
         </label>
       </div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>👥 Sĩ số tối đa/lớp (chỉ áp dụng Offline)</label><input id="ec-max-students" type="number" min="1" placeholder="VD: 10 — để trống = không giới hạn"/></div>
+      <div class="fg" id="ec-capacity-hint" style="justify-content:center;font-size:11.5px;color:var(--muted)"></div>
     </div>
     <div class="btn-group" style="margin-top:8px">
       <button class="btn btn-green btn-sm" onclick="saveEditCourse()">Lưu thay đổi</button>
@@ -5116,7 +5151,7 @@ const sbDel = async (t, f) => {
 // ══════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════
-let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[],transactions:[],quotations:[],salesOrders:[],soActivities:[]};
+let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[],transactions:[],quotations:[],salesOrders:[],soActivities:[],classAttendance:[]};
 let cfg = {tgToken:'',tgChatId:'',zaloToken:'',zaloChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',accPhone:'0984830303',gsUrl:'https://script.google.com/macros/s/AKfycbwk6oBp1yjg8E4AexktyJ2VQpdUImsdBVl47xWBUGtY4Y7Be7kwZIKBf8cOGM6A31oh/exec'};
 let cart=[], invoice=null, selectedStudentId=null, stFilter='all', tgLog=[];
 
@@ -5205,6 +5240,7 @@ async function boot(){
             {table:'stock_log',       order:{col:'created_at',dir:'desc'}, limit:200},
             {table:'recipes',         order:{col:'created_at',dir:'asc'}},
             {table:'class_checklists', order:{col:'created_at',dir:'asc'}},
+            {table:'class_attendance', order:{col:'date',dir:'asc'}, limit:3000},
             {table:'employees',       order:{col:'created_at',dir:'asc'}},
             {table:'suppliers',       order:{col:'created_at',dir:'asc'}},
             {table:'purchase_orders', order:{col:'created_at',dir:'desc'}, limit:100},
@@ -5229,6 +5265,7 @@ async function boot(){
         const stockLog        = _bulk2a.stock_log       || [];
         const recipes         = _bulk2a.recipes         || [];
         const classChecklists = _bulk2a.class_checklists|| [];
+        const classAttendance = _bulk2a.class_attendance|| [];
         const employees       = _bulk2a.employees       || [];
         const suppliers       = _bulk2a.suppliers       || [];
         const purchaseOrders  = _bulk2a.purchase_orders || [];
@@ -5250,6 +5287,7 @@ async function boot(){
         D.stockLog  = stockLog||[];
         D.recipes   = recipes||[];
         D.classChecklists = classChecklists||[];
+        D.classAttendance = classAttendance||[];
         D.employees = employees||[];
         D.suppliers = suppliers||[];
         D.purchaseOrders = purchaseOrders||[];
@@ -5409,6 +5447,9 @@ function stTab(el,f){
   // Ẩn schedule panel nếu chuyển tab khác
   const schedDiv=document.getElementById('schedule-in-students');
   if(schedDiv&&f!=='schedule') schedDiv.style.display='none';
+  // Ẩn panel điểm danh nếu chuyển tab khác
+  const panelAt=document.getElementById('panel-attendance');
+  if(panelAt&&f!=='attendance') panelAt.style.display='none';
 
   if(f==='schedule'){
     // Nhúng page-schedule vào students lần đầu
@@ -5424,6 +5465,16 @@ function stTab(el,f){
     });
     stFilter=f;
     renderSchedule();
+    return;
+  }
+
+  if(f==='attendance'){
+    ['panel-students','panel-courses','deleted-students-card'].forEach(id=>{
+      const p=document.getElementById(id); if(p) p.style.display='none';
+    });
+    if(panelAt) panelAt.style.display='block';
+    stFilter=f;
+    renderAttendancePanel();
     return;
   }
 
@@ -5549,24 +5600,27 @@ function renderCourses(){
     <td><strong>${c.name}</strong></td>
     <td><span class="tag ${c.type==='Online'?'t-online':c.type==='Cả hai'?'t-pending':'t-offline'}">${c.type}</span></td>
     <td style="color:var(--brand);font-weight:700">${c.is_free?'<span class="tag t-paid">Miễn phí</span>':fmt(c.fee)}</td>
+    <td style="text-align:center">${(c.type!=='Online'&&+c.max_students>0)?`<span class="tag t-pending">${+c.max_students} HV/lớp</span>`:'<span style="color:var(--muted);font-size:11px">Không giới hạn</span>'}</td>
     <td><span class="tag t-paid">Đang mở</span></td>
     <td><button class="btn btn-ghost btn-sm" onclick="openEditCourse('${c.id}')">✏️ Sửa</button></td>
   </tr>`).join('')
-  :'<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:16px">Chưa có khóa học — thêm khóa học đầu tiên!</td></tr>';
+  :'<tr><td colspan="6" style="color:var(--muted);text-align:center;padding:16px">Chưa có khóa học — thêm khóa học đầu tiên!</td></tr>';
 }
 
 async function addCourse(){
   const name=document.getElementById('fc-name').value.trim();
   if(!name){notify('Nhập tên khóa học!',false);return;}
   const is_free=document.getElementById('fc-free').checked;
+  const maxStudentsRaw = +document.getElementById('fc-max-students')?.value||0;
   const c={id:uid(),name,type:document.getElementById('fc-type').value,
     fee:is_free?0:+document.getElementById('fc-fee').value||0,
-    is_free,created_at:Date.now()};
+    is_free, max_students: maxStudentsRaw>0?maxStudentsRaw:null,
+    created_at:Date.now()};
   try{
     await sbUpsert('courses',c);
     D.courses.push(c);
     closeM('modal-add-course');
-    ['fc-name','fc-fee'].forEach(id=>document.getElementById(id).value='');
+    ['fc-name','fc-fee','fc-max-students'].forEach(id=>document.getElementById(id).value='');
     document.getElementById('fc-free').checked=false;
     renderCourses();fillCourseSelects();
     notify('Đã thêm khóa học: '+name);
@@ -5628,12 +5682,14 @@ async function handleCourseCSVImport(evt){
 
         const id = cleanStr(r.id) || uid();
         const type = cleanStr(r.type) || 'Offline';
+        const maxStudentsCsv = cleanNum(r.max_students);
         const course = {
           id,
           name,
           type,
           fee: cleanNum(r.fee),
           is_free: cleanBool(r.is_free),
+          max_students: maxStudentsCsv>0 ? maxStudentsCsv : null,
           created_at: cleanStr(r.created_at) ? (parseInt(cleanStr(r.created_at)) || Date.now()) : Date.now()
         };
 
@@ -5776,6 +5832,17 @@ function openEditCourse(id){
   document.getElementById('ec-fee').value=c.fee||0;
   document.getElementById('ec-free').checked=c.is_free||false;
   document.getElementById('ec-fee').disabled=c.is_free||false;
+  document.getElementById('ec-max-students').value=c.max_students||'';
+  // ★ Gợi ý: hiện sĩ số lớp đông nhất hiện tại của khóa này (nếu có), để tránh
+  // đặt sĩ số tối đa THẤP HƠN số học viên đã ghi danh thực tế ở 1 lớp cụ thể.
+  const hintEl=document.getElementById('ec-capacity-hint');
+  if(hintEl){
+    const sessions=buildAttendanceSessions_().filter(s=>s.course_id===id);
+    // Dùng ĐÚNG cách đếm giống getClassSessionCount_() (loại học viên "Nghỉ học")
+    // để nhất quán với logic chặn sĩ số thật sự — tránh cảnh báo sai lệch.
+    const peak=sessions.reduce((mx,s)=>Math.max(mx,getClassSessionCount_(s.course_id,s.class_date,s.end_date,s.class_time)),0);
+    hintEl.textContent = peak>0 ? `Lớp đông nhất hiện có: ${peak} học viên` : '';
+  }
   showM('modal-edit-course');
 }
 
@@ -5784,14 +5851,35 @@ async function saveEditCourse(){
   const name=document.getElementById('ec-name').value.trim();
   if(!name){notify('Nhập tên khóa học!',false);return;}
   const is_free=document.getElementById('ec-free').checked;
-  const upd={name,type:document.getElementById('ec-type').value,
-    fee:is_free?0:+document.getElementById('ec-fee').value||0,is_free};
-  try{
-    await sbPatch('courses',upd,`?id=eq.${id}`);
-    const c=D.courses.find(x=>x.id===id);if(c)Object.assign(c,upd);
-    closeM('modal-edit-course');renderCourses();fillCourseSelects();
-    notify('Đã cập nhật khóa học: '+name);
-  }catch(e){notify('Lỗi: '+e.message,false);}
+  const maxStudentsRaw = +document.getElementById('ec-max-students')?.value||0;
+  const max_students = maxStudentsRaw>0?maxStudentsRaw:null;
+  const doSave = async ()=>{
+    const upd={name,type:document.getElementById('ec-type').value,
+      fee:is_free?0:+document.getElementById('ec-fee').value||0,is_free,max_students};
+    try{
+      await sbPatch('courses',upd,`?id=eq.${id}`);
+      const c=D.courses.find(x=>x.id===id);if(c)Object.assign(c,upd);
+      closeM('modal-edit-course');renderCourses();fillCourseSelects();
+      notify('Đã cập nhật khóa học: '+name);
+    }catch(e){notify('Lỗi: '+e.message,false);}
+  };
+  // ★ Cảnh báo nếu hạ sĩ số tối đa XUỐNG THẤP HƠN số học viên đã có ở 1 lớp cụ thể
+  // của khóa này — không chặn (đây là quyết định của MHKL), chỉ xác nhận lại.
+  if(max_students){
+    const sessions=buildAttendanceSessions_().filter(s=>s.course_id===id);
+    // Dùng ĐÚNG cách đếm giống getClassSessionCount_() (loại học viên "Nghỉ học")
+    // để nhất quán với logic chặn sĩ số thật sự — tránh cảnh báo sai lệch.
+    const peak=sessions.reduce((mx,s)=>Math.max(mx,getClassSessionCount_(s.course_id,s.class_date,s.end_date,s.class_time)),0);
+    if(peak>max_students){
+      confirmAct(
+        `Sĩ số tối đa mới (${max_students}) thấp hơn số học viên đang có ở 1 lớp (${peak} học viên)!`,
+        'Các lớp đã vượt sĩ số mới sẽ KHÔNG bị ảnh hưởng, nhưng sẽ không thể thêm học viên mới vào lớp đó nữa. Vẫn lưu?',
+        doSave
+      );
+      return;
+    }
+  }
+  await doSave();
 }
 
 function deleteCourse(){
@@ -5805,6 +5893,307 @@ function deleteCourse(){
       notify('Đã xóa khóa học');
     }catch(e){notify('Lỗi: '+e.message,false);}
   });
+}
+
+// ══════════════════════════════════════════════════
+// ★ SĨ SỐ TỐI ĐA/LỚP (chỉ áp dụng Offline) — "1 lớp" = 1 lần mở lớp cụ thể
+// (CÙNG khóa học + CÙNG ngày bắt đầu/kết thúc/giờ học), khớp đúng cách nhóm
+// "buổi học" đã dùng sẵn ở tính năng Checklist chuẩn bị buổi học. Mỗi lần mở
+// lại khóa (đợt khác, ngày khác) được tính sĩ số RIÊNG từ đầu, không cộng dồn
+// với đợt trước.
+// ══════════════════════════════════════════════════
+
+// "Chữ ký" của 1 lớp cụ thể — dùng thống nhất để nhóm/so khớp buổi học.
+function classSessionKey_(courseId, classDate, endDate, classTime){
+  return [courseId||'', classDate||'', endDate||classDate||'', (classTime||'').trim()].join('|');
+}
+
+// Đếm sĩ số HIỆN TẠI của 1 lớp cụ thể — chỉ tính học viên Offline, chưa xóa,
+// và chưa "Nghỉ học" (học viên nghỉ học không còn chiếm chỗ trong lớp nữa).
+// Cộng dồn student_count vì 1 dòng học viên có thể đại diện nhiều người (đăng
+// ký nhóm) — đếm số DÒNG là sai nếu có đăng ký nhóm.
+// excludeStudentId: bỏ qua chính học viên đang sửa/dời lịch, tránh tự đếm trùng mình.
+function getClassSessionCount_(courseId, classDate, endDate, classTime, excludeStudentId){
+  if(!classDate) return 0;
+  const key = classSessionKey_(courseId, classDate, endDate, classTime);
+  return D.students
+    .filter(s=>s.id!==excludeStudentId && s.type==='Offline' && !s.deleted_at && s.status!=='Đã xóa' && s.status!=='Nghỉ học')
+    .filter(s=>classSessionKey_(s.course_id, s.class_date, s.end_date||s.class_date, s.class_time)===key)
+    .reduce((sum,s)=>sum+Math.max(1,+s.student_count||1), 0);
+}
+
+// Kiểm tra sĩ số TRƯỚC KHI lưu — dùng ở cả 3 nơi: Thêm học viên, Sửa học viên,
+// Dời lịch học. Trả về {allowed, blocked, warn, count, max, remaining, after}.
+// max=0 nghĩa là khóa học KHÔNG giới hạn sĩ số → luôn allowed.
+function checkClassCapacity_(courseId, classDate, endDate, classTime, addCount, excludeStudentId){
+  const course = D.courses.find(c=>c.id===courseId);
+  const max = +course?.max_students || 0;
+  if(!classDate || !max) return {allowed:true, blocked:false, warn:false, count:0, max:0, remaining:null, after:0};
+  const count = getClassSessionCount_(courseId, classDate, endDate, classTime, excludeStudentId);
+  const after = count + Math.max(1, +addCount||1);
+  const remaining = max - count;
+  const warnThreshold = Math.max(1, Math.ceil(max*0.2)); // cảnh báo khi còn ≤20% chỗ trống (tối thiểu 1 chỗ)
+  return {
+    allowed: after<=max,
+    blocked: after>max,
+    warn: remaining>0 && remaining<=warnThreshold,
+    count, max, remaining, after
+  };
+}
+
+// Hiện chỉ báo sĩ số trực quan trong form (Thêm/Sửa học viên, Dời lịch) — cập
+// nhật ngay khi đổi khóa học/ngày học/giờ học/số lượng, KHÔNG chặn submit (việc
+// chặn thật sự nằm ở addStudent()/saveEditStudent()/confirmRescheduleStudent()
+// để không bị qua mặt nếu dữ liệu vừa đổi ở tab/thiết bị khác).
+function renderCapacityIndicator_(elId, courseId, classDate, endDate, classTime, addCount, excludeStudentId){
+  const el = document.getElementById(elId);
+  if(!el) return {blocked:false};
+  const course = D.courses.find(c=>c.id===courseId);
+  if(!classDate || !course || !(+course.max_students>0)){ el.style.display='none'; return {blocked:false}; }
+  const r = checkClassCapacity_(courseId, classDate, endDate, classTime, addCount, excludeStudentId);
+  el.style.display='block';
+  if(r.blocked){
+    el.style.cssText='display:block;margin-top:6px;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:600;background:#fdecea;border:1.5px solid var(--red);color:#a5231a';
+    el.innerHTML = `🚫 Lớp này đã ĐỦ sĩ số (${r.count}/${r.max}) — không thể thêm học viên vào đúng lớp/buổi học này nữa. Hãy chọn ngày/giờ học khác hoặc mở lớp mới.`;
+  } else if(r.warn){
+    el.style.cssText='display:block;margin-top:6px;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:600;background:#fff8e6;border:1.5px solid #e0b04a;color:#a15c00';
+    el.innerHTML = `⚠️ Lớp sắp đầy: ${r.count}/${r.max} — còn ${r.remaining} chỗ.`;
+  } else {
+    el.style.cssText='display:block;margin-top:6px;padding:6px 10px;border-radius:8px;font-size:11.5px;font-weight:600;background:#eafaf1;border:1px solid rgba(39,174,96,.35);color:#1a7a4a';
+    el.innerHTML = `✅ Sĩ số lớp: ${r.count}/${r.max}`;
+  }
+  return r;
+}
+
+// ── Form Thêm học viên (fs-*) ──
+function updateFsCapacity(){
+  const type=document.getElementById('fs-type')?.value;
+  if(type!=='Offline'){ const el=document.getElementById('fs-capacity-info'); if(el) el.style.display='none'; return; }
+  const courseId=document.getElementById('fs-course-id')?.value;
+  const classDate=document.getElementById('fs-class-date')?.value;
+  const endDate=document.getElementById('fs-end-date')?.value||classDate;
+  const classTime=document.getElementById('fs-class-time')?.value;
+  const addCount=Math.max(1,+document.getElementById('fs-student-count')?.value||1);
+  renderCapacityIndicator_('fs-capacity-info', courseId, classDate, endDate, classTime, addCount, null);
+}
+
+// ── Form Sửa học viên (es-*) ──
+function updateEsCapacity(){
+  const type=document.getElementById('es-type')?.value;
+  const id=document.getElementById('es-id')?.value;
+  if(type!=='Offline'){ const el=document.getElementById('es-capacity-info'); if(el) el.style.display='none'; return; }
+  const courseId=document.getElementById('es-course-id')?.value;
+  const classDate=document.getElementById('es-class-date')?.value;
+  const endDate=document.getElementById('es-end-date')?.value||classDate;
+  const classTime=document.getElementById('es-class-time')?.value;
+  const s=D.students.find(x=>x.id===id);
+  const addCount=Math.max(1,+document.getElementById('es-student-count')?.value||s?.student_count||1);
+  renderCapacityIndicator_('es-capacity-info', courseId, classDate, endDate, classTime, addCount, id);
+}
+
+// ── Form Dời lịch (rs-*) — giữ nguyên khóa học + giờ học, chỉ đổi ngày ──
+function updateRsCapacity(){
+  const s=D.students.find(x=>x.id===selectedStudentId);if(!s)return;
+  if(s.type!=='Offline'){ const el=document.getElementById('rs-capacity-info'); if(el) el.style.display='none'; return; }
+  const classDate=document.getElementById('rs-class-date')?.value;
+  const endDate=document.getElementById('rs-end-date')?.value||classDate;
+  renderCapacityIndicator_('rs-capacity-info', s.course_id, classDate, endDate, s.class_time, s.student_count||1, s.id);
+}
+
+// ══════════════════════════════════════════════════
+// ★ ĐIỂM DANH HỌC VIÊN THEO TỪNG LỚP (chỉ Offline) — điểm danh RIÊNG theo
+// TỪNG NGÀY học cụ thể: nếu 1 lớp học nhiều ngày (VD 10/9 → 12/9), mỗi ngày có
+// 1 lượt điểm danh riêng biệt, không gộp chung cả đợt. "1 lớp" = đúng 1 lần mở
+// lớp cụ thể (cùng khóa học + cùng ngày bắt đầu/kết thúc/giờ học), giống hệt
+// cách nhóm "buổi học" đã dùng ở Checklist chuẩn bị & sĩ số tối đa/lớp phía trên.
+// ══════════════════════════════════════════════════
+let _atSessionKey = '';
+let _atDay = '';
+
+// Gom nhóm TOÀN BỘ học viên Offline (cả quá khứ lẫn tương lai — điểm danh cần
+// xem lại được cả lớp đã học xong) theo đúng buổi học, kèm danh sách học viên
+// đầy đủ (không chỉ đếm số lượng như buildClassSessions() dùng cho Checklist).
+function buildAttendanceSessions_(){
+  const map = {};
+  D.students.filter(s=>s.type==='Offline'&&s.class_date&&!s.deleted_at&&s.status!=='Đã xóa').forEach(s=>{
+    const key = [s.class_date, s.end_date||s.class_date, s.class_time||'', s.course_id||s.course||''].join('|');
+    if(!map[key]){
+      const course = D.courses.find(c=>c.id===s.course_id);
+      map[key] = {
+        key, class_date:s.class_date, end_date:s.end_date||s.class_date, class_time:s.class_time||'',
+        course_id:s.course_id||'', course_name: course?course.name:(s.course||'—'),
+        students:[]
+      };
+    }
+    map[key].students.push(s);
+  });
+  const todayStr_ = dateStr(new Date());
+  const list = Object.values(map);
+  list.forEach(s=>{ s.isActive = s.class_date<=todayStr_ && (s.end_date||s.class_date)>=todayStr_; });
+  // Lớp đang diễn ra lên đầu; còn lại sắp theo khoảng cách gần ngày hôm nay nhất
+  // (tương lai gần & quá khứ gần đều ưu tiên hơn các lớp xa ngày hôm nay).
+  list.sort((a,b)=>{
+    if(a.isActive!==b.isActive) return a.isActive?-1:1;
+    const da=Math.abs(new Date(a.class_date+'T00:00:00')-new Date(todayStr_+'T00:00:00'));
+    const db=Math.abs(new Date(b.class_date+'T00:00:00')-new Date(todayStr_+'T00:00:00'));
+    return da-db;
+  });
+  return list;
+}
+
+// Khai triển khoảng [class_date, end_date] thành danh sách từng ngày cụ thể —
+// mỗi ngày là 1 lượt điểm danh riêng. Chặn tối đa 400 ngày (hơn 1 năm — đủ cho
+// mọi khóa học thực tế, kể cả khóa kéo dài vài tháng) CHỈ để tránh vòng lặp vô
+// hạn nếu dữ liệu ngày bị lỗi (VD end_date nhập nhầm cách xa class_date hàng
+// chục năm) — không nhằm giới hạn khóa học hợp lệ.
+function expandSessionDays_(sess){
+  const start = sess.class_date;
+  const end = sess.end_date||sess.class_date;
+  const d0 = new Date(start+'T00:00:00');
+  const dEnd = new Date(end+'T00:00:00');
+  if(isNaN(d0)||isNaN(dEnd)||d0>dEnd) return [start];
+  const days=[]; let d=d0; let guard=0;
+  while(d<=dEnd && guard<400){ days.push(dateStr(d)); d=new Date(d.getFullYear(),d.getMonth(),d.getDate()+1); guard++; }
+  return days.length?days:[start];
+}
+
+function attSessionLabel_(sess){
+  let d = formatDateVN_(sess.class_date);
+  if(sess.end_date && sess.end_date!==sess.class_date) d += ' - '+formatDateVN_(sess.end_date);
+  return `${sess.isActive?'🟢 ':''}${d}${sess.class_time?', '+sess.class_time:''} — ${sess.course_name} (${sess.students.length} học viên)`;
+}
+
+function renderAttendancePanel(){
+  const sel = document.getElementById('at-session-select');
+  if(!sel) return;
+  const sessions = buildAttendanceSessions_();
+  const preview = document.getElementById('at-session-preview');
+  const dayPicker = document.getElementById('at-day-picker');
+  const listEl = document.getElementById('at-student-list');
+  if(!sessions.length){
+    sel.innerHTML = '<option value="">— Chưa có lớp Offline nào —</option>';
+    preview.style.display='none'; dayPicker.style.display='none'; dayPicker.innerHTML='';
+    listEl.innerHTML = '<div style="text-align:center;padding:24px;color:var(--muted)">Chưa có lớp Offline nào để điểm danh — thêm học viên Offline kèm ngày học cụ thể trước đã.</div>';
+    return;
+  }
+  const prevKey = _atSessionKey;
+  sel.innerHTML = '<option value="">— Chọn lớp —</option>' +
+    sessions.map(s=>`<option value="${s.key}">${attSessionLabel_(s)}</option>`).join('');
+  // Giữ lại lớp đang xem nếu vẫn còn tồn tại; không thì tự chọn lớp đang diễn ra
+  // hôm nay (nếu có); nếu cũng không có thì để trống, không tự đoán bừa.
+  const target = sessions.find(s=>s.key===prevKey) || sessions.find(s=>s.isActive) || null;
+  sel.value = target ? target.key : '';
+  atSessionChanged();
+}
+
+function renderDayPicker_(sess){
+  const dayPicker = document.getElementById('at-day-picker');
+  if(!dayPicker) return;
+  const days = expandSessionDays_(sess);
+  const todayStr_ = dateStr(new Date());
+  if(days.length<=1){ dayPicker.style.display='none'; dayPicker.innerHTML=''; return; }
+  dayPicker.style.cssText='display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px';
+  dayPicker.innerHTML = days.map(d=>{
+    const active = d===_atDay;
+    const isToday = d===todayStr_;
+    return `<button onclick="atDayChanged('${d}')" style="padding:6px 12px;border-radius:20px;border:1.5px solid ${active?'var(--brand)':'var(--border)'};background:${active?'var(--brand)':'#fff'};color:${active?'#fff':'var(--text)'};font-size:12px;font-weight:600;cursor:pointer">${formatDateVN_(d)}${isToday?' · Hôm nay':''}</button>`;
+  }).join('');
+}
+
+function atSessionChanged(){
+  const key = document.getElementById('at-session-select').value;
+  _atSessionKey = key;
+  const preview = document.getElementById('at-session-preview');
+  const dayPicker = document.getElementById('at-day-picker');
+  const listEl = document.getElementById('at-student-list');
+  if(!key){
+    preview.style.display='none'; dayPicker.style.display='none'; dayPicker.innerHTML='';
+    listEl.innerHTML=''; _atDay='';
+    return;
+  }
+  const sess = buildAttendanceSessions_().find(s=>s.key===key);
+  if(!sess){ preview.style.display='none'; dayPicker.style.display='none'; listEl.innerHTML=''; return; }
+  preview.style.display='';
+  const dateRangeStr = sess.end_date&&sess.end_date!==sess.class_date
+    ? formatDateVN_(sess.class_date)+' - '+formatDateVN_(sess.end_date)
+    : formatDateVN_(sess.class_date);
+  preview.innerHTML = `📚 <b>${sess.course_name}</b> — ${sess.students.length} học viên · 📅 ${dateRangeStr}${sess.class_time?' · 🕐 '+sess.class_time:''}`;
+
+  const days = expandSessionDays_(sess);
+  const todayStr_ = dateStr(new Date());
+  _atDay = days.includes(todayStr_) ? todayStr_ : (days.filter(d=>d<=todayStr_).pop() || days[0]);
+  renderDayPicker_(sess);
+  renderAttendanceDayList();
+}
+
+function atDayChanged(day){
+  _atDay = day;
+  const sess = buildAttendanceSessions_().find(s=>s.key===_atSessionKey);
+  if(sess) renderDayPicker_(sess);
+  renderAttendanceDayList();
+}
+
+// Trạng thái điểm danh của 1 học viên vào 1 ngày cụ thể: 'present'|'absent'|''
+// (chuỗi rỗng = chưa điểm danh). courseId dùng làm 1 phần khóa để 2 học viên
+// trùng ID (không thể xảy ra, nhưng phòng hờ) hay 1 học viên học lại khóa khác
+// vào đúng ngày không bị lẫn dữ liệu điểm danh của nhau.
+function getAttendanceStatus_(studentId, courseId, date){
+  const row = D.classAttendance.find(r=>r.student_id===studentId && r.course_id===(courseId||'') && r.date===date);
+  return row ? row.status : '';
+}
+
+function renderAttendanceDayList(){
+  const listEl = document.getElementById('at-student-list');
+  if(!listEl) return;
+  const sess = buildAttendanceSessions_().find(s=>s.key===_atSessionKey);
+  if(!sess || !_atDay){ listEl.innerHTML=''; return; }
+  const students = [...sess.students].sort((a,b)=>(a.name||'').localeCompare(b.name||'','vi'));
+  let present=0, absent=0, blank=0;
+  const cfgMap = {
+    present:{label:'✓ Có mặt', bg:'#eafaf1', border:'var(--green)', color:'#1a7a4a'},
+    absent: {label:'✗ Vắng',   bg:'#fdecea', border:'var(--red)',   color:'#a5231a'},
+    '':     {label:'— Chưa điểm danh', bg:'#f9f9f9', border:'var(--border)', color:'var(--muted)'}
+  };
+  const rows = students.map(s=>{
+    const st = getAttendanceStatus_(s.id, sess.course_id, _atDay);
+    if(st==='present') present++; else if(st==='absent') absent++; else blank++;
+    const c = cfgMap[st]||cfgMap[''];
+    return `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;margin-bottom:6px">
+      <div>
+        <div style="font-weight:700;font-size:13px">${s.name}</div>
+        <div style="font-size:11px;color:var(--muted)">${normPhone(s.phone)||''}</div>
+      </div>
+      <button onclick="toggleAttendance('${s.id}','${sess.course_id}','${_atDay}')" style="padding:6px 14px;border-radius:20px;border:1.5px solid ${c.border};background:${c.bg};color:${c.color};font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">${c.label}</button>
+    </div>`;
+  }).join('');
+  listEl.innerHTML = `
+    <div style="display:flex;gap:14px;margin-bottom:10px;font-size:12px;font-weight:600;flex-wrap:wrap">
+      <span style="color:#1a7a4a">✓ Có mặt: ${present}</span>
+      <span style="color:#a5231a">✗ Vắng: ${absent}</span>
+      <span style="color:var(--muted)">— Chưa điểm danh: ${blank}</span>
+      <span style="color:var(--muted)">Tổng: ${students.length} học viên</span>
+    </div>
+    ${rows || '<div style="text-align:center;padding:16px;color:var(--muted)">Lớp này chưa có học viên</div>'}
+  `;
+}
+
+// Bấm để chuyển trạng thái: chưa điểm danh → Có mặt → Vắng → chưa điểm danh (xóa).
+async function toggleAttendance(studentId, courseId, date){
+  const cur = getAttendanceStatus_(studentId, courseId, date);
+  const next = cur===''?'present':cur==='present'?'absent':'';
+  const id = `${studentId}_${courseId||'x'}_${date}`;
+  try{
+    if(next===''){
+      await sbDel('class_attendance', `?id=eq.${id}`);
+      D.classAttendance = D.classAttendance.filter(r=>r.id!==id);
+    } else {
+      const row = {id, student_id:studentId, course_id:courseId||'', date, status:next, updated_at:new Date().toISOString()};
+      await sbUpsert('class_attendance', row);
+      const idx = D.classAttendance.findIndex(r=>r.id===id);
+      if(idx>=0) D.classAttendance[idx]=row; else D.classAttendance.push(row);
+    }
+    renderAttendanceDayList();
+  }catch(e){ notify('Lỗi lưu điểm danh: '+e.message, false); }
 }
 
 // ══════════════════════════════════════════════════
@@ -7581,6 +7970,7 @@ function openRescheduleStudent(){
   document.getElementById('rs-end-date').value = s.end_date||'';
   document.getElementById('rs-reason').value = '';
   showM('modal-reschedule-student');
+  updateRsCapacity();
 }
 
 async function confirmRescheduleStudent(){
@@ -7589,6 +7979,16 @@ async function confirmRescheduleStudent(){
   const newEnd = document.getElementById('rs-end-date').value;
   const reason = document.getElementById('rs-reason').value.trim();
   if(!newDate){notify('Chọn ngày học mới!',false);return;}
+
+  // ★ Chặn sĩ số tối đa/lớp (Offline) — dời học viên sang buổi mới cũng phải kiểm
+  // tra sĩ số của buổi ĐÍCH, loại trừ chính học viên này (giữ nguyên khóa+giờ học).
+  if(s.type==='Offline'){
+    const cap=checkClassCapacity_(s.course_id, newDate, newEnd||newDate, s.class_time, s.student_count||1, s.id);
+    if(cap.blocked){
+      notify(`🚫 Buổi học ngày ${formatDateVN_(newDate)} đã đủ sĩ số (${cap.count}/${cap.max}) — không thể dời học viên vào buổi này!`,false);
+      return;
+    }
+  }
 
   const oldDate = s.class_date;
   const oldEnd = s.end_date;
@@ -7746,7 +8146,7 @@ function openEditStudent(){
   if(esSocial) esSocial.value = s.social_name||'';
 
   closeM('modal-student-detail');
-  setTimeout(()=>showM('modal-edit-student'),150);
+  setTimeout(()=>{showM('modal-edit-student');updateEsCapacity();},150);
 }
 
 function calcEditFee(){
@@ -7800,6 +8200,28 @@ async function saveEditStudent(){
     contact_channel,
     social_name:document.getElementById('es-social-name')?.value.trim()||'',
   };
+  // ★ Chặn sĩ số tối đa/lớp (Offline) — kiểm tra lại NGAY TRƯỚC KHI LƯU, loại trừ
+  // chính học viên đang sửa (không tự đếm trùng mình khi không đổi lớp). CHỈ kiểm
+  // tra khi thực sự ĐỔI LỚP (khóa/ngày/giờ học) hoặc TĂNG số lượng — nếu chỉ sửa
+  // các trường khác (VD số điện thoại) mà không đổi lớp, KHÔNG chặn, kể cả khi
+  // lớp đó lỡ đã vượt sĩ số mới do MHKL hạ sĩ số tối đa sau này (những học viên cũ
+  // được giữ nguyên, chỉ chặn thêm/chuyển học viên MỚI vào — đúng như đã cảnh báo
+  // lúc sửa khóa học).
+  if(upd.type==='Offline'){
+    // ★ Chuẩn hóa null/undefined/'' về cùng 1 dạng trước khi so sánh (class_time cũ
+    // có thể là null/undefined với học viên nhập từ trước) — tránh báo "đổi lớp"
+    // giả do lệch kiểu dữ liệu, gây chặn nhầm khi thực ra không đổi gì về lớp học.
+    const sessionChanged = (upd.course_id||'')!==(s.course_id||'') || (upd.class_date||'')!==(s.class_date||'') ||
+      (upd.end_date||upd.class_date||'')!==(s.end_date||s.class_date||'') || (upd.class_time||'')!==(s.class_time||'');
+    const countIncreased = (upd.student_count||1) > (s.student_count||1);
+    if(sessionChanged || countIncreased){
+      const cap=checkClassCapacity_(upd.course_id, upd.class_date, upd.end_date||upd.class_date, upd.class_time, upd.student_count, id);
+      if(cap.blocked){
+        notify(`🚫 Lớp này đã đủ sĩ số (${cap.count}/${cap.max}) — không thể chuyển/thêm học viên vào đúng buổi học này nữa!`,false);
+        return;
+      }
+    }
+  }
   try{
     // ★ Chụp lại dữ liệu CŨ trước khi ghi đè, để dựng thông báo trước/sau
     const oldSnapshot = {...s};
@@ -7884,6 +8306,18 @@ async function addStudent(){
   }
   const unitFee=+document.getElementById('fs-fee').value||(course&&!course.is_free?course.fee:0);
   const studentCount=Math.max(1,+document.getElementById('fs-student-count')?.value||1);
+  // ★ Chặn sĩ số tối đa/lớp (Offline) — kiểm tra lại NGAY TRƯỚC KHI LƯU (không chỉ
+  // dựa vào chỉ báo trên form) để không bị vượt sĩ số do dữ liệu vừa đổi ở nơi khác.
+  if(type==='Offline'){
+    const classDate=document.getElementById('fs-class-date').value;
+    const endDate=document.getElementById('fs-end-date').value||classDate;
+    const classTime=document.getElementById('fs-class-time').value;
+    const cap=checkClassCapacity_(courseId, classDate, endDate, classTime, studentCount, null);
+    if(cap.blocked){
+      notify(`🚫 Lớp này đã đủ sĩ số (${cap.count}/${cap.max}) — không thể thêm học viên vào đúng buổi học này nữa!`,false);
+      return;
+    }
+  }
   const feeOrig=unitFee*studentCount; // Tổng học phí gốc = đơn giá × số lượng học viên
   const discType = document.getElementById('fs-discount-type')?.value||'pct';
   const discVal = +document.getElementById('fs-discount-val')?.value||0;
