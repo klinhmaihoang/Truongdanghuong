@@ -4533,6 +4533,11 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       ⚠️ Học phí đặt cọc <b>không được hoàn lại</b>. Hỗ trợ bảo lưu/dời lịch trong 1 năm kể từ ngày đăng ký lịch học đầu tiên, tối đa 2 lần.
     </div>
 
+    <!-- ★ MỚI: xuất ảnh xác nhận thông tin + đặt cọc đợt 1, kèm QR động, gửi học viên xem & chuyển khoản -->
+    <div class="btn-group" style="margin-bottom:14px">
+      <button class="btn btn-sm" style="flex:1;background:#8e44ad;color:#fff" onclick="exportDeposit1ConfirmImage()">🖼️ Xuất ảnh xác nhận đặt cọc đợt 1</button>
+    </div>
+
     <!-- ★ MỚI: đợt thanh toán tùy chỉnh (nếu học viên có cấu hình riêng) -->
     <div id="cf-dynamic-plan" style="display:none"></div>
 
@@ -10523,6 +10528,161 @@ async function saveInvoiceAsImage(orderId){
     link.href = canvas.toDataURL('image/png');
     link.click();
     notify('✅ Đã lưu ảnh hóa đơn: HoaDon_'+order.id+'.png');
+  }catch(e){
+    notify('Lỗi tạo ảnh: '+e.message, false);
+  }finally{
+    document.body.removeChild(holder);
+  }
+}
+
+// ══════════════════════════════════════════════════
+// ★ MỚI: ẢNH XÁC NHẬN THÔNG TIN HỌC VIÊN + ĐẶT CỌC ĐỢT 1
+// Dùng ngay tại tab "Thu học phí", TRƯỚC khi thu tiền — để gửi học
+// viên xem lại toàn bộ thông tin (họ tên, lớp đăng ký, ngày giờ học,
+// tổng học phí, các đợt thanh toán) và quét mã QR động chuyển khoản
+// đặt cọc đợt 1. Đợt 2 trở đi thường học viên đóng trực tiếp tại lớp
+// nên KHÔNG cần ảnh xác nhận lại — chỉ áp dụng cho đợt 1.
+// ══════════════════════════════════════════════════
+function buildDepositConfirmHTML_(s){
+  const ps = getPrintSettings();
+  const size = getPageSizeCss_(ps.invoiceSize);
+  const fs = size.fontScale;
+  const isOnline = s.type==='Online';
+  const fee = s.fee||0;
+  const course = D.courses.find(c=>c.id===s.course_id);
+  const courseName = course?course.name:(s.course||'');
+
+  // Xác định đợt 1 + toàn bộ các đợt để hiển thị, dùng đúng logic
+  // với collectFee(): ưu tiên kế hoạch tùy chỉnh (installment_plan),
+  // nếu không có thì dùng luồng mặc định 30/70 (hoặc 100% nếu Online).
+  const plan = getInstallmentPlan(s);
+  let rows, amt1;
+  if(plan && plan.length){
+    rows = plan.map((it,i)=>({label:'Đợt '+(i+1), pct:it.pct, amount:it.amount, paid:!!it.paid, isFirst:i===0}));
+    amt1 = plan[0]?.amount || 0;
+  } else if(isOnline){
+    amt1 = s.paid1_amount || fee;
+    rows = [{label:'Toàn bộ học phí (Online)', pct:100, amount:amt1, paid:!!s.paid1, isFirst:true}];
+  } else {
+    const dep = s.paid1_amount || Math.round(fee*0.3);
+    const rest = s.paid2_amount || (fee-dep);
+    amt1 = dep;
+    rows = [
+      {label:'Đợt 1', pct: fee?Math.round(dep/fee*100):30, amount:dep, paid:!!s.paid1, isFirst:true},
+      {label:'Đợt 2', pct: fee?Math.round(rest/fee*100):70, amount:rest, paid:!!s.paid2, isFirst:false}
+    ];
+  }
+
+  const bankId=cfg.bankId||'', accNo=cfg.bankAcc||'', accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
+  const qrUrl = (bankId&&accNo)
+    ? `https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amt1}&addInfo=${encodeURIComponent((isOnline?'Hoc phi Online ':'Hoc phi dot 1 ')+s.name)}&accountName=${encodeURIComponent(accName)}`
+    : '';
+
+  let dateLabel='';
+  if(s.class_date){
+    dateLabel = formatDateVN_(s.class_date);
+    if(s.end_date && s.end_date!==s.class_date) dateLabel += ' - '+formatDateVN_(s.end_date);
+  }
+
+  const bodyStyle = `font-family:Arial,sans-serif;font-size:${11*fs}px;color:#222;width:${size.bodyWidth};margin:0;padding:5mm 3mm;background:#fff`;
+  const styleBlock = `
+    *{box-sizing:border-box}
+    .tdh-inv{${bodyStyle}}
+    .tdh-inv .header{background:#FF8C00;color:#fff;text-align:center;padding:10px;border-radius:6px;margin-bottom:14px}
+    .tdh-inv .header h1{font-size:${13*fs}px;font-weight:bold;margin-bottom:2px}
+    .tdh-inv .header p{font-size:${10*fs}px;opacity:.9}
+    .tdh-inv .title{text-align:center;font-size:${12*fs}px;font-weight:bold;color:#FF8C00;margin-bottom:8px;letter-spacing:.5px}
+    .tdh-inv .divider{border:none;border-top:1px solid #ddd;margin:8px 0}
+    .tdh-inv .row{display:flex;justify-content:space-between;padding:4px 0;font-size:${12*fs}px}
+    .tdh-inv .row .label{color:#888}
+    .tdh-inv .row .value{font-weight:500;text-align:right;max-width:60%}
+    .tdh-inv .plan-box{background:#f9f9f9;border-radius:6px;padding:10px;margin:10px 0}
+    .tdh-inv .plan-box h3{font-size:${11*fs}px;font-weight:bold;margin-bottom:6px;color:#555}
+    .tdh-inv .total-box{background:#fff3e0;border:1.5px solid #FF8C00;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin:12px 0}
+    .tdh-inv .total-box .label{font-size:${13*fs}px;font-weight:bold;color:#cc5500}
+    .tdh-inv .total-box .amount{font-size:${14*fs}px;font-weight:bold;color:#cc5500}
+    .tdh-inv .qr{text-align:center;margin:14px 0;padding:10px;background:#f9f9f9;border-radius:8px}
+    .tdh-inv .qr img{width:${160*fs}px;height:${160*fs}px;border-radius:6px;border:2px solid #FF8C00}
+    .tdh-inv .qr p{font-size:${10*fs}px;color:#555;margin-top:6px;font-weight:600}
+    .tdh-inv .note{font-size:${10*fs}px;color:#a15c00;background:#fff8e6;border:1px dashed #e0b04a;border-radius:6px;padding:8px 10px;margin-top:10px;line-height:1.5}
+    .tdh-inv .footer{text-align:center;font-size:${9*fs}px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:12px}
+    ${size.pageCss}
+  `;
+
+  const bodyHtml = `<div class="tdh-inv">
+  <div class="header">
+    <h1>${ps.headerTitle}</h1>
+    <p>${ps.headerSub}</p>
+  </div>
+  <div class="title">XÁC NHẬN THÔNG TIN &amp; ĐẶT CỌC ĐỢT 1</div>
+  <div class="row"><span class="label">Học viên:</span><span class="value">${s.name||''}</span></div>
+  ${s.phone?`<div class="row"><span class="label">SĐT:</span><span class="value">${normPhone(s.phone)}</span></div>`:''}
+  <div class="row"><span class="label">Lớp đăng ký:</span><span class="value">${courseName}</span></div>
+  <div class="row"><span class="label">Hình thức:</span><span class="value">${s.type||''}</span></div>
+  ${dateLabel?`<div class="row"><span class="label">Ngày học:</span><span class="value">${dateLabel}</span></div>`:''}
+  ${s.class_time?`<div class="row"><span class="label">Giờ học:</span><span class="value">${s.class_time}</span></div>`:''}
+  <hr class="divider"/>
+  <div class="plan-box">
+    <h3>HỌC PHÍ &amp; CÁC ĐỢT THANH TOÁN</h3>
+    <div class="row" style="font-size:${12*fs}px"><span class="label">Tổng học phí:</span><span class="value" style="font-weight:700">${fmt(fee)}</span></div>
+    <table style="width:100%;border-collapse:collapse;margin-top:6px">
+      <tr style="border-bottom:1px solid #eee;font-size:${10*fs}px;color:#888">
+        <td style="padding:3px 0">Đợt</td>
+        <td style="text-align:right;padding:3px 0">Số tiền</td>
+        <td style="text-align:right;padding:3px 0">Hình thức</td>
+      </tr>
+      ${rows.map(r=>`<tr style="border-bottom:1px dashed #f0f0f0">
+        <td style="padding:5px 0;font-size:${11*fs}px;font-weight:${r.isFirst?700:500};color:${r.isFirst?'#cc5500':'#333'}">${r.label} (${r.pct}%)</td>
+        <td style="text-align:right;padding:5px 0;font-size:${11*fs}px;font-weight:700;color:${r.isFirst?'#cc5500':'#333'}">${fmt(r.amount)}</td>
+        <td style="text-align:right;padding:5px 0;font-size:${10*fs}px;color:#888">${r.isFirst?'Chuyển khoản QR':'Đóng tại lớp'}</td>
+      </tr>`).join('')}
+    </table>
+  </div>
+  <div class="total-box">
+    <span class="label">CẦN THANH TOÁN ĐỢT 1:</span>
+    <span class="amount">${fmt(amt1)}</span>
+  </div>
+  ${qrUrl?`<div class="qr">
+    <div style="font-size:${10*fs}px;color:#888;margin-bottom:6px">Quét mã QR để chuyển khoản đặt cọc đợt 1</div>
+    <img src="${qrUrl}" crossorigin="anonymous" onerror="this.style.display='none'" style="width:${160*fs}px;height:${160*fs}px"/>
+    <div style="margin-top:8px;font-size:${11*fs}px;font-weight:700;color:#cc5500">${fmt(amt1)}</div>
+    ${bankId&&accNo?`<div style="font-size:${10*fs}px;color:#555;margin-top:3px">${bankId.toUpperCase()} — ${accNo}</div>`:''}
+    ${accName?`<div style="font-size:${10*fs}px;color:#888">${accName}</div>`:''}
+    <div style="font-size:${10*fs}px;color:#888;margin-top:2px">Nội dung: ${isOnline?'Hoc phi Online':'Hoc phi dot 1'} ${s.name||''}</div>
+  </div>`:''}
+  <div class="note">📌 Vui lòng kiểm tra kỹ thông tin ở trên. Nếu đúng, chuyển khoản đặt cọc đợt 1 theo mã QR để giữ lịch học. ${rows.length>1?'Đợt tiếp theo đóng trực tiếp khi đến lớp, không cần xác nhận lại.':''}</div>
+  <div class="footer">${ps.footerText || 'Trương Dáng Hương Academy — Phiếu xác nhận tự động từ hệ thống'}</div>
+  </div>`;
+  return {styleBlock, bodyHtml};
+}
+
+async function exportDeposit1ConfirmImage(){
+  const id = document.getElementById('cf-student-id').value;
+  const s = D.students.find(x=>x.id===id);
+  if(!s){notify('Không tìm thấy học viên!',false);return;}
+  if(typeof html2canvas==='undefined'){notify('Chưa tải được thư viện xuất ảnh, thử lại sau!',false);return;}
+  if(!cfg.bankId||!cfg.bankAcc){notify('Chưa cài đặt tài khoản ngân hàng nhận tiền (mục Cài đặt) — ảnh sẽ thiếu QR!',false);}
+  notify('Đang tạo ảnh xác nhận đặt cọc đợt 1...');
+  const {styleBlock, bodyHtml} = buildDepositConfirmHTML_(s);
+  const holder = document.createElement('div');
+  holder.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;';
+  const styleEl = document.createElement('style');
+  styleEl.textContent = styleBlock;
+  holder.appendChild(styleEl);
+  holder.innerHTML += bodyHtml;
+  document.body.appendChild(holder);
+  try{
+    // Đợi ảnh QR tải xong trước khi chụp, tránh bị thiếu QR trong ảnh
+    const imgs = holder.querySelectorAll('img');
+    await Promise.all(Array.from(imgs).map(img=>img.complete?Promise.resolve():new Promise(res=>{img.onload=img.onerror=res;})));
+    const target = holder.querySelector('.tdh-inv');
+    const canvas = await html2canvas(target, {backgroundColor:'#fff', scale:2, useCORS:true});
+    const link = document.createElement('a');
+    const safeName = (s.name||'HocVien').trim().replace(/\s+/g,'_');
+    link.download = 'XacNhanCoc_'+id+'_'+safeName+'.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    notify('✅ Đã lưu ảnh xác nhận đặt cọc đợt 1');
   }catch(e){
     notify('Lỗi tạo ảnh: '+e.message, false);
   }finally{
