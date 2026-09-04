@@ -6947,8 +6947,11 @@ function syncBottomNav(btn){
   if(btn&&btn.classList.contains('bottom-nav-btn'))btn.classList.add('active');
 }
 
+let _goInProgress = false;
 function go(p,btn){
-  // Redirect gộp tab: products→inventory, nvl→pos, schedule→students
+  // Redirect gộp tab: products→inventory, nvl→pos, schedule→students — các lệnh gọi
+  // đệ quy này KHÔNG qua lớp bảo vệ chống chồng lấn bên dưới (đặt trước để không bị
+  // tự chặn chính mình).
   if(p==='products'){
     go('inventory',btn);
     setTimeout(()=>invTab('products',document.getElementById('inv-tab-products')),50);
@@ -6964,6 +6967,13 @@ function go(p,btn){
     setTimeout(()=>{const el=document.getElementById('st-tab-schedule');if(el&&el.onclick)el.onclick();},50);
     return;
   }
+  // ★ FIX: chặn chuyển trang chồng lấn khi bấm quá nhanh/liên tục lúc app đang lag —
+  // nếu 1 lượt go() đang xử lý dở, bỏ qua lượt gọi mới cho tới khi lượt cũ xong hẳn,
+  // tránh tình trạng 2 trang cùng hiện ra do việc ẩn/hiện bị chồng lấn giữa chừng.
+  if(_goInProgress) return;
+  _goInProgress = true;
+  setTimeout(()=>{ _goInProgress = false; }, 120);
+
   document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));
   const pg=document.getElementById('page-'+p);
   if(pg) pg.classList.add('active');
