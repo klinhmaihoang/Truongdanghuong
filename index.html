@@ -9109,13 +9109,17 @@ async function importStock(){
   if(!qty||qty<=0){notify('Nhập số lượng hợp lệ!',false);return;}
   const mat=D.inventory.find(i=>i.id===id);if(!mat)return;
   const oldQty=mat.qty;
+  const oldCost=mat.cost;
   const total = Math.round(qty * price);
   mat.qty=Math.round((mat.qty+qty)*100)/100;
+  if(price>0) mat.cost=price; // ★ Fix bug: lưu giá nhập mới nhất làm giá vốn nguyên liệu (trước đây chỉ cập nhật qty, không cập nhật cost)
   try{
-    await sbPatch('inventory',{qty:mat.qty},`?id=eq.${id}`);
+    const invPatch = {qty:mat.qty};
+    if(price>0) invPatch.cost = price; // ★ Fix bug: ghi giá nhập đợt này vào DB_inventory.cost
+    await sbPatch('inventory',invPatch,`?id=eq.${id}`);
     const logNote = ['['+purposeLabel+']', sup, price?fmt(price)+'/đv':'', note].filter(Boolean).join(' — ');
     const log={id:uid(),time:nowDT(),name:mat.name,type:'Nhập',qty:qty,unit:mat.unit,
-      note:logNote,created_at:Date.now()};
+      note:logNote,created_at:Date.now(),mat_id:id,mat_qty:qty,price:price}; // ★ Thêm price: lưu lại giá nhập của đợt này vào lịch sử kho
     await sbUpsert('stock_log',log);D.stockLog.unshift(log);
 
     // Tự động tạo phiếu chi nếu có giá tiền và chọn trả ngay/ghi nợ
@@ -9164,7 +9168,7 @@ async function importStock(){
       setTimeout(()=>gsSend({sheet:'BaoCaoLaiLo',rows:gsBaoCaoData(),time:nowDT()}),1500);
     }
 
-  }catch(e){mat.qty=oldQty;notify('Lưu thất bại: '+e.message,false);}
+  }catch(e){mat.qty=oldQty;mat.cost=oldCost;notify('Lưu thất bại: '+e.message,false);}
 }
 
 async function exportStock(){
