@@ -3570,53 +3570,12 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
   </div>
 
-  <!-- ══ ĐỔI MẬT KHẨU ══ -->
+  <!-- ══ ĐỔI MẬT KHẨU ══ (đã chuyển thành modal, mở qua nút "🔑 Đổi mật khẩu" ở
+       thanh trên cùng — luôn hiện sẵn cho mọi vai trò, xem openChangePasswordModal()) -->
   <div class="card" style="border-color:rgba(255,140,0,.3)">
     <div class="card-head"><span class="card-title">🔑 Đổi mật khẩu</span></div>
-    <div id="chpw-account-info" style="font-size:13px;color:var(--muted);margin-bottom:14px">
-      Đang đăng nhập: <strong id="chpw-username" style="color:var(--brown)">—</strong>
-    </div>
-    <div class="form-row">
-      <div class="fg">
-        <label>Mật khẩu hiện tại *</label>
-        <div style="position:relative">
-          <input id="chpw-old" type="password" placeholder="Nhập mật khẩu hiện tại..."
-            style="width:100%;padding:9px 36px 9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"/>
-          <button onclick="togglePw('chpw-old')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted)">👁</button>
-        </div>
-      </div>
-    </div>
-    <div class="form-row">
-      <div class="fg">
-        <label>Mật khẩu mới *</label>
-        <div style="position:relative">
-          <input id="chpw-new" type="password" placeholder="Tối thiểu 6 ký tự..." oninput="chpwStrength()"
-            style="width:100%;padding:9px 36px 9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"/>
-          <button onclick="togglePw('chpw-new')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted)">👁</button>
-        </div>
-        <!-- Thanh độ mạnh mật khẩu -->
-        <div id="chpw-strength-bar" style="height:4px;border-radius:2px;margin-top:5px;background:var(--dim);overflow:hidden">
-          <div id="chpw-strength-fill" style="height:4px;border-radius:2px;width:0%;transition:.3s"></div>
-        </div>
-        <div id="chpw-strength-label" style="font-size:11px;color:var(--muted);margin-top:3px"></div>
-      </div>
-      <div class="fg">
-        <label>Xác nhận mật khẩu mới *</label>
-        <div style="position:relative">
-          <input id="chpw-confirm" type="password" placeholder="Nhập lại mật khẩu mới..." oninput="chpwCheckMatch()"
-            style="width:100%;padding:9px 36px 9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"/>
-          <button onclick="togglePw('chpw-confirm')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted)">👁</button>
-        </div>
-        <div id="chpw-match-label" style="font-size:11px;margin-top:3px"></div>
-      </div>
-    </div>
-    <div id="chpw-error" style="display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;font-size:12px;color:#dc2626;margin-bottom:12px"></div>
-    <div class="btn-group">
-      <button class="btn btn-green btn-sm" onclick="changePassword()">💾 Đổi mật khẩu</button>
-      <button class="btn btn-ghost btn-sm" onclick="chpwClear()">Hủy</button>
-    </div>
-    <div class="guide" style="margin-top:12px">
-      💡 Mật khẩu được lưu trên trình duyệt này. Nếu muốn đổi trên thiết bị khác, cần thực hiện lại trên thiết bị đó.
+    <div class="guide" style="margin-bottom:0">
+      Bấm nút "🔑 Đổi mật khẩu" ở góc trên cùng bên phải màn hình (cạnh tên đăng nhập) để đổi mật khẩu — mở được từ mọi trang, mọi vai trò.
     </div>
   </div>
 
@@ -4681,6 +4640,54 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
 </div>
 
 <!-- ★ MỚI: Thêm/Sửa Checklist chuẩn bị buổi học -->
+<!-- ★ MỚI: Đổi mật khẩu — modal độc lập, mở được từ MỌI vai trò qua nút ở thanh
+     trên cùng (không còn phụ thuộc trang Cài đặt bị ẩn với 1 số vai trò) -->
+<div class="overlay" id="modal-change-password">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-title">🔑 Đổi mật khẩu</div>
+    <div id="chpw-account-info" style="font-size:13px;color:var(--muted);margin-bottom:14px">
+      Đang đăng nhập: <strong id="chpw-username" style="color:var(--brown)">—</strong>
+    </div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>Mật khẩu hiện tại *</label>
+      <div style="position:relative">
+        <input id="chpw-old" type="password" placeholder="Nhập mật khẩu hiện tại..."
+          style="width:100%;padding:9px 36px 9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"/>
+        <button onclick="togglePw('chpw-old')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted)">👁</button>
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>Mật khẩu mới *</label>
+      <div style="position:relative">
+        <input id="chpw-new" type="password" placeholder="Tối thiểu 6 ký tự..." oninput="chpwStrength()"
+          style="width:100%;padding:9px 36px 9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"/>
+        <button onclick="togglePw('chpw-new')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted)">👁</button>
+      </div>
+      <div id="chpw-strength-bar" style="height:4px;border-radius:2px;margin-top:5px;background:var(--dim);overflow:hidden">
+        <div id="chpw-strength-fill" style="height:4px;border-radius:2px;width:0%;transition:.3s"></div>
+      </div>
+      <div id="chpw-strength-label" style="font-size:11px;color:var(--muted);margin-top:3px"></div>
+    </div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>Xác nhận mật khẩu mới *</label>
+      <div style="position:relative">
+        <input id="chpw-confirm" type="password" placeholder="Nhập lại mật khẩu mới..." oninput="chpwCheckMatch()"
+          style="width:100%;padding:9px 36px 9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;box-sizing:border-box"/>
+        <button onclick="togglePw('chpw-confirm')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:14px;color:var(--muted)">👁</button>
+      </div>
+      <div id="chpw-match-label" style="font-size:11px;margin-top:3px"></div>
+    </div>
+    <div id="chpw-error" style="display:none;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:8px 12px;font-size:12px;color:#dc2626;margin-bottom:12px"></div>
+    <div class="btn-group">
+      <button class="btn btn-green btn-sm" onclick="changePassword()">💾 Đổi mật khẩu</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeChangePasswordModal()">Hủy</button>
+    </div>
+    <div class="guide" style="margin-top:12px">
+      💡 Sau khi đổi thành công, lần đăng nhập sau dùng mật khẩu mới.
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="modal-add-checklist">
   <div class="modal wide">
     <div class="modal-title">✅ Checklist chuẩn bị buổi học</div>
@@ -13225,6 +13232,7 @@ async function changePassword() {
   }
 
   chpwClear();
+  closeChangePasswordModal();
   notify(`✅ Đổi mật khẩu thành công! Lần đăng nhập sau dùng mật khẩu mới.`);
   tgMsg(`🔑 *Đổi mật khẩu thành công!*\n\n👤 Tài khoản: ${AUTH_CURRENT.user}\n🕐 ${new Date().toLocaleString('vi-VN')}\n\n_Trương Dáng Hương Academy_`);
 }
@@ -13333,9 +13341,24 @@ function _authUpdateTopbar() {
     <span style="font-size:12px;font-weight:600;color:var(--brown)">
       ${AUTH_CURRENT.role==='admin'?'👑':'👤'} ${AUTH_CURRENT.user}
     </span>
+    <button onclick="openChangePasswordModal()" style="padding:4px 10px;background:rgba(255,140,0,.1);border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:11px;color:var(--brown);font-family:inherit">🔑 Đổi mật khẩu</button>
     <button onclick="doLogout()" style="padding:4px 10px;background:rgba(255,140,0,.15);border:1px solid var(--brand);border-radius:6px;cursor:pointer;font-size:11px;color:var(--brown);font-family:inherit">Đăng xuất</button>
   `;
   topbar.appendChild(badge);
+}
+
+// ★ FIX: trước đây "Đổi mật khẩu" chỉ nằm trong trang Cài đặt — nhưng trang này bị
+// ẩn hoàn toàn với vai trò staff/sale/warehouse/accountant (xem hideTabs trong
+// _authApplyRole), khiến các vai trò đó KHÔNG BAO GIỜ tự đổi được mật khẩu của
+// chính mình! Giờ chuyển thành modal, mở được từ nút ở thanh trên cùng — LUÔN hiện
+// sẵn cho MỌI vai trò, không phụ thuộc trang nào bị ẩn hay không.
+function openChangePasswordModal(){
+  chpwClear();
+  _chpwUpdateInfo();
+  showM('modal-change-password');
+}
+function closeChangePasswordModal(){
+  closeM('modal-change-password');
 }
 
 
