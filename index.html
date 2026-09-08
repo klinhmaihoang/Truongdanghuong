@@ -13263,11 +13263,16 @@ async function doLogin() {
   try {
     res = await gasCall({action:'login', username:u, password:p});
   } catch(e) {
-    _loginFail('Không kết nối được máy chủ, thử lại sau!');
+    // ★ FIX: trước đây LUÔN hiện "Không kết nối được máy chủ" cho MỌI lỗi, kể cả khi
+    // server trả lời rõ ràng là sai tài khoản/mật khẩu (gasCall ném lỗi kèm nội dung
+    // thật) — khiến không phân biệt được lỗi mạng thật với sai mật khẩu. Giờ hiện
+    // đúng nội dung lỗi từ server nếu có, chỉ dùng câu chung chung khi thực sự không
+    // có thông tin gì (lỗi mạng/timeout thật).
+    _loginFail(e?.message || 'Không kết nối được máy chủ, thử lại sau!');
     return;
   }
   if(!res || res.status !== 'ok' || !res.token) {
-    _loginFail('Tên đăng nhập hoặc mật khẩu không đúng!');
+    _loginFail(res?.error || 'Tên đăng nhập hoặc mật khẩu không đúng!');
     return;
   }
 
@@ -16897,8 +16902,25 @@ function renderSaleUserList() {
         <div style="font-weight:700;font-size:13px">${u.name||u.username}</div>
         <div style="font-size:11px;color:var(--muted)">${u.email||u.username} · ${u.role}</div>
       </div>
+      <button onclick="adminResetUserPassword('${u.id}','${(u.name||u.username).replace(/'/g,"\\'")}')" style="background:none;border:1px solid var(--border);border-radius:6px;padding:3px 8px;color:var(--brand);cursor:pointer;font-size:11px;margin-right:6px">🔑 Đặt lại mật khẩu</button>
       <button onclick="deleteSaleUser('${u.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px">✕ Xóa</button>
     </div>`).join('');
+}
+
+// ★ MỚI: admin đặt lại mật khẩu cho 1 tài khoản bất kỳ — dùng khi nhân viên bị trục
+// trặc không tự đăng nhập/đổi mật khẩu được. Không cần biết mật khẩu cũ của họ.
+// Sau khi đặt xong, đưa mật khẩu MỚI này cho nhân viên để đăng nhập, họ có thể tự
+// đổi sang mật khẩu riêng của mình sau (qua "Đổi mật khẩu" như bình thường).
+async function adminResetUserPassword(id, name) {
+  const newPw = prompt(`Nhập mật khẩu MỚI cho "${name}" (ít nhất 6 ký tự):\n\nSau khi đặt xong, báo mật khẩu này cho ${name} để họ đăng nhập lại — họ có thể tự đổi sang mật khẩu riêng sau đó.`);
+  if(!newPw) return; // bấm Hủy hoặc để trống
+  if(newPw.length < 6) { notify('Mật khẩu phải có ít nhất 6 ký tự!', false); return; }
+  const res = await gasCall({action:'admin_reset_password', id, new_password: newPw});
+  if(!res || res.status !== 'ok') {
+    notify(res?.error || 'Không đặt lại được mật khẩu!', false);
+    return;
+  }
+  notify(`✅ Đã đặt lại mật khẩu cho ${name}. Mật khẩu mới: "${newPw}" — nhớ báo lại cho họ!`);
 }
 
 async function deleteSaleUser(id) {
