@@ -11079,6 +11079,7 @@ function buildDepositConfirmHTML_(s){
   ${s.phone?`<div class="row"><span class="label">SĐT:</span><span class="value">${normPhone(s.phone)}</span></div>`:''}
   <div class="row"><span class="label">Lớp đăng ký:</span><span class="value">${courseName}</span></div>
   <div class="row"><span class="label">Hình thức:</span><span class="value">${s.type||''}</span></div>
+  ${(s.student_count||1)>1?`<div class="row"><span class="label">Số lượng học viên:</span><span class="value">${s.student_count} người</span></div>`:''}
   ${dateLabel?`<div class="row"><span class="label">Ngày học:</span><span class="value">${dateLabel}</span></div>`:''}
   ${s.class_time?`<div class="row"><span class="label">Giờ học:</span><span class="value">${s.class_time}</span></div>`:''}
   ${s.note?`<div class="row"><span class="label">Ghi chú:</span><span class="value">${s.note}</span></div>`:''}
