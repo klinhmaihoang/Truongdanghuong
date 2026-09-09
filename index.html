@@ -3463,7 +3463,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
     <div class="btn-group">
       <button class="btn btn-sm" style="background:#0068ff;color:#fff" onclick="saveZalo()">Lưu &amp; kiểm tra kết nối</button>
-      <button class="btn btn-ghost btn-sm" onclick="zaloMsg('🎉 Đây là tin nhắn test từ Trương Dáng Hương Academy!')">Gửi tin test</button>
+      <button class="btn btn-ghost btn-sm" onclick="zaloSendTest()">Gửi tin test</button>
       <button class="btn btn-ghost btn-sm" onclick="clearZalo()">Xóa cấu hình</button>
     </div>
     <div id="zalo-debug" style="display:none;margin-top:10px;padding:10px;background:#0d1117;border-radius:8px;font-family:monospace;font-size:11px;color:#9fdb9f;white-space:pre-wrap;word-break:break-all;max-height:220px;overflow:auto"></div>
@@ -3505,6 +3505,20 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <button class="btn btn-sm" style="background:#8e44ad;color:#fff" onclick="savePancakeSettings()">Lưu cấu hình</button>
     </div>
     <div id="pancake-token-age" style="font-size:11px;color:var(--muted);margin-top:8px"></div>
+
+    <!-- ★ MỚI (2026-09-09): công tắc TỰ ĐỘNG GỬI — mặc định TẮT (duyệt tay), chỉ bật
+    khi đã tin tưởng nội dung mẫu và đã test đủ nhiều qua "Gửi thử". Khi bật: tin xác
+    nhận cọc (lúc thu đợt 1) và tin nhắc lịch (quét 20h hàng ngày) sẽ GỬI THẲNG cho
+    khách luôn, không cần vào duyệt — nếu gửi lỗi, tự động rơi về hàng đợi để xem lại. -->
+    <div style="border-top:1px dashed var(--border);margin-top:16px;padding-top:14px">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:700;color:#8e44ad">
+        <input type="checkbox" id="pancake-auto-send" style="width:18px;height:18px"/>
+        🚀 Tự động gửi tin nhắn cho khách (không cần duyệt tay)
+      </label>
+      <div class="guide" style="margin-top:8px;background:#fff4e5;border-color:var(--orange);font-size:11.5px">
+        ⚠️ Khi BẬT: tin xác nhận đặt cọc (lúc bấm "Đã thu đợt 1") và tin nhắc lịch học (quét lúc 20h mỗi ngày) sẽ được <b>gửi thẳng cho khách ngay lập tức</b>, KHÔNG còn dừng lại chờ duyệt nữa. Nếu gửi lỗi (VD token hết hạn), tin đó sẽ tự rơi về hàng đợi để bạn xử lý tay. Chỉ nên bật sau khi đã dùng thử ổn định ở chế độ duyệt tay 1 thời gian và tin tưởng nội dung mẫu không cần sửa gì thêm.
+      </div>
+    </div>
 
     <div style="border-top:1px dashed var(--border);margin-top:16px;padding-top:14px">
       <div style="font-size:13px;font-weight:700;color:#8e44ad;margin-bottom:8px">🔗 Tự động ghép ID hội thoại theo SĐT</div>
@@ -5266,7 +5280,7 @@ const sbDel = async (t, f) => {
 let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[],transactions:[],quotations:[],salesOrders:[],soActivities:[],classAttendance:[]};
 let cfg = {tgToken:'',tgChatId:'',zaloToken:'',zaloChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',accPhone:'0984830303',gsUrl:'https://script.google.com/macros/s/AKfycbwk6oBp1yjg8E4AexktyJ2VQpdUImsdBVl47xWBUGtY4Y7Be7kwZIKBf8cOGM6A31oh/exec',
   pancakeToken:'',pancakeFbPageId:'',pancakeZaloPageId:'',pancakeTestConvId:'',pancakeTestPlatform:'zalo',pancakeTokenSavedAt:'',
-  pancakeFbPageToken:'',pancakeZaloPageToken:''};
+  pancakeFbPageToken:'',pancakeZaloPageToken:'',pancakeAutoSend:false};
 let cart=[], invoice=null, selectedStudentId=null, stFilter='all', tgLog=[];
 
 const DEFAULTS = {
@@ -5339,7 +5353,8 @@ async function boot(){
         pancakeTestPlatform: s.pancake_test_platform      ||cfg.pancakeTestPlatform||'zalo',
         pancakeTokenSavedAt: s.pancake_token_saved_at     ||cfg.pancakeTokenSavedAt||'',
         pancakeFbPageToken:  s.pancake_fb_page_token      ||cfg.pancakeFbPageToken||'',
-        pancakeZaloPageToken:s.pancake_zalo_page_token    ||cfg.pancakeZaloPageToken||''
+        pancakeZaloPageToken:s.pancake_zalo_page_token    ||cfg.pancakeZaloPageToken||'',
+        pancakeAutoSend: (s.pancake_auto_send===true||s.pancake_auto_send==='TRUE'||s.pancake_auto_send==='true'||s.pancake_auto_send===1)||false
       };
       saveCfgLocal();
       applyTgUI();
@@ -5573,6 +5588,8 @@ function applyPancakeUI(){
   for(const id in map){ const el=document.getElementById(id); if(el&&map[id]) el.value=map[id]; }
   const tpEl=document.getElementById('pancake-test-platform');
   if(tpEl&&cfg.pancakeTestPlatform) tpEl.value=cfg.pancakeTestPlatform;
+  const asEl=document.getElementById('pancake-auto-send');
+  if(asEl) asEl.checked=!!cfg.pancakeAutoSend;
   const dot=document.getElementById('pancake-dot'), st=document.getElementById('pancake-status');
   if(dot&&st){
     if(cfg.pancakeToken&&(cfg.pancakeFbPageId||cfg.pancakeZaloPageId)){
@@ -5821,7 +5838,8 @@ async function savePancakeSettings(){
     pancakeTestConvId:document.getElementById('pancake-test-convid').value.trim(),
     pancakeTokenSavedAt: tokenChanged ? new Date().toISOString() : (cfg.pancakeTokenSavedAt||new Date().toISOString()),
     pancakeFbPageToken:document.getElementById('pancake-fb-pagetoken')?.value.trim()||'',
-    pancakeZaloPageToken:document.getElementById('pancake-zalo-pagetoken')?.value.trim()||''
+    pancakeZaloPageToken:document.getElementById('pancake-zalo-pagetoken')?.value.trim()||'',
+    pancakeAutoSend:document.getElementById('pancake-auto-send')?.checked||false
   };
   saveCfgLocal();
   await saveSettingsFull();
@@ -9871,10 +9889,27 @@ async function markFeePaid(dotNum){
     // phí" chính — khung tin nhắn tự cập nhật khi soạn xong.
     if(dotNum===1){
       if(s.pancake_conversation_id){
-        queuePancakeMessage_(s, 'deposit_confirm', composeDepositConfirmMessage_(s)).then(okQ=>{
-          renderPancakeStudentPanel('cf-pancake-panel', id);
-          if(okQ) notify('📨 Đã soạn sẵn tin nhắn xác nhận đặt cọc — kéo xuống cuối khung này để xem & gửi');
-        });
+        const msgText=composeDepositConfirmMessage_(s);
+        if(cfg.pancakeAutoSend){
+          // ★ MỚI (2026-09-09): chế độ TỰ ĐỘNG GỬI — gửi thẳng cho khách, không
+          // qua hàng đợi duyệt tay. Nếu gửi lỗi (VD token hết hạn), rơi về hàng
+          // đợi như cũ để admin xử lý tay.
+          pancakeSend(s.pancake_platform||'zalo', s.pancake_conversation_id, msgText).then(r=>{
+            if(r&&r.success){
+              notify(`📨 Đã TỰ ĐỘNG gửi tin xác nhận đặt cọc cho ${s.name}`);
+            } else {
+              queuePancakeMessage_(s, 'deposit_confirm', msgText).then(okQ=>{
+                renderPancakeStudentPanel('cf-pancake-panel', id);
+                notify(`⚠️ Gửi tự động thất bại (${(r&&r.error)||'không rõ'}) — đã đưa vào hàng đợi để gửi tay`,false);
+              });
+            }
+          });
+        } else {
+          queuePancakeMessage_(s, 'deposit_confirm', msgText).then(okQ=>{
+            renderPancakeStudentPanel('cf-pancake-panel', id);
+            if(okQ) notify('📨 Đã soạn sẵn tin nhắn xác nhận đặt cọc — kéo xuống cuối khung này để xem & gửi');
+          });
+        }
       } else {
         notify('ℹ️ Học viên chưa có ID hội thoại Pancake nên chưa soạn được tin nhắn xác nhận đặt cọc — vào "Sửa học viên" để ghép/nhập ID rồi thu lại (hoặc bấm "Chạy tự động ghép ngay" trong Cài đặt → Pancake).', false);
       }
@@ -10518,7 +10553,8 @@ async function saveSettingsFull(){
     pancake_access_token:cfg.pancakeToken||'', pancake_fb_page_id:cfg.pancakeFbPageId||'',
     pancake_zalo_page_id:cfg.pancakeZaloPageId||'', pancake_test_conversation_id:cfg.pancakeTestConvId||'',
     pancake_test_platform:cfg.pancakeTestPlatform||'zalo', pancake_token_saved_at:cfg.pancakeTokenSavedAt||'',
-    pancake_fb_page_token:cfg.pancakeFbPageToken||'', pancake_zalo_page_token:cfg.pancakeZaloPageToken||''
+    pancake_fb_page_token:cfg.pancakeFbPageToken||'', pancake_zalo_page_token:cfg.pancakeZaloPageToken||'',
+    pancake_auto_send:cfg.pancakeAutoSend||false
   });
 }
 
@@ -10575,6 +10611,35 @@ async function zaloMsg(text){
     if(!entry.ok) entry.err = d.error?.message || d.description || JSON.stringify(d);
   }catch(e){entry.text='✗ Lỗi mạng: '+entry.text;entry.err=e.message;}
   addLog(entry);
+}
+
+// ★ MỚI (2026-09-09): "Gửi tin test" cho Zalo Bot trước đây gọi thẳng zaloMsg()
+// — hàm này ÂM THẦM bỏ qua nếu chưa cấu hình, và khi lỗi cũng chỉ ghi vào
+// "Nhật ký gửi" chứ không báo notify() nổi bật — khiến admin bấm nút mà tưởng
+// không có phản hồi gì. Hàm này bọc lại để LUÔN báo rõ kết quả (thành công/lỗi)
+// bằng notify(), kèm text lỗi thật từ Zalo để chẩn đoán (VD: hết hạn phiên chat,
+// bot bị chặn, sai chat_id...).
+async function zaloSendTest(){
+  const t=cfg.zaloToken, c=cfg.zaloChatId;
+  if(!t||!c){ notify('Chưa cấu hình đủ Zalo Bot Token + Chat ID — vào Cài đặt → Zalo Bot để lưu trước.',false); return; }
+  notify('Đang gửi tin test qua Zalo...');
+  const text='🎉 Đây là tin nhắn test từ Trương Dáng Hương Academy!';
+  try{
+    const d=await zaloApiCall(t,'sendMessage',{chat_id:c,text});
+    const ok = d.ok !== false;
+    const entry={time:nowTime(),text:(ok?'✓ Đã gửi: ':'✗ Lỗi: ')+'[Zalo] '+text,ok,err:''};
+    if(ok){
+      notify('✓ Đã gửi tin test Zalo thành công — kiểm tra Zalo OA/Bot xem đã nhận chưa');
+    } else {
+      const errMsg = d.error?.message || d.description || JSON.stringify(d);
+      entry.err=errMsg;
+      notify('✗ Gửi Zalo thất bại: '+errMsg, false);
+    }
+    addLog(entry);
+  }catch(e){
+    notify('✗ Lỗi mạng khi gửi Zalo: '+e.message, false);
+    addLog({time:nowTime(),text:'✗ Lỗi mạng: [Zalo] '+text,ok:false,err:e.message});
+  }
 }
 
 async function saveZalo(){
