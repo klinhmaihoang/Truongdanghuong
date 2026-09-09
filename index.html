@@ -8776,7 +8776,18 @@ async function addStudent(){
 // hình gây phiền lúc thêm học viên) — chỉ báo khi ghép thành công cho ĐÚNG học viên
 // vừa thêm. Dùng lại action 'pancake_auto_match' — an toàn gọi nhiều lần vì chỉ điền
 // cho học viên CHƯA có ID, không đụng ai đã có sẵn.
+// ★ SỬA (2026-09-09, sau khi phát hiện bug "thêm học viên bị treo/hết giờ server"):
+// mỗi lượt quét tốn khá nhiều request lên Pancake + ghi Sheet — nếu thêm liên tiếp
+// nhiều học viên trong thời gian ngắn, KHÔNG được bắn nhiều lượt quét chạy chồng lên
+// nhau (dễ làm nghẽn Apps Script, ảnh hưởng tới cả việc lưu học viên mới). Chỉ cho
+// chạy 1 lượt tại 1 thời điểm, và cách nhau tối thiểu 20 giây.
+let _pancakeAutoMatchSilentBusy = false;
+let _pancakeAutoMatchSilentLastRun = 0;
 async function pancakeAutoMatchSilent_(studentId){
+  const now = Date.now();
+  if(_pancakeAutoMatchSilentBusy || (now - _pancakeAutoMatchSilentLastRun) < 20000) return;
+  _pancakeAutoMatchSilentBusy = true;
+  _pancakeAutoMatchSilentLastRun = now;
   try{
     const r=await gasCall({action:'pancake_auto_match'});
     const result=r.result;
@@ -8789,6 +8800,7 @@ async function pancakeAutoMatchSilent_(studentId){
       notify(`📨 Đã tự động ghép hội thoại Pancake (${st.pancake_platform==='fb'?'Facebook':'Zalo'}) cho ${st.name}`);
     }
   }catch(e){ console.warn('pancakeAutoMatchSilent_ lỗi:', e.message); }
+  finally{ _pancakeAutoMatchSilentBusy = false; }
 }
 
 // ── PRODUCTS ──
