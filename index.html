@@ -5573,26 +5573,21 @@ async function pancakeSend(platform, conversationId, text){
 
 // Soạn nội dung tin nhắn XÁC NHẬN ĐẶT CỌC ĐỢT 1 — gọi ngay sau khi bấm "Đã thu đợt 1"
 // trong markFeePaid(). Nội dung có thể chỉnh sửa lại trong ô preview trước khi gửi.
+// ★ Nội dung mẫu tin nhắn XÁC NHẬN ĐẶT CỌC — đúng nguyên văn MHKL cung cấp
+// (2026-09-09), giọng "Cô" (cô Trương Dáng Hương trực tiếp nhắn) — chỉ thay các
+// chỗ [placeholder] bằng dữ liệu thật, giữ nguyên toàn bộ câu chữ.
 function composeDepositConfirmMessage_(s){
-  const fee=s.fee||0;
-  const isOnline=s.type==='Online';
-  const dep=isOnline?fee:(s.paid1_amount||Math.round(fee*0.3));
-  const remaining=isOnline?0:(fee-dep);
-  const course=D.courses.find(c=>c.id===s.course_id);
-  const courseName=course?course.name:(s.course||'');
   let dateLabel='';
   if(s.class_date){
     dateLabel=formatDateVN_(s.class_date);
     if(s.end_date&&s.end_date!==s.class_date) dateLabel+=' - '+formatDateVN_(s.end_date);
   }
-  let msg = `Chào ${s.name||'bạn'},\n\n`;
-  msg += `Mình là trợ lý của cô Trương Dáng Hương, xin xác nhận đã nhận được tiền cọc của bạn cho lớp "${courseName}".\n\n`;
-  msg += `💰 Đã cọc: ${fmt(dep)}\n`;
-  if(remaining>0) msg += `💵 Còn lại (thu tại lớp): ${fmt(remaining)}\n`;
-  if(dateLabel) msg += `📅 Ngày học: ${dateLabel}\n`;
-  if(s.class_time) msg += `🕐 Giờ học: ${s.class_time}\n`;
-  if(s.location) msg += `📍 Địa điểm: ${s.location}\n`;
-  msg += `\nNếu cần dời lịch hoặc có thắc mắc gì, bạn cứ nhắn lại tin này nhé.\n\nCảm ơn bạn!\nTrương Dáng Hương Academy`;
+  const location=s.location||'(địa điểm sẽ được thông báo)';
+  const timeLabel=s.class_time||'(giờ học)';
+
+  let msg = `Cô đã nhận được tiền cọc, cảm ơn con/em nhé. Cô nhắc lại thông tin lớp học như sau:\n\n`;
+  msg += `* Mình sẽ học tại ${location} lúc ${timeLabel} vào ngày ${dateLabel||'(ngày học)'}\n\n`;
+  msg += `Có gì gần tới ngày học, các bạn trợ lý sẽ nhắn nhắc lịch học cho con/em nhé`;
   return msg;
 }
 
