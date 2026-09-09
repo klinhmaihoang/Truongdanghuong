@@ -5203,24 +5203,27 @@ const sbGet = async (t, f='') => {
 };
 
 // Đọc nhiều bảng trong 1 request GAS (tránh timeout)
+// ★ SỬA (2026-09-09): TRƯỚC ĐÂY hàm này tự bắt và NUỐT MỌI LỖI, trả về {} thay vì
+// báo lỗi ra ngoài — khiến boot()/pollUpdates() (nơi gọi hàm này) không bao giờ biết
+// là có lỗi, và tự hiện "✅ Đã đồng bộ" như bình thường dù dữ liệu tải về hoàn toàn
+// rỗng do lỗi thật (mất kết nối, sai URL Apps Script, token hết hạn, v.v.) — gây
+// hiểu lầm nghiêm trọng "kết nối được nhưng không có data". Mọi nơi gọi hàm này đều
+// ĐÃ SẴN có try/catch xử lý lỗi đúng cách (hiện "Lỗi kết nối"/"Mất kết nối" + thông
+// báo chi tiết) nên bỏ hẳn việc nuốt lỗi ở đây, để lỗi thật sự lộ ra và được xử lý
+// đúng chỗ thay vì bị giấu đi.
 const sbGetBulk = async (tables) => {
-  try {
-    const result = await gasCall({
-      action: 'db_read_bulk',
-      tables: tables.map(t => typeof t === 'string'
-        ? {table:t, filters:null, order:{col:'created_at',dir:'asc'}, limit:null}
-        : t)
-    });
-    const raw = result.results || {};
-    const normalized = {};
-    for (const t in raw) {
-      normalized[t] = (raw[t] || []).map(r => normalizeRow(r, t));
-    }
-    return normalized;
-  } catch(e) {
-    console.warn('sbGetBulk lỗi:', e.message);
-    return {};
+  const result = await gasCall({
+    action: 'db_read_bulk',
+    tables: tables.map(t => typeof t === 'string'
+      ? {table:t, filters:null, order:{col:'created_at',dir:'asc'}, limit:null}
+      : t)
+  });
+  const raw = result.results || {};
+  const normalized = {};
+  for (const t in raw) {
+    normalized[t] = (raw[t] || []).map(r => normalizeRow(r, t));
   }
+  return normalized;
 };
 
 const sbPost   = (t, d) => sbUpsert(t, d);
@@ -5444,7 +5447,10 @@ async function boot(){
 
         setSyncStatus(true,'Đã đồng bộ — '+nowTime());
         render(); // Re-render với đầy đủ data
-      } catch(e){ console.warn('Boot group 2 error:', e.message); }
+      } catch(e){
+        console.warn('Boot group 2 error:', e.message);
+        notify('⚠️ Một phần dữ liệu phụ (kho/sản phẩm/CRM...) tải chưa được: '+e.message,false);
+      }
     }, 100);
 
     // Polling realtime mỗi 15s
@@ -5664,7 +5670,7 @@ function composeDepositConfirmMessage_(s){
 async function queuePancakeMessage_(s, type, content){
   if(!s.pancake_conversation_id){
     console.warn(`Học viên ${s.name} chưa có pancake_conversation_id — bỏ qua soạn tin ${type}.`);
-    return;
+    return false;
   }
   const item={
     id:'PCQ'+Date.now()+'_'+s.id,
@@ -5672,7 +5678,8 @@ async function queuePancakeMessage_(s, type, content){
     type, platform:s.pancake_platform||'zalo', conversation_id:s.pancake_conversation_id,
     content, status:'pending', created_at:new Date().toISOString(), sent_at:'', error:''
   };
-  try{ await sbUpsert('pancake_queue', item); }catch(e){ console.error('queuePancakeMessage_ lỗi:', e.message); }
+  try{ await sbUpsert('pancake_queue', item); return true; }
+  catch(e){ console.error('queuePancakeMessage_ lỗi:', e.message); notify('⚠️ Soạn tin nhắn Pancake thất bại: '+e.message, false); return false; }
 }
 
 async function loadPancakeQueue(){
@@ -5735,7 +5742,7 @@ async function renderPancakeStudentPanel(containerId, studentId){
         <textarea id="pcq-text-${it.id}" style="width:100%;min-height:120px;padding:8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:12.5px" onchange="pancakeQueueEditContent('${it.id}',this.value)">${it.content||''}</textarea>
         <div id="pcq-result-${it.id}" style="font-size:11px;margin-top:4px"></div>
         <div class="btn-group" style="margin-top:6px">
-          <button class="btn btn-ghost btn-sm" onclick="pancakeSendTest('${it.id}')">🧪 Gửi thử</button>
+          <button class="btn btn-ghost btn-sm" onclick="pancakeSendTest('${it.id}', ()=>${refreshCall})">🧪 Gửi thử</button>
           <button class="btn btn-sm" style="background:#27ae60;color:#fff" onclick="pancakeSendReal('${it.id}', ()=>${refreshCall})">✅ Gửi</button>
           <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="pancakeQueueDelete('${it.id}', ()=>${refreshCall})">🗑 Xóa</button>
         </div>
@@ -5744,19 +5751,24 @@ async function renderPancakeStudentPanel(containerId, studentId){
   </div>`;
 }
 
-async function pancakeSendTest(id){
+// ★ SỬA (2026-09-09): sau khi gửi thử (hoặc gửi thật) THÀNH CÔNG, tự động XÓA tin
+// nhắn khỏi hàng đợi luôn (theo yêu cầu MHKL — đỡ tồn đọng/nặng danh sách chờ
+// duyệt). Gửi thử thất bại thì GIỮ LẠI để sửa/thử lại.
+async function pancakeSendTest(id, onDone){
   const textEl=document.getElementById(`pcq-text-${id}`);
   const resEl=document.getElementById(`pcq-result-${id}`);
   const text=textEl?textEl.value:'';
   if(!cfg.pancakeTestConvId){ notify('Chưa cấu hình "Hội thoại test" trong Cài đặt → Pancake!',false); return; }
   if(resEl) resEl.innerHTML='<span style="color:var(--muted)">Đang gửi thử...</span>';
   const r=await pancakeSend(cfg.pancakeTestPlatform||'zalo', cfg.pancakeTestConvId, text);
-  if(resEl){
-    resEl.innerHTML = r.success
-      ? `<span style="color:var(--teal)">✓ Đã gửi thử thành công vào hội thoại test.</span>`
-      : `<span style="color:var(--red)">✗ Lỗi: ${r.error||'không rõ'}</span>`;
+  if(r.success){
+    notify('✓ Đã gửi thử thành công vào hội thoại test — đã xóa khỏi hàng đợi');
+    try{ await sbDel('pancake_queue', `?id=eq.${id}`); }catch(e){}
+    if(onDone) onDone(); else loadPancakeQueue();
+    return;
   }
-  if(!r.success && /invalid.*access.?token/i.test(r.error||'')){
+  if(resEl) resEl.innerHTML = `<span style="color:var(--red)">✗ Lỗi: ${r.error||'không rõ'}</span>`;
+  if(/invalid.*access.?token/i.test(r.error||'')){
     notify('⚠️ Token Pancake đã hết hạn! Vào Cài đặt → Pancake để lấy token mới.',false);
   }
 }
@@ -5775,8 +5787,10 @@ async function pancakeSendReal(id, onDone){
       if(resEl) resEl.innerHTML='<span style="color:var(--muted)">Đang gửi...</span>';
       const r=await pancakeSend(it.platform, it.conversation_id, text);
       if(r.success){
-        await sbPatch('pancake_queue', {status:'sent', sent_at:new Date().toISOString(), content:text}, `?id=eq.${id}`);
-        notify(`✓ Đã gửi tin nhắn cho ${it.student_name}`);
+        // ★ SỬA: xóa hẳn khỏi hàng đợi sau khi gửi thành công (thay vì chỉ đánh dấu
+        // 'sent') — theo yêu cầu MHKL, tránh tồn đọng danh sách.
+        await sbDel('pancake_queue', `?id=eq.${id}`);
+        notify(`✓ Đã gửi tin nhắn cho ${it.student_name} — đã xóa khỏi hàng đợi`);
         if(onDone) onDone(); else loadPancakeQueue();
       }else{
         await sbPatch('pancake_queue', {status:'failed', error:r.error||''}, `?id=eq.${id}`);
@@ -9849,15 +9863,22 @@ async function markFeePaid(dotNum){
     auditLog('payment','student',`Thu học phí ${isOnline?'toàn bộ':'đợt '+dotNum} — ${s.name} — ${fmt(amount)}`);
     notify(`✓ Đã thu ${isOnline?'toàn bộ':'đợt '+dotNum}: ${fmt(amount)}`);
     tgMsg(`💰 *Thu học phí!*\n\n👤 ${s.name}\n📚 ${s.course||'—'}\n💵 ${fmt(amount)} — ${label}\n🕐 ${ts}\n\n_Trương Dáng Hương Academy_`);
-    // ★ MỚI (2026-09-09): soạn sẵn tin nhắn xác nhận đặt cọc qua Pancake khi thu
-    // đợt 1 (không tự động gửi — chỉ soạn sẵn, chờ duyệt ở tab "Tin nhắn chờ gửi").
-    if(dotNum===1 && s.pancake_conversation_id){
-      await queuePancakeMessage_(s, 'deposit_confirm', composeDepositConfirmMessage_(s));
-      renderPancakeStudentPanel('cf-pancake-panel', id);
-      notify('📨 Đã soạn sẵn tin nhắn xác nhận đặt cọc — kéo xuống cuối khung này để xem & gửi');
-    }
     renderStudents();renderOrders();renderDash();
     gsSend({sheet:'HocVien',rows:gsStudents(),time:ts});
+    // ★ MỚI (2026-09-09): soạn sẵn tin nhắn xác nhận đặt cọc qua Pancake khi thu
+    // đợt 1 (không tự động gửi — chỉ soạn sẵn, chờ duyệt trong khung bên dưới).
+    // ★ SỬA: chạy NGẦM (không await) để không làm chậm thao tác "Xác nhận thu học
+    // phí" chính — khung tin nhắn tự cập nhật khi soạn xong.
+    if(dotNum===1){
+      if(s.pancake_conversation_id){
+        queuePancakeMessage_(s, 'deposit_confirm', composeDepositConfirmMessage_(s)).then(okQ=>{
+          renderPancakeStudentPanel('cf-pancake-panel', id);
+          if(okQ) notify('📨 Đã soạn sẵn tin nhắn xác nhận đặt cọc — kéo xuống cuối khung này để xem & gửi');
+        });
+      } else {
+        notify('ℹ️ Học viên chưa có ID hội thoại Pancake nên chưa soạn được tin nhắn xác nhận đặt cọc — vào "Sửa học viên" để ghép/nhập ID rồi thu lại (hoặc bấm "Chạy tự động ghép ngay" trong Cài đặt → Pancake).', false);
+      }
+    }
   }catch(e){notify('Lỗi: '+e.message,false);}
 }
 
