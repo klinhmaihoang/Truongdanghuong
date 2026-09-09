@@ -5603,10 +5603,12 @@ async function pancakeAutoMatch(){
   if(resEl) resEl.textContent='Đang quét hội thoại và so khớp SĐT... (có thể mất chút thời gian nếu nhiều hội thoại)';
   try{
     const r=await gasCall({action:'pancake_auto_match'});
-    const result=r.result||{};
-    if(!result.ok){
+    const result=r.result;
+    if(!result || !result.ok){
+      const errMsg = (result && result.error) ? result.error
+        : 'Server trả về không đúng định dạng — có thể Apps Script chưa được deploy bản mới nhất (Deploy → Manage deployments → Edit → New version → Deploy). Chi tiết: '+JSON.stringify(r);
       if(resEl) resEl.textContent='';
-      notify('Lỗi: '+(result.error||'không rõ'),false);
+      notify('Lỗi: '+errMsg,false);
       return;
     }
     const lines=[`✓ Đã ghép ${result.matchedCount} học viên.`,
