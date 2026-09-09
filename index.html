@@ -398,6 +398,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="tab" onclick="stTab(this,'deleted')" style="color:var(--red)">🗑 Đã xóa</div>
     <div class="tab" onclick="stTab(this,'courses')">📚 Khóa học</div>
     <div class="tab" onclick="stTab(this,'attendance')">✅ Điểm danh</div>
+    <div class="tab" id="st-tab-pancake" onclick="stTab(this,'pancake')">📨 Tin nhắn chờ gửi</div>
   </div>
 
   <!-- Danh sách học viên -->
@@ -436,6 +437,22 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       </div>
       <table><thead><tr><th>Họ tên</th><th class="hide-mobile">Khóa học</th><th class="hide-mobile" style="min-width:80px">Kênh LL</th><th>Học phí</th><th class="hide-mobile">Ngày học</th><th class="hide-mobile">Thanh toán</th><th class="hide-mobile">Trạng thái</th><th></th></tr></thead>
       <tbody id="student-list"></tbody></table>
+    </div>
+  </div>
+
+  <!-- ★ MỚI (2026-09-09): hàng đợi tin nhắn Pancake — chờ admin duyệt Gửi thử/Gửi -->
+  <div id="panel-pancake" style="display:none">
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">📨 Tin nhắn chờ gửi (Pancake)</span>
+        <div class="btn-group">
+          <button class="btn btn-ghost btn-sm" onclick="loadPancakeQueue()">🔄 Tải lại</button>
+        </div>
+      </div>
+      <div class="guide" style="margin-bottom:14px">
+        Tin nhắn xác nhận đặt cọc (sau khi bấm thu học phí đợt 1) và tin nhắn nhắc lịch học (quét tự động lúc 20:00 mỗi ngày) sẽ nằm ở đây, CHỜ DUYỆT — hệ thống KHÔNG tự gửi thẳng. Bấm "Gửi thử" để gửi vào hội thoại test (xem đúng nội dung trước), rồi bấm "Gửi" để gửi thật cho học viên.
+      </div>
+      <div id="pancake-queue-list"></div>
     </div>
   </div>
 
@@ -3452,6 +3469,44 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div id="zalo-debug" style="display:none;margin-top:10px;padding:10px;background:#0d1117;border-radius:8px;font-family:monospace;font-size:11px;color:#9fdb9f;white-space:pre-wrap;word-break:break-all;max-height:220px;overflow:auto"></div>
   </div>
 
+  <!-- ★ MỚI (2026-09-09): PANCAKE — gửi tin nhắn tự động (xác nhận cọc + nhắc lịch học) -->
+  <div class="tg-box">
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
+      <div style="width:42px;height:42px;background:#8e44ad;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;color:#fff">📨</div>
+      <div style="flex:1">
+        <div style="font-size:15px;font-weight:700;color:#8e44ad">Pancake — Nhắn tin tự động cho học viên</div>
+        <div style="font-size:12px;color:var(--muted)">Xác nhận đặt cọc + nhắc lịch học qua Facebook/Zalo</div>
+      </div>
+      <span style="display:flex;align-items:center;gap:6px;font-size:12px">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--red);display:inline-block;transition:.3s" id="pancake-dot"></span>
+        <span id="pancake-status" style="color:var(--muted)">Chưa cấu hình</span>
+      </span>
+    </div>
+    <div class="guide" style="margin-bottom:14px">
+      <b>Access token</b> là token đăng nhập cá nhân (KHÔNG phải page_access_token) — có hạn dùng, sẽ hết hạn sau vài tháng hoặc khi đăng xuất/đổi mật khẩu. Khi hết hạn, hệ thống sẽ tự báo qua Telegram kèm hướng dẫn lấy token mới (mở Pancake trên Chrome → F12 → tab Network → gửi thử 1 tin → copy access_token từ request "messages?access_token=...").
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Access token (cá nhân)</label><input id="pancake-token" placeholder="eyJhbGci..." type="password"/></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Page ID — Facebook</label><input id="pancake-fb-pageid" placeholder="VD: 360354477151778"/></div>
+      <div class="fg"><label>Page ID — Zalo</label><input id="pancake-zalo-pageid" placeholder="VD: pzl_714381368540284078"/></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Hội thoại test — nền tảng</label>
+        <select id="pancake-test-platform">
+          <option value="zalo">Zalo</option>
+          <option value="fb">Facebook</option>
+        </select>
+      </div>
+      <div class="fg"><label>Hội thoại test — conversation_id</label><input id="pancake-test-convid" placeholder="Dùng cho nút Gửi thử"/></div>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-sm" style="background:#8e44ad;color:#fff" onclick="savePancakeSettings()">Lưu cấu hình</button>
+    </div>
+    <div id="pancake-token-age" style="font-size:11px;color:var(--muted);margin-top:8px"></div>
+  </div>
+
   <!-- TÍCH ĐIỂM CONFIG -->
   <div class="card">
     <div class="card-head"><span class="card-title">⭐ Cài đặt tích điểm khách hàng</span></div>
@@ -4015,6 +4070,13 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       <div class="fg"><label>👤 Tên FB/Zalo/TikTok liên hệ</label><input id="es-social-name" placeholder="VD: Trang Nguyễn, 0987xxxxxx (Zalo)..."/></div>
       <div class="fg"></div>
     </div>
+    <div class="form-row">
+      <div class="fg"><label>📨 Kênh Pancake nhắn tin</label>
+        <select id="es-pancake-platform"><option value="">— Không dùng —</option><option value="zalo">Zalo</option><option value="fb">Facebook</option></select>
+      </div>
+      <div class="fg"><label>ID hội thoại Pancake</label><input id="es-pancake-convid" placeholder="VD: pzl_u_..."/></div>
+    </div>
+    <div class="fg" style="margin-bottom:12px"><label>📍 Địa điểm học (nếu khác địa chỉ mặc định)</label><input id="es-location" placeholder="VD: 221B/1A Trần Huy Liệu, Phú Nhuận (quán cà phê Lululala)"/></div>
     <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="es-note" placeholder="Ghi chú thêm..."/></div>
     <div class="btn-group" style="margin-top:8px">
       <button class="btn btn-green btn-sm" onclick="saveEditStudent()">💾 Lưu thay đổi</button>
@@ -4110,6 +4172,13 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       <div class="fg"><label>👤 Tên FB/Zalo/TikTok liên hệ</label><input id="fs-social-name" placeholder="VD: Trang Nguyễn, 0987xxxxxx (Zalo)..."/></div>
       <div class="fg"></div>
     </div>
+    <div class="form-row">
+      <div class="fg"><label>📨 Kênh Pancake nhắn tin</label>
+        <select id="fs-pancake-platform"><option value="">— Không dùng —</option><option value="zalo">Zalo</option><option value="fb">Facebook</option></select>
+      </div>
+      <div class="fg"><label>ID hội thoại Pancake</label><input id="fs-pancake-convid" placeholder="VD: pzl_u_..."/></div>
+    </div>
+    <div class="fg" style="margin-bottom:12px"><label>📍 Địa điểm học (nếu khác địa chỉ mặc định)</label><input id="fs-location" placeholder="VD: 221B/1A Trần Huy Liệu, Phú Nhuận (quán cà phê Lululala)"/></div>
     <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="fs-note" placeholder="Ghi chú..."/></div>
     <div class="btn-group" style="margin-top:8px">
       <button class="btn btn-green btn-sm" onclick="addStudent()">Lưu học viên</button>
@@ -5173,7 +5242,8 @@ const sbDel = async (t, f) => {
 // STATE
 // ══════════════════════════════════════════════════
 let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[],transactions:[],quotations:[],salesOrders:[],soActivities:[],classAttendance:[]};
-let cfg = {tgToken:'',tgChatId:'',zaloToken:'',zaloChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',accPhone:'0984830303',gsUrl:'https://script.google.com/macros/s/AKfycbwk6oBp1yjg8E4AexktyJ2VQpdUImsdBVl47xWBUGtY4Y7Be7kwZIKBf8cOGM6A31oh/exec'};
+let cfg = {tgToken:'',tgChatId:'',zaloToken:'',zaloChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',accPhone:'0984830303',gsUrl:'https://script.google.com/macros/s/AKfycbwk6oBp1yjg8E4AexktyJ2VQpdUImsdBVl47xWBUGtY4Y7Be7kwZIKBf8cOGM6A31oh/exec',
+  pancakeToken:'',pancakeFbPageId:'',pancakeZaloPageId:'',pancakeTestConvId:'',pancakeTestPlatform:'zalo',pancakeTokenSavedAt:''};
 let cart=[], invoice=null, selectedStudentId=null, stFilter='all', tgLog=[];
 
 const DEFAULTS = {
@@ -5238,10 +5308,17 @@ async function boot(){
         bankId:   s.bank_id   ||cfg.bankId  ||'VCB',
         accName:  s.acc_name  ||cfg.accName ||'TRUONG DANG HUONG',
         accPhone: s.acc_phone ||cfg.accPhone||'0984830303',
-        gsUrl:    s.gs_url    ||cfg.gsUrl   ||''
+        gsUrl:    s.gs_url    ||cfg.gsUrl   ||'',
+        pancakeToken:        s.pancake_access_token       ||cfg.pancakeToken       ||'',
+        pancakeFbPageId:     s.pancake_fb_page_id         ||cfg.pancakeFbPageId    ||'',
+        pancakeZaloPageId:   s.pancake_zalo_page_id       ||cfg.pancakeZaloPageId  ||'',
+        pancakeTestConvId:   s.pancake_test_conversation_id||cfg.pancakeTestConvId ||'',
+        pancakeTestPlatform: s.pancake_test_platform      ||cfg.pancakeTestPlatform||'zalo',
+        pancakeTokenSavedAt: s.pancake_token_saved_at     ||cfg.pancakeTokenSavedAt||''
       };
       saveCfgLocal();
       applyTgUI();
+      applyPancakeUI();
     }
 
     setSyncStatus(true,'Đã đồng bộ — '+nowTime());
@@ -5433,7 +5510,7 @@ function saveCfgLocal(){localStorage.setItem('tdh_cfg',JSON.stringify(cfg));}
 function loadLocalCfg(){
   try{
     const s=localStorage.getItem('tdh_cfg');
-    if(s){cfg={...cfg,...JSON.parse(s)};applyTgUI();}
+    if(s){cfg={...cfg,...JSON.parse(s)};applyTgUI();applyPancakeUI();}
   }catch(e){}
 }
 function applyTgUI(){
@@ -5459,6 +5536,191 @@ function applyTgUI(){
 }
 
 // ══════════════════════════════════════════════════
+// ★ MỚI (2026-09-09): PANCAKE — cấu hình gửi tin nhắn tự động
+// ══════════════════════════════════════════════════
+function applyPancakeUI(){
+  const map={'pancake-token':cfg.pancakeToken,'pancake-fb-pageid':cfg.pancakeFbPageId,
+    'pancake-zalo-pageid':cfg.pancakeZaloPageId,'pancake-test-convid':cfg.pancakeTestConvId};
+  for(const id in map){ const el=document.getElementById(id); if(el&&map[id]) el.value=map[id]; }
+  const tpEl=document.getElementById('pancake-test-platform');
+  if(tpEl&&cfg.pancakeTestPlatform) tpEl.value=cfg.pancakeTestPlatform;
+  const dot=document.getElementById('pancake-dot'), st=document.getElementById('pancake-status');
+  if(dot&&st){
+    if(cfg.pancakeToken&&(cfg.pancakeFbPageId||cfg.pancakeZaloPageId)){
+      dot.style.background='var(--teal)'; st.textContent='Đã cấu hình'; st.style.color='var(--teal)';
+    }else{
+      dot.style.background='var(--red)'; st.textContent='Chưa cấu hình'; st.style.color='var(--muted)';
+    }
+  }
+  const ageEl=document.getElementById('pancake-token-age');
+  if(ageEl){
+    if(cfg.pancakeTokenSavedAt){
+      const days=Math.floor((Date.now()-new Date(cfg.pancakeTokenSavedAt).getTime())/86400000);
+      ageEl.textContent=`Token đã lưu được ${days} ngày. Nếu tin nhắn báo lỗi "Invalid access_token", hãy lấy token mới theo hướng dẫn ở trên.`;
+    }else{
+      ageEl.textContent='';
+    }
+  }
+}
+
+// Gọi backend gửi tin thật qua Pancake (dùng chung cho cả Gửi thử lẫn Gửi thật —
+// khác nhau ở conversationId truyền vào). Token được giữ ở server (DB_settings),
+// không lộ ra console trình duyệt.
+async function pancakeSend(platform, conversationId, text){
+  const r = await gasCall({action:'pancake_send', platform, conversationId, text});
+  return r.result || {success:false, error:'Không có phản hồi từ server'};
+}
+
+// Soạn nội dung tin nhắn XÁC NHẬN ĐẶT CỌC ĐỢT 1 — gọi ngay sau khi bấm "Đã thu đợt 1"
+// trong markFeePaid(). Nội dung có thể chỉnh sửa lại trong ô preview trước khi gửi.
+function composeDepositConfirmMessage_(s){
+  const fee=s.fee||0;
+  const isOnline=s.type==='Online';
+  const dep=isOnline?fee:(s.paid1_amount||Math.round(fee*0.3));
+  const remaining=isOnline?0:(fee-dep);
+  const course=D.courses.find(c=>c.id===s.course_id);
+  const courseName=course?course.name:(s.course||'');
+  let dateLabel='';
+  if(s.class_date){
+    dateLabel=formatDateVN_(s.class_date);
+    if(s.end_date&&s.end_date!==s.class_date) dateLabel+=' - '+formatDateVN_(s.end_date);
+  }
+  let msg = `Chào ${s.name||'bạn'},\n\n`;
+  msg += `Mình là trợ lý của cô Trương Dáng Hương, xin xác nhận đã nhận được tiền cọc của bạn cho lớp "${courseName}".\n\n`;
+  msg += `💰 Đã cọc: ${fmt(dep)}\n`;
+  if(remaining>0) msg += `💵 Còn lại (thu tại lớp): ${fmt(remaining)}\n`;
+  if(dateLabel) msg += `📅 Ngày học: ${dateLabel}\n`;
+  if(s.class_time) msg += `🕐 Giờ học: ${s.class_time}\n`;
+  if(s.location) msg += `📍 Địa điểm: ${s.location}\n`;
+  msg += `\nNếu cần dời lịch hoặc có thắc mắc gì, bạn cứ nhắn lại tin này nhé.\n\nCảm ơn bạn!\nTrương Dáng Hương Academy`;
+  return msg;
+}
+
+// Thêm 1 tin nhắn vào hàng đợi (KHÔNG gửi ngay — chỉ soạn sẵn, chờ duyệt ở tab
+// "Tin nhắn chờ gửi"). type: 'deposit_confirm' | 'reminder'
+async function queuePancakeMessage_(s, type, content){
+  if(!s.pancake_conversation_id){
+    console.warn(`Học viên ${s.name} chưa có pancake_conversation_id — bỏ qua soạn tin ${type}.`);
+    return;
+  }
+  const item={
+    id:'PCQ'+Date.now()+'_'+s.id,
+    student_id:s.id, student_name:s.name||'',
+    type, platform:s.pancake_platform||'zalo', conversation_id:s.pancake_conversation_id,
+    content, status:'pending', created_at:new Date().toISOString(), sent_at:'', error:''
+  };
+  try{ await sbUpsert('pancake_queue', item); }catch(e){ console.error('queuePancakeMessage_ lỗi:', e.message); }
+}
+
+async function loadPancakeQueue(){
+  const listEl=document.getElementById('pancake-queue-list');
+  if(listEl) listEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Đang tải...</div>';
+  let items=[];
+  try{ items=await sbGet('pancake_queue',''); }catch(e){ items=[]; }
+  items=(items||[]).filter(x=>x.status==='pending').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  renderPancakeQueueList(items);
+}
+
+function renderPancakeQueueList(items){
+  const listEl=document.getElementById('pancake-queue-list');
+  if(!listEl) return;
+  if(!items.length){
+    listEl.innerHTML='<div style="text-align:center;padding:30px;color:var(--muted)">Không có tin nhắn nào đang chờ gửi.</div>';
+    return;
+  }
+  listEl.innerHTML=items.map(it=>{
+    const typeLabel=it.type==='deposit_confirm'?'💰 Xác nhận đặt cọc':'🔔 Nhắc lịch học';
+    const platLabel=it.platform==='fb'?'Facebook':'Zalo';
+    return `<div class="card" style="margin-bottom:12px;border:1.5px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
+        <div><b>${it.student_name}</b> <span style="font-size:11px;color:var(--muted)">— ${typeLabel} — ${platLabel}</span></div>
+        <div style="font-size:11px;color:var(--muted)">${it.created_at?new Date(it.created_at).toLocaleString('vi-VN'):''}</div>
+      </div>
+      <textarea id="pcq-text-${it.id}" style="width:100%;min-height:140px;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px" onchange="pancakeQueueEditContent('${it.id}',this.value)">${it.content||''}</textarea>
+      <div id="pcq-result-${it.id}" style="font-size:12px;margin-top:6px"></div>
+      <div class="btn-group" style="margin-top:8px">
+        <button class="btn btn-ghost btn-sm" onclick="pancakeSendTest('${it.id}')">🧪 Gửi thử</button>
+        <button class="btn btn-sm" style="background:#27ae60;color:#fff" onclick="pancakeSendReal('${it.id}')">✅ Gửi</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="pancakeQueueDelete('${it.id}')">🗑 Xóa</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function pancakeQueueEditContent(id, newText){
+  try{ await sbPatch('pancake_queue', {content:newText}, `?id=eq.${id}`); }catch(e){}
+}
+
+async function pancakeSendTest(id){
+  const textEl=document.getElementById(`pcq-text-${id}`);
+  const resEl=document.getElementById(`pcq-result-${id}`);
+  const text=textEl?textEl.value:'';
+  if(!cfg.pancakeTestConvId){ notify('Chưa cấu hình "Hội thoại test" trong Cài đặt → Pancake!',false); return; }
+  if(resEl) resEl.innerHTML='<span style="color:var(--muted)">Đang gửi thử...</span>';
+  const r=await pancakeSend(cfg.pancakeTestPlatform||'zalo', cfg.pancakeTestConvId, text);
+  if(resEl){
+    resEl.innerHTML = r.success
+      ? `<span style="color:var(--teal)">✓ Đã gửi thử thành công vào hội thoại test.</span>`
+      : `<span style="color:var(--red)">✗ Lỗi: ${r.error||'không rõ'}</span>`;
+  }
+  if(!r.success && /invalid.*access.?token/i.test(r.error||'')){
+    notify('⚠️ Token Pancake đã hết hạn! Vào Cài đặt → Pancake để lấy token mới.',false);
+  }
+}
+
+async function pancakeSendReal(id){
+  const textEl=document.getElementById(`pcq-text-${id}`);
+  const resEl=document.getElementById(`pcq-result-${id}`);
+  const text=textEl?textEl.value:'';
+  let items=[]; try{ items=await sbGet('pancake_queue',''); }catch(e){}
+  const it=(items||[]).find(x=>x.id===id);
+  if(!it){ notify('Không tìm thấy tin nhắn này (có thể đã bị xóa)',false); return; }
+  confirmAct(
+    `Gửi tin nhắn thật cho ${it.student_name}?`,
+    `Tin nhắn sẽ được gửi thật qua ${it.platform==='fb'?'Facebook':'Zalo'} cho học viên này. Hãy chắc chắn bạn đã kiểm tra kỹ nội dung.`,
+    async()=>{
+      if(resEl) resEl.innerHTML='<span style="color:var(--muted)">Đang gửi...</span>';
+      const r=await pancakeSend(it.platform, it.conversation_id, text);
+      if(r.success){
+        await sbPatch('pancake_queue', {status:'sent', sent_at:new Date().toISOString(), content:text}, `?id=eq.${id}`);
+        notify(`✓ Đã gửi tin nhắn cho ${it.student_name}`);
+        loadPancakeQueue();
+      }else{
+        await sbPatch('pancake_queue', {status:'failed', error:r.error||''}, `?id=eq.${id}`);
+        if(resEl) resEl.innerHTML=`<span style="color:var(--red)">✗ Lỗi: ${r.error||'không rõ'}</span>`;
+        notify('Gửi thất bại: '+(r.error||'không rõ'),false);
+        if(/invalid.*access.?token/i.test(r.error||'')){
+          notify('⚠️ Token Pancake đã hết hạn! Vào Cài đặt → Pancake để lấy token mới.',false);
+        }
+      }
+    }
+  );
+}
+
+async function pancakeQueueDelete(id){
+  confirmAct('Xóa tin nhắn chờ gửi này?','Tin nhắn sẽ bị xóa khỏi hàng đợi, không thể hoàn tác.',async()=>{
+    try{ await sbDel('pancake_queue', `?id=eq.${id}`); loadPancakeQueue(); }catch(e){ notify('Lỗi: '+e.message,false); }
+  });
+}
+
+async function savePancakeSettings(){
+  const newToken=document.getElementById('pancake-token').value.trim();
+  const tokenChanged=newToken&&newToken!==cfg.pancakeToken;
+  cfg={...cfg,
+    pancakeToken:newToken,
+    pancakeFbPageId:document.getElementById('pancake-fb-pageid').value.trim(),
+    pancakeZaloPageId:document.getElementById('pancake-zalo-pageid').value.trim(),
+    pancakeTestPlatform:document.getElementById('pancake-test-platform').value,
+    pancakeTestConvId:document.getElementById('pancake-test-convid').value.trim(),
+    pancakeTokenSavedAt: tokenChanged ? new Date().toISOString() : (cfg.pancakeTokenSavedAt||new Date().toISOString())
+  };
+  saveCfgLocal();
+  await saveSettingsFull();
+  applyPancakeUI();
+  notify('✓ Đã lưu cấu hình Pancake');
+}
+
+// ══════════════════════════════════════════════════
 // NAVIGATION
 // ══════════════════════════════════════════════════
 function stTab(el,f){
@@ -5471,6 +5733,9 @@ function stTab(el,f){
   // Ẩn panel điểm danh nếu chuyển tab khác
   const panelAt=document.getElementById('panel-attendance');
   if(panelAt&&f!=='attendance') panelAt.style.display='none';
+  // Ẩn panel tin nhắn Pancake nếu chuyển tab khác
+  const panelPc=document.getElementById('panel-pancake');
+  if(panelPc&&f!=='pancake') panelPc.style.display='none';
 
   if(f==='schedule'){
     // Nhúng page-schedule vào students lần đầu
@@ -5496,6 +5761,16 @@ function stTab(el,f){
     if(panelAt) panelAt.style.display='block';
     stFilter=f;
     renderAttendancePanel();
+    return;
+  }
+
+  if(f==='pancake'){
+    ['panel-students','panel-courses','deleted-students-card'].forEach(id=>{
+      const p=document.getElementById(id); if(p) p.style.display='none';
+    });
+    if(panelPc) panelPc.style.display='block';
+    stFilter=f;
+    loadPancakeQueue();
     return;
   }
 
@@ -8169,6 +8444,12 @@ function openEditStudent(){
   }
   const esSocial = document.getElementById('es-social-name');
   if(esSocial) esSocial.value = s.social_name||'';
+  const esPcPlat = document.getElementById('es-pancake-platform');
+  if(esPcPlat) esPcPlat.value = s.pancake_platform||'';
+  const esPcConv = document.getElementById('es-pancake-convid');
+  if(esPcConv) esPcConv.value = s.pancake_conversation_id||'';
+  const esLoc = document.getElementById('es-location');
+  if(esLoc) esLoc.value = s.location||'';
 
   closeM('modal-student-detail');
   setTimeout(()=>{showM('modal-edit-student');updateEsCapacity();},150);
@@ -8224,6 +8505,9 @@ async function saveEditStudent(){
     note:document.getElementById('es-note').value,
     contact_channel,
     social_name:document.getElementById('es-social-name')?.value.trim()||'',
+    pancake_platform:document.getElementById('es-pancake-platform')?.value||'',
+    pancake_conversation_id:document.getElementById('es-pancake-convid')?.value.trim()||'',
+    location:document.getElementById('es-location')?.value.trim()||'',
   };
   // ★ Chặn sĩ số tối đa/lớp (Offline) — kiểm tra lại NGAY TRƯỚC KHI LƯU, loại trừ
   // chính học viên đang sửa (không tự đếm trùng mình khi không đổi lớp). CHỈ kiểm
@@ -8365,6 +8649,9 @@ async function addStudent(){
     note:document.getElementById('fs-note').value,
     contact_channel,
     social_name:document.getElementById('fs-social-name')?.value.trim()||'',
+    pancake_platform:document.getElementById('fs-pancake-platform')?.value||'',
+    pancake_conversation_id:document.getElementById('fs-pancake-convid')?.value.trim()||'',
+    location:document.getElementById('fs-location')?.value.trim()||'',
     fee_original: feeOrig,
     discount_type: discVal>0 ? discType : null,
     discount_value: discVal>0 ? discVal : null,
@@ -9406,6 +9693,11 @@ async function markFeePaid(dotNum){
     auditLog('payment','student',`Thu học phí ${isOnline?'toàn bộ':'đợt '+dotNum} — ${s.name} — ${fmt(amount)}`);
     notify(`✓ Đã thu ${isOnline?'toàn bộ':'đợt '+dotNum}: ${fmt(amount)}`);
     tgMsg(`💰 *Thu học phí!*\n\n👤 ${s.name}\n📚 ${s.course||'—'}\n💵 ${fmt(amount)} — ${label}\n🕐 ${ts}\n\n_Trương Dáng Hương Academy_`);
+    // ★ MỚI (2026-09-09): soạn sẵn tin nhắn xác nhận đặt cọc qua Pancake khi thu
+    // đợt 1 (không tự động gửi — chỉ soạn sẵn, chờ duyệt ở tab "Tin nhắn chờ gửi").
+    if(dotNum===1 && s.pancake_conversation_id){
+      queuePancakeMessage_(s, 'deposit_confirm', composeDepositConfirmMessage_(s));
+    }
     renderStudents();renderOrders();renderDash();
     gsSend({sheet:'HocVien',rows:gsStudents(),time:ts});
   }catch(e){notify('Lỗi: '+e.message,false);}
@@ -10043,7 +10335,10 @@ async function saveSettingsFull(){
     zalo_token:cfg.zaloToken||'', zalo_chat_id:cfg.zaloChatId||'',
     bank_acc:cfg.bankAcc||'', bank_id:cfg.bankId||'VCB',
     acc_name:cfg.accName||'TRUONG DANG HUONG', acc_phone:cfg.accPhone||'',
-    gs_url:cfg.gsUrl||''
+    gs_url:cfg.gsUrl||'',
+    pancake_access_token:cfg.pancakeToken||'', pancake_fb_page_id:cfg.pancakeFbPageId||'',
+    pancake_zalo_page_id:cfg.pancakeZaloPageId||'', pancake_test_conversation_id:cfg.pancakeTestConvId||'',
+    pancake_test_platform:cfg.pancakeTestPlatform||'zalo', pancake_token_saved_at:cfg.pancakeTokenSavedAt||''
   });
 }
 
