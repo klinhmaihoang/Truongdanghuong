@@ -5620,6 +5620,10 @@ async function pancakeAutoMatch(){
     if(result.notFoundForChosenPlatform&&result.notFoundForChosenPlatform.length){
       lines.push('', `⚠️ ${result.notFoundForChosenPlatform.length} học viên đã CHỌN SẴN kênh (Facebook/Zalo) nhưng không tìm thấy SĐT khớp ở đúng kênh đó (có thể khách chưa nhắn ở kênh này, hoặc chọn nhầm kênh):`, ...result.notFoundForChosenPlatform.map(n=>'• '+n));
     }
+    if(result.writeVerifyFailed&&result.writeVerifyFailed.length){
+      lines.push('', `🛑 LƯU Ý: ${result.writeVerifyFailed.length} học viên báo ghép được nhưng KIỂM TRA LẠI cho thấy chưa thực sự lưu vào Sheet (có thể do DB_students thiếu cột — hãy chạy fixStudentsPancakeHeader() rồi thử lại):`, ...result.writeVerifyFailed.map(n=>'• '+n));
+      notify('⚠️ Có học viên ghép "thành công" nhưng thực ra chưa lưu được — xem chi tiết bên dưới',false);
+    }
     if(resEl) resEl.textContent=lines.join('\n');
     notify(`✓ Đã tự động ghép ${result.matchedCount} học viên`);
     // Nạp lại danh sách học viên (đã có pancake_conversation_id mới) mà KHÔNG reload
@@ -8583,6 +8587,17 @@ async function saveEditStudent(){
   const esChOther = document.getElementById('es-channel-other')?.value.trim()||'';
   const contact_channel = esChSel==='Khác' ? (esChOther||'Khác') : esChSel;
 
+  // ★ SỬA (2026-09-09): lấy lại dữ liệu Pancake MỚI NHẤT từ server ngay trước khi
+  // lưu — tránh trường hợp modal Sửa học viên đang mở TỪ TRƯỚC khi lượt tự động
+  // ghép ID hội thoại (chạy nền sau khi thêm học viên) hoàn tất: lúc mở modal, ô ID
+  // hội thoại còn trống (chưa ghép xong) — nếu bấm Lưu lúc này, giá trị trống sẽ
+  // ghi ĐÈ LÊN ID vừa ghép được ngay sau đó, xóa mất dữ liệu (bug đã gặp thực tế).
+  let freshPancake = {};
+  try{
+    const freshRows = await sbGet('students', `?id=eq.${id}`);
+    if(freshRows && freshRows[0]) freshPancake = freshRows[0];
+  }catch(e){}
+
   const upd={
     name,
     phone:document.getElementById('es-phone').value,
@@ -8600,8 +8615,11 @@ async function saveEditStudent(){
     note:document.getElementById('es-note').value,
     contact_channel,
     social_name:document.getElementById('es-social-name')?.value.trim()||'',
-    pancake_platform:document.getElementById('es-pancake-platform')?.value||'',
-    pancake_conversation_id:document.getElementById('es-pancake-convid')?.value.trim()||'',
+    // Ưu tiên giá trị người dùng vừa nhập trong form; nếu form đang trống nhưng
+    // server đã có sẵn giá trị mới hơn (VD do lượt auto-match chạy xong SAU khi mở
+    // modal) → giữ nguyên giá trị đó, không cho form trống ghi đè mất.
+    pancake_platform:document.getElementById('es-pancake-platform')?.value || freshPancake.pancake_platform || s.pancake_platform || '',
+    pancake_conversation_id:document.getElementById('es-pancake-convid')?.value.trim() || freshPancake.pancake_conversation_id || s.pancake_conversation_id || '',
     location:document.getElementById('es-location')?.value.trim()||'',
   };
   // ★ Chặn sĩ số tối đa/lớp (Offline) — kiểm tra lại NGAY TRƯỚC KHI LƯU, loại trừ
@@ -8801,6 +8819,10 @@ async function pancakeAutoMatchSilent_(studentId){
     const st=D.students.find(x=>x.id===studentId);
     if(st && st.pancake_conversation_id){
       notify(`📨 Đã tự động ghép hội thoại Pancake (${st.pancake_platform==='fb'?'Facebook':'Zalo'}) cho ${st.name}`);
+    } else if(result.matchedNames && result.matchedNames.some(n=>st&&n.startsWith(st.name+' '))){
+      // Server báo đã ghép cho ĐÚNG học viên này nhưng kiểm tra lại không thấy — báo
+      // lỗi rõ thay vì im lặng (khớp trường hợp DB_students thiếu cột migration).
+      notify(`⚠️ Server báo đã ghép hội thoại Pancake cho ${st.name} nhưng kiểm tra lại chưa thấy lưu — có thể DB_students thiếu cột, cần chạy fixStudentsPancakeHeader()`,false);
     }
   }catch(e){ console.warn('pancakeAutoMatchSilent_ lỗi:', e.message); }
   finally{ _pancakeAutoMatchSilentBusy = false; }
