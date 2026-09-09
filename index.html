@@ -3505,6 +3505,22 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <button class="btn btn-sm" style="background:#8e44ad;color:#fff" onclick="savePancakeSettings()">Lưu cấu hình</button>
     </div>
     <div id="pancake-token-age" style="font-size:11px;color:var(--muted);margin-top:8px"></div>
+
+    <div style="border-top:1px dashed var(--border);margin-top:16px;padding-top:14px">
+      <div style="font-size:13px;font-weight:700;color:#8e44ad;margin-bottom:8px">🔗 Tự động ghép ID hội thoại theo SĐT</div>
+      <div class="guide" style="margin-bottom:14px">
+        Thay vì copy tay từng khách qua DevTools, điền thêm <b>Page Access Token chính thức</b> (loại token bạn từng dùng cho dự án "Pancake Reminder System" cũ — KHÁC với Access token cá nhân ở trên) — hệ thống sẽ tự đọc SĐT khách trong tất cả hội thoại và ghép với đúng học viên có cùng SĐT trong app. Chỉ điền học viên NÀO CHƯA CÓ ID hội thoại — không ghi đè học viên đã điền sẵn.
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Page Access Token — Facebook</label><input id="pancake-fb-pagetoken" placeholder="Token chính thức của Fanpage" type="password"/></div>
+        <div class="fg"><label>Page Access Token — Zalo</label><input id="pancake-zalo-pagetoken" placeholder="Token chính thức của kênh Zalo" type="password"/></div>
+      </div>
+      <div class="btn-group">
+        <button class="btn btn-sm" style="background:#8e44ad;color:#fff" onclick="savePancakeSettings()">Lưu token</button>
+        <button class="btn btn-ghost btn-sm" onclick="pancakeAutoMatch()">🔗 Chạy tự động ghép ngay</button>
+      </div>
+      <div id="pancake-auto-match-result" style="font-size:12px;margin-top:10px;white-space:pre-wrap"></div>
+    </div>
   </div>
 
   <!-- TÍCH ĐIỂM CONFIG -->
@@ -5243,7 +5259,8 @@ const sbDel = async (t, f) => {
 // ══════════════════════════════════════════════════
 let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[],transactions:[],quotations:[],salesOrders:[],soActivities:[],classAttendance:[]};
 let cfg = {tgToken:'',tgChatId:'',zaloToken:'',zaloChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',accPhone:'0984830303',gsUrl:'https://script.google.com/macros/s/AKfycbwk6oBp1yjg8E4AexktyJ2VQpdUImsdBVl47xWBUGtY4Y7Be7kwZIKBf8cOGM6A31oh/exec',
-  pancakeToken:'',pancakeFbPageId:'',pancakeZaloPageId:'',pancakeTestConvId:'',pancakeTestPlatform:'zalo',pancakeTokenSavedAt:''};
+  pancakeToken:'',pancakeFbPageId:'',pancakeZaloPageId:'',pancakeTestConvId:'',pancakeTestPlatform:'zalo',pancakeTokenSavedAt:'',
+  pancakeFbPageToken:'',pancakeZaloPageToken:''};
 let cart=[], invoice=null, selectedStudentId=null, stFilter='all', tgLog=[];
 
 const DEFAULTS = {
@@ -5314,7 +5331,9 @@ async function boot(){
         pancakeZaloPageId:   s.pancake_zalo_page_id       ||cfg.pancakeZaloPageId  ||'',
         pancakeTestConvId:   s.pancake_test_conversation_id||cfg.pancakeTestConvId ||'',
         pancakeTestPlatform: s.pancake_test_platform      ||cfg.pancakeTestPlatform||'zalo',
-        pancakeTokenSavedAt: s.pancake_token_saved_at     ||cfg.pancakeTokenSavedAt||''
+        pancakeTokenSavedAt: s.pancake_token_saved_at     ||cfg.pancakeTokenSavedAt||'',
+        pancakeFbPageToken:  s.pancake_fb_page_token      ||cfg.pancakeFbPageToken||'',
+        pancakeZaloPageToken:s.pancake_zalo_page_token    ||cfg.pancakeZaloPageToken||''
       };
       saveCfgLocal();
       applyTgUI();
@@ -5540,7 +5559,8 @@ function applyTgUI(){
 // ══════════════════════════════════════════════════
 function applyPancakeUI(){
   const map={'pancake-token':cfg.pancakeToken,'pancake-fb-pageid':cfg.pancakeFbPageId,
-    'pancake-zalo-pageid':cfg.pancakeZaloPageId,'pancake-test-convid':cfg.pancakeTestConvId};
+    'pancake-zalo-pageid':cfg.pancakeZaloPageId,'pancake-test-convid':cfg.pancakeTestConvId,
+    'pancake-fb-pagetoken':cfg.pancakeFbPageToken,'pancake-zalo-pagetoken':cfg.pancakeZaloPageToken};
   for(const id in map){ const el=document.getElementById(id); if(el&&map[id]) el.value=map[id]; }
   const tpEl=document.getElementById('pancake-test-platform');
   if(tpEl&&cfg.pancakeTestPlatform) tpEl.value=cfg.pancakeTestPlatform;
@@ -5569,6 +5589,37 @@ function applyPancakeUI(){
 async function pancakeSend(platform, conversationId, text){
   const r = await gasCall({action:'pancake_send', platform, conversationId, text});
   return r.result || {success:false, error:'Không có phản hồi từ server'};
+}
+
+// ★ MỚI (2026-09-09, bổ sung): quét toàn bộ hội thoại Pancake (qua Open API,
+// dùng Page Access Token chính thức), so khớp SĐT với học viên CHƯA có ID hội
+// thoại, tự điền nếu khớp — thay cho việc copy tay từng khách qua DevTools.
+async function pancakeAutoMatch(){
+  const resEl=document.getElementById('pancake-auto-match-result');
+  if(!cfg.pancakeFbPageToken && !cfg.pancakeZaloPageToken){
+    notify('Chưa điền Page Access Token (Facebook hoặc Zalo) — điền rồi bấm "Lưu token" trước đã.',false);
+    return;
+  }
+  if(resEl) resEl.textContent='Đang quét hội thoại và so khớp SĐT... (có thể mất chút thời gian nếu nhiều hội thoại)';
+  try{
+    const r=await gasCall({action:'pancake_auto_match'});
+    const result=r.result||{};
+    if(!result.ok){
+      if(resEl) resEl.textContent='';
+      notify('Lỗi: '+(result.error||'không rõ'),false);
+      return;
+    }
+    const lines=[`✓ Đã ghép ${result.matchedCount} học viên.`,
+      `(${result.alreadyHadCount} học viên đã có sẵn ID từ trước — không đụng tới, ${result.totalConversationsScanned} SĐT tìm thấy trong hội thoại Pancake)`];
+    if(result.matchedNames&&result.matchedNames.length) lines.push('', 'Danh sách vừa ghép:', ...result.matchedNames.map(n=>'• '+n));
+    if(resEl) resEl.textContent=lines.join('\n');
+    notify(`✓ Đã tự động ghép ${result.matchedCount} học viên`);
+    // Cập nhật lại dữ liệu học viên local nếu đang xem trang Học viên
+    if(typeof loadAllData==='function') loadAllData(); else location.reload();
+  }catch(e){
+    if(resEl) resEl.textContent='';
+    notify('Lỗi: '+e.message,false);
+  }
 }
 
 // Soạn nội dung tin nhắn XÁC NHẬN ĐẶT CỌC ĐỢT 1 — gọi ngay sau khi bấm "Đã thu đợt 1"
@@ -5707,7 +5758,9 @@ async function savePancakeSettings(){
     pancakeZaloPageId:document.getElementById('pancake-zalo-pageid').value.trim(),
     pancakeTestPlatform:document.getElementById('pancake-test-platform').value,
     pancakeTestConvId:document.getElementById('pancake-test-convid').value.trim(),
-    pancakeTokenSavedAt: tokenChanged ? new Date().toISOString() : (cfg.pancakeTokenSavedAt||new Date().toISOString())
+    pancakeTokenSavedAt: tokenChanged ? new Date().toISOString() : (cfg.pancakeTokenSavedAt||new Date().toISOString()),
+    pancakeFbPageToken:document.getElementById('pancake-fb-pagetoken')?.value.trim()||'',
+    pancakeZaloPageToken:document.getElementById('pancake-zalo-pagetoken')?.value.trim()||''
   };
   saveCfgLocal();
   await saveSettingsFull();
@@ -10333,7 +10386,8 @@ async function saveSettingsFull(){
     gs_url:cfg.gsUrl||'',
     pancake_access_token:cfg.pancakeToken||'', pancake_fb_page_id:cfg.pancakeFbPageId||'',
     pancake_zalo_page_id:cfg.pancakeZaloPageId||'', pancake_test_conversation_id:cfg.pancakeTestConvId||'',
-    pancake_test_platform:cfg.pancakeTestPlatform||'zalo', pancake_token_saved_at:cfg.pancakeTokenSavedAt||''
+    pancake_test_platform:cfg.pancakeTestPlatform||'zalo', pancake_token_saved_at:cfg.pancakeTokenSavedAt||'',
+    pancake_fb_page_token:cfg.pancakeFbPageToken||'', pancake_zalo_page_token:cfg.pancakeZaloPageToken||''
   });
 }
 
