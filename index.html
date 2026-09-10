@@ -5481,9 +5481,16 @@ let _pollFailCount=0;
 let _pollInterval=null;
 let _isPolling=false;
 
+let _lastPollAt = 0;
 async function pollUpdates(){
   if(_isPolling) return; // Tránh chạy đè nhau
+  // ★ MỚI (2026-09-10): bỏ qua khi tab đang ẩn (chuyển tab khác/minimize) — không
+  // ai đang xem thì không cần đọc lại 7 bảng từ Google Sheets mỗi 15-45s làm nặng
+  // server không cần thiết. Sẽ tự đồng bộ lại ngay khi quay lại tab (xem
+  // visibilitychange bên dưới).
+  if(document.hidden) return;
   _isPolling=true;
+  _lastPollAt = Date.now();
   try{
     const _poll = await sbGetBulk([
       {table:'students',     order:{col:'created_at',dir:'asc'}},
@@ -5541,10 +5548,28 @@ async function pollUpdates(){
   }
 }
 
+// ★ SỬA (2026-09-10): tăng chu kỳ đồng bộ nền từ 15s → 45s. Mỗi lần đồng bộ này
+// đọc TOÀN BỘ 7 bảng (students/inventory/products/orders/courses/customers/
+// transactions) từ Google Sheets trong 1 lượt gọi Apps Script — với 15s/lần,
+// việc này chạy liên tục suốt cả ngày dù không ai thao tác gì, cạnh tranh
+// tài nguyên Apps Script/Sheets với chính các thao tác của người dùng (thêm/sửa,
+// cập nhật trạng thái đơn, thu học phí...) khiến MỌI thao tác cảm giác chậm đi,
+// đặc biệt nếu vừa hay rơi đúng lúc đồng bộ nền đang chạy. 45s vẫn đủ nhanh để
+// nhiều người dùng thấy dữ liệu mới của nhau, nhưng giảm ~3 lần tải nền so với
+// trước. Các thao tác của chính người dùng vẫn cập nhật NGAY LẬP TỨC trên máy họ
+// (không cần chờ đồng bộ nền) vì đã tự cập nhật D.* + render() ngay sau khi lưu.
 function startPolling(){
   if(_pollInterval) clearInterval(_pollInterval);
-  _pollInterval=setInterval(pollUpdates,15000);
+  _pollInterval=setInterval(pollUpdates,45000);
 }
+// Tab đang ẩn thì tạm dừng đọc nền (xem trong pollUpdates); quay lại tab thì
+// đồng bộ lại ngay nếu đã hơn 20s kể từ lần đồng bộ gần nhất, để dữ liệu không
+// bị cũ khi người dùng quay lại làm việc.
+document.addEventListener('visibilitychange', ()=>{
+  if(!document.hidden && (Date.now()-_lastPollAt) > 20000){
+    pollUpdates();
+  }
+});
 
 // ══════════════════════════════════════════════════
 // LOCAL CONFIG (Telegram — không cần nhập lại sau refresh)
