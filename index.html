@@ -5112,9 +5112,18 @@ async function gasCall(payload, _isRetry) {
     payload = { ...payload, token: AUTH_TOKEN };
   }
   const qs = encodeURIComponent(JSON.stringify(payload));
-  // Tự hủy sau 25s nếu không có phản hồi — tránh treo vô thời hạn khi GAS quá tải/chậm
+  // Tự hủy nếu không có phản hồi sau 1 khoảng thời gian — tránh treo vô thời hạn
+  // khi GAS quá tải/chậm. ★ SỬA (2026-09-11): trước đây dùng CHUNG 25s cho mọi
+  // request, kể cả 'db_read_bulk' (đọc 7-12 bảng, có bảng không giới hạn số dòng,
+  // trong 1 lượt gọi Apps Script) — loại request này VỐN DĨ cần nhiều thời gian
+  // hơn hẳn 1 request ghi 1 dòng đơn giản, nên hay bị hủy ngang dù server vẫn
+  // đang xử lý bình thường (chỉ là chậm hơn 25s), khiến app báo "Mất kết nối" oan.
+  // Giờ 'db_read_bulk' được cho 45s, các action khác (ghi 1 dòng, action đơn lẻ...)
+  // vẫn giữ 25s như cũ — nếu những action đơn giản đó cũng mất hơn 25s thì đúng là
+  // có vấn đề thật cần biết sớm, không nên chờ lâu hơn.
+  const _gasTimeoutMs = payload.action === 'db_read_bulk' ? 45000 : 25000;
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 25000);
+  const timeoutId = setTimeout(() => controller.abort(), _gasTimeoutMs);
   let res;
   try{
     res = await fetch(`${url}?payload=${qs}&_t=${Date.now()}`, { method: 'GET', cache: 'no-store', signal: controller.signal });
@@ -5126,7 +5135,7 @@ async function gasCall(payload, _isRetry) {
       console.warn('gasCall timeout, tự thử lại 1 lần:', payload.action || payload.table);
       return gasCall(payload, true);
     }
-    if(e.name === 'AbortError') throw new Error('Hết thời gian chờ (25s) — server phản hồi quá chậm hoặc mất mạng');
+    if(e.name === 'AbortError') throw new Error(`Hết thời gian chờ (${_gasTimeoutMs/1000}s) — server phản hồi quá chậm hoặc mất mạng`);
     throw e;
   }finally{
     clearTimeout(timeoutId);
@@ -5468,7 +5477,7 @@ async function boot(){
       }
     }, 100);
 
-    // Polling realtime mỗi 15s
+    // Polling realtime mỗi 45s (xem ghi chú trong startPolling())
     startPolling();
   }catch(e){
     setSyncStatus(false,'Lỗi kết nối');
