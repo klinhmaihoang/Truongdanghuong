@@ -5111,7 +5111,7 @@ async function gasCall(payload, _isRetry) {
   if (payload.action !== 'login' && AUTH_TOKEN) {
     payload = { ...payload, token: AUTH_TOKEN };
   }
-  const qs = encodeURIComponent(JSON.stringify(payload));
+  const bodyStr = JSON.stringify(payload);
   // Tự hủy nếu không có phản hồi sau 1 khoảng thời gian — tránh treo vô thời hạn
   // khi GAS quá tải/chậm. ★ SỬA (2026-09-11): trước đây dùng CHUNG 25s cho mọi
   // request, kể cả 'db_read_bulk' (đọc 7-12 bảng, có bảng không giới hạn số dòng,
@@ -5126,7 +5126,21 @@ async function gasCall(payload, _isRetry) {
   const timeoutId = setTimeout(() => controller.abort(), _gasTimeoutMs);
   let res;
   try{
-    res = await fetch(`${url}?payload=${qs}&_t=${Date.now()}`, { method: 'GET', cache: 'no-store', signal: controller.signal });
+    // ★ SỬA (2026-09-11): đổi từ GET (nhét toàn bộ payload vào query string URL,
+    // ?payload=...) sang POST (payload nằm trong body). GET có giới hạn độ dài URL
+    // — action đọc nhiều bảng cùng lúc (`db_read_bulk`, ghép cả chục {table,
+    // filters, order, limit}) hoặc ghi 1 bản ghi lớn (đơn hàng nhiều sản phẩm, báo
+    // giá, đợt thanh toán tùy chỉnh...) có thể vượt giới hạn đó, khiến Google trả
+    // lỗi khó hiểu (từng thấy lỗi 404 ở script.googleusercontent.com) dù server và
+    // mạng không thực sự có vấn đề gì — đây nhiều khả năng là 1 nguyên nhân "mất
+    // kết nối" quan trọng chưa được xử lý ở lần sửa trước. Content-Type
+    // 'text/plain' để trình duyệt coi là "simple request", không cần preflight
+    // CORS (tránh phát sinh thêm 1 lượt gọi OPTIONS mà Apps Script không xử lý).
+    res = await fetch(`${url}?_t=${Date.now()}`, {
+      method: 'POST', cache: 'no-store', signal: controller.signal,
+      headers: {'Content-Type':'text/plain;charset=utf-8'},
+      body: bodyStr
+    });
   }catch(e){
     clearTimeout(timeoutId);
     // Tự động thử lại NGAY 1 lần nếu bị timeout/mất mạng — phục hồi nhanh hơn khi
@@ -6409,15 +6423,22 @@ function renderCapacityIndicator_(elId, courseId, classDate, endDate, classTime,
   if(!classDate || !course || !(+course.max_students>0)){ el.style.display='none'; return {blocked:false}; }
   const r = checkClassCapacity_(courseId, classDate, endDate, classTime, addCount, excludeStudentId);
   el.style.display='block';
+  // ★ SỬA (2026-09-11): TRƯỚC ĐÂY hiển thị r.count — nhưng r.count CỐ Ý KHÔNG tính
+  // chính học viên đang sửa/dời lịch (excludeStudentId), để checkClassCapacity_()
+  // so sánh đúng "sau khi thêm/sửa thì có vượt sĩ số không". Vấn đề là chỉ báo trên
+  // form lại show thẳng con số đó cho admin xem — nên khi sửa 1 trong 2 học viên
+  // của cùng 1 lớp, chỉ báo hiện "1/3" (chỉ đếm người KIA) dù lớp đó thực tế đang
+  // có 2 người, khiến admin tưởng app đếm sai. Giờ hiển thị r.after (tổng CÓ TÍNH
+  // học viên đang sửa) — đúng với sĩ số thật của lớp tại thời điểm xem.
   if(r.blocked){
     el.style.cssText='display:block;margin-top:6px;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:600;background:#fdecea;border:1.5px solid var(--red);color:#a5231a';
-    el.innerHTML = `🚫 Lớp này đã ĐỦ sĩ số (${r.count}/${r.max}) — không thể thêm học viên vào đúng lớp/buổi học này nữa. Hãy chọn ngày/giờ học khác hoặc mở lớp mới.`;
+    el.innerHTML = `🚫 Lớp này đã ĐỦ sĩ số (${r.after}/${r.max}) — không thể thêm học viên vào đúng lớp/buổi học này nữa. Hãy chọn ngày/giờ học khác hoặc mở lớp mới.`;
   } else if(r.warn){
     el.style.cssText='display:block;margin-top:6px;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:600;background:#fff8e6;border:1.5px solid #e0b04a;color:#a15c00';
-    el.innerHTML = `⚠️ Lớp sắp đầy: ${r.count}/${r.max} — còn ${r.remaining} chỗ.`;
+    el.innerHTML = `⚠️ Lớp sắp đầy: ${r.after}/${r.max} — còn ${r.max-r.after} chỗ.`;
   } else {
     el.style.cssText='display:block;margin-top:6px;padding:6px 10px;border-radius:8px;font-size:11.5px;font-weight:600;background:#eafaf1;border:1px solid rgba(39,174,96,.35);color:#1a7a4a';
-    el.innerHTML = `✅ Sĩ số lớp: ${r.count}/${r.max}`;
+    el.innerHTML = `✅ Sĩ số lớp: ${r.after}/${r.max}`;
   }
   return r;
 }
