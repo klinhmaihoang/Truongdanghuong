@@ -8698,6 +8698,16 @@ async function saveEditStudent(){
     start:startFmt,
     class_date:document.getElementById('es-class-date').value||null,
     end_date:document.getElementById('es-end-date').value||null,
+    // ★ SỬA (2026-09-11): trước đây form Sửa học viên KHÔNG BAO GIỜ cập nhật
+    // first_class_date (cột này chỉ được set lúc Thêm mới, hoặc cố tình GIỮ
+    // NGUYÊN lúc dùng nút "Dời lịch" chính thức để tính đúng hạn mức 2 lần/năm)
+    // — nên nếu đổi ngày học qua form Sửa bình thường (không qua "Dời lịch"),
+    // first_class_date bị "mắc kẹt" ở ngày cũ mãi mãi, khiến tin nhắc lịch học
+    // (dựa vào đúng cột này) gửi sai/không gửi được. Chỉ tự đồng bộ theo ngày
+    // học mới khi CHƯA từng dùng "Dời lịch" chính thức lần nào (reschedule_count
+    // rỗng/0) — một khi đã dời lịch chính thức ít nhất 1 lần, giữ nguyên như cũ
+    // (khóa lại, đúng ý đồ ban đầu của tính năng hạn mức dời lịch).
+    first_class_date:(s.reschedule_count ? (s.first_class_date||s.class_date||null) : (document.getElementById('es-class-date').value||null)),
     class_time:document.getElementById('es-class-time')?.value||'',
     note:document.getElementById('es-note').value,
     contact_channel,
