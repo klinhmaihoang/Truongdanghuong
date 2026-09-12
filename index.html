@@ -5544,6 +5544,20 @@ async function pollUpdates(){
     if(_pollFailCount>0){
       _pollFailCount=0;
       notify('✅ Đã kết nối lại!');
+      // ★ SỬA (2026-09-12): BUG NGHIÊM TRỌNG vừa tìm ra — khi bị lỗi, code cũ dùng
+      // setInterval (lặp lại MÃI MÃI) thay vì setTimeout (thử lại 1 LẦN) để backoff,
+      // và khi kết nối lại thành công KHÔNG hề khôi phục lại chu kỳ 45s ban đầu.
+      // Hậu quả: chỉ cần 1 lần trục trặc mạng/Apps Script thoáng qua (rất bình
+      // thường, không phải lỗi thật), chu kỳ đồng bộ nền bị "kẹt" vĩnh viễn ở
+      // 15s/30s/60s (nhanh gấp 3 lần trở lên so với 45s dự kiến) — dồn dập gọi
+      // Apps Script hơn nhiều, dễ đụng giới hạn số lượt chạy đồng thời của Apps
+      // Script hơn, dễ gây lỗi tiếp theo hơn → càng lỗi càng dồn dập, một vòng
+      // luẩn quẩn. Đây rất có thể là nguyên nhân thật của hiện tượng "mất kết nối"
+      // lặp lại nhiều lần trong quá khứ (khác hẳn với các giả thuyết đã thử trước
+      // đó: tối ưu session, tăng timeout, đổi GET→POST — không cái nào đụng tới
+      // đoạn code này). Từ nay: hễ đồng bộ lại thành công, LUÔN khôi phục lại đúng
+      // chu kỳ nền 45s ban đầu qua startPolling().
+      startPolling();
     }
     setSyncStatus(true,'Đồng bộ lúc '+nowTime());
     // Chỉ re-render nếu không đang mở modal đơn hàng (tránh overwrite sau khi vừa update)
@@ -5563,9 +5577,17 @@ async function pollUpdates(){
       notify('❌ Không kết nối được sau 3 lần thử. Kiểm tra mạng!',false);
     }
     // Exponential backoff: lần 1=15s, lần 2=30s, lần 3+=60s
+    // ★ SỬA (2026-09-12): trước đây dùng setInterval ở đây — nghĩa là mỗi lần lỗi
+    // sẽ THAY THẾ VĨNH VIỄN chu kỳ đồng bộ nền 45s bằng 1 vòng lặp lại MÃI MÃI ở
+    // 15s/30s/60s, và khi kết nối lại thành công cũng KHÔNG có chỗ nào khôi phục
+    // lại 45s (xem chỗ reset _pollFailCount ở trên đã thêm startPolling()). Giờ
+    // đổi sang setTimeout: chỉ THỬ LẠI 1 LẦN duy nhất sau khi lỗi — nếu tiếp tục
+    // lỗi thì pollUpdates() sẽ tự vào lại nhánh catch này và đặt lịch thử lại tiếp
+    // theo (delay tăng dần đúng như cũ), còn nếu thành công thì chu kỳ 45s bình
+    // thường sẽ được khôi phục ngay (qua startPolling() ở nhánh try).
     const delay=_pollFailCount===1?15000:_pollFailCount===2?30000:60000;
     if(_pollInterval) clearInterval(_pollInterval);
-    _pollInterval=setInterval(pollUpdates, delay);
+    _pollInterval=setTimeout(pollUpdates, delay);
   }finally{
     _isPolling=false;
   }
