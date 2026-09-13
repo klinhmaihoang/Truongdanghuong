@@ -5094,7 +5094,11 @@ const SUPABASE_KEY = '';
 const NEON_HOST    = '';
 const NEON_TOKEN   = '';
 
-const GAS_URL = 'https://script.google.com/macros/s/AKfycbwk6oBp1yjg8E4AexktyJ2VQpdUImsdBVl47xWBUGtY4Y7Be7kwZIKBf8cOGM6A31oh/exec';
+// ★ CUTOVER (2026-09-13): đổi mặc định từ Apps Script sang Cloudflare Worker
+// (Apps Script liên tục lỗi/hết hạn mức phút chạy/ngày). URL Apps Script cũ
+// giữ lại trong comment để rollback khẩn cấp nếu cần:
+//   https://script.google.com/macros/s/AKfycbwk6oBp1yjg8E4AexktyJ2VQpdUImsdBVl47xWBUGtY4Y7Be7kwZIKBf8cOGM6A31oh/exec
+const GAS_URL = 'https://tdh-erp-api.klinh-maihoang.workers.dev';
 
 function getGasUrl() {
   return cfg?.gsUrl || GAS_URL;
@@ -5301,7 +5305,7 @@ const sbDel = async (t, f) => {
 // STATE
 // ══════════════════════════════════════════════════
 let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[],transactions:[],quotations:[],salesOrders:[],soActivities:[],classAttendance:[]};
-let cfg = {tgToken:'',tgChatId:'',zaloToken:'',zaloChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',accPhone:'0984830303',gsUrl:'https://script.google.com/macros/s/AKfycbwk6oBp1yjg8E4AexktyJ2VQpdUImsdBVl47xWBUGtY4Y7Be7kwZIKBf8cOGM6A31oh/exec',
+let cfg = {tgToken:'',tgChatId:'',zaloToken:'',zaloChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',accPhone:'0984830303',gsUrl:GAS_URL,
   pancakeToken:'',pancakeFbPageId:'',pancakeZaloPageId:'',pancakeTestConvId:'',pancakeTestPlatform:'zalo',pancakeTokenSavedAt:'',
   pancakeFbPageToken:'',pancakeZaloPageToken:'',pancakeAutoSend:false};
 let cart=[], invoice=null, selectedStudentId=null, stFilter='all', tgLog=[];
