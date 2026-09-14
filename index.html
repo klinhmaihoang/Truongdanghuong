@@ -6803,6 +6803,24 @@ function formatDateVN_(isoDate){
   return `${+m[3]}/${+m[2]}/${m[1]}`;
 }
 
+// ★ FIX (2026-09-14): đơn hàng cũ (migrate từ Excel) có ô "time" bị lưu
+// dạng số thô Excel serial (VD "46138.88263888889") thay vì "d/M/yyyy
+// HH:mm" — hàm này chỉ để HIỂN THỊ cho đẹp, không sửa dữ liệu gốc trong
+// D1 (việc đó chạy 1 lần bằng fix_excel_serial_datetimes.js). Chuỗi đã
+// đúng định dạng thì trả về y nguyên, không đụng vào.
+function formatOrderTimeVN_(t){
+  if(!t) return t;
+  const s = String(t);
+  if(!/^\d+(\.\d+)?$/.test(s)) return t; // đã đúng định dạng (có "/") — bỏ qua
+  const num = Number(s);
+  if(num < 32874 || num > 73415) return t; // ngoài khoảng hợp lý ~1990-2100, đừng đoán bừa
+  const ms = Math.round((num - 25569) * 86400 * 1000);
+  const d = new Date(ms);
+  const hh = String(d.getUTCHours()).padStart(2,'0');
+  const mm = String(d.getUTCMinutes()).padStart(2,'0');
+  return `${d.getUTCDate()}/${d.getUTCMonth()+1}/${d.getUTCFullYear()} ${hh}:${mm}`;
+}
+
 function sessionLabel_(sess){
   let d = formatDateVN_(sess.class_date);
   if(sess.end_date && sess.end_date!==sess.class_date) d += ' - '+formatDateVN_(sess.end_date);
@@ -7285,7 +7303,7 @@ function openCustomerDetail(id) {
         <div style="flex:1">
           <div style="font-weight:700;font-size:13px">${o.id}</div>
           <div style="font-size:11px;color:var(--muted)">${cleanItems(o.items)}</div>
-          <div style="font-size:11px;color:var(--muted)">${o.time||''}</div>
+          <div style="font-size:11px;color:var(--muted)">${formatOrderTimeVN_(o.time)||''}</div>
         </div>
         <div style="text-align:right;flex-shrink:0">
           <div style="font-weight:800;color:var(--brand)">${fmt(o.total||0)}</div>
@@ -9511,7 +9529,7 @@ function filterOrders(){
       <td>${o.customer}</td>
       <td style="font-size:12px;color:var(--muted)">${cleanItems(o.items)}</td>
       <td style="font-weight:700">${fmt(o.total||0)}</td>
-      <td style="font-size:12px;color:var(--muted)">${o.time}</td>
+      <td style="font-size:12px;color:var(--muted)">${formatOrderTimeVN_(o.time)}</td>
       <td><span class="tag ${isOrderPaid(o)?'t-paid':'t-pending'}">${o.status}</span></td>
       <td><button class="btn btn-pdf btn-sm" onclick="exportPDF('${o.id}')">📄 PDF</button></td>
     </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--muted)">Không tìm thấy kết quả</td></tr>';
@@ -9523,7 +9541,7 @@ function filterOrders(){
       <td>${o.customer}</td>
       <td style="font-size:12px;color:var(--muted)">${cleanItems(o.items)}</td>
       <td style="font-weight:700">${fmt(o.total||0)}</td>
-      <td style="font-size:12px;color:var(--muted)">${o.time}</td>
+      <td style="font-size:12px;color:var(--muted)">${formatOrderTimeVN_(o.time)}</td>
       <td><span class="tag ${isOrderPaid(o)?'t-paid':o.status==='Chờ thanh toán'?'t-pending':'t-done'}">${o.status}</span></td>
       <td></td>
     </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;padding:14px;color:var(--muted)">Không tìm thấy kết quả</td></tr>';
@@ -9576,7 +9594,7 @@ function renderOrders(){
     <td>${o.customer}</td>
     <td style="font-size:12px;color:var(--muted)">${cleanItems(o.items)}</td>
     <td style="font-weight:700">${fmt(o.total||0)}</td>
-    <td style="font-size:12px;color:var(--muted)">${o.time}</td>
+    <td style="font-size:12px;color:var(--muted)">${formatOrderTimeVN_(o.time)}</td>
     <td><span class="tag ${isOrderPaid(o)?'t-paid':'t-pending'}">${o.status}</span></td>
     <td class="btn-group" style="gap:4px">
       <button class="btn btn-ghost btn-sm" onclick="showOrderDetail('${o.id}')">👁</button>
@@ -9591,7 +9609,7 @@ function renderOrders(){
     <td>${o.customer}</td>
     <td style="font-size:12px;color:var(--muted)">${cleanItems(o.items)}</td>
     <td style="font-weight:700;color:var(--green)">${fmt(o.total||0)}</td>
-    <td style="font-size:12px;color:var(--muted)">${o.time}</td>
+    <td style="font-size:12px;color:var(--muted)">${formatOrderTimeVN_(o.time)}</td>
     <td><span class="tag t-paid">${o.status}</span></td>
   </tr>`).join('')||'<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--muted)">Chưa có thu học phí</td></tr>';
 
@@ -9602,7 +9620,7 @@ function renderOrders(){
     <td>${o.customer}</td>
     <td style="font-size:12px;color:var(--muted)">${cleanItems(o.items)}</td>
     <td style="font-weight:700">${fmt(o.total||0)}</td>
-    <td style="font-size:12px;color:var(--muted)">${o.time}</td>
+    <td style="font-size:12px;color:var(--muted)">${formatOrderTimeVN_(o.time)}</td>
     <td><span class="tag ${isOrderPaid(o)?'t-paid':o.status==='Chờ thanh toán'?'t-pending':'t-done'}">${o.status}</span></td>
     <td class="btn-group" style="gap:4px">
       <button class="btn btn-ghost btn-sm" onclick="showOrderDetail('${o.id}')">👁</button>
@@ -9664,7 +9682,7 @@ function renderArchivedOrders(){
       <td style="color:var(--muted)">${o.customer}</td>
       <td style="font-size:12px;color:var(--muted)">${(typeof o.items==='string'?o.items:JSON.stringify(o.items||[])).substring(0,25)}${(typeof o.items==='string'?o.items:JSON.stringify(o.items||[])).length>25?'...':''}</td>
       <td style="color:var(--muted);text-decoration:line-through">${fmt(o.total||0)}</td>
-      <td style="font-size:12px;color:var(--muted)">${o.time}</td>
+      <td style="font-size:12px;color:var(--muted)">${formatOrderTimeVN_(o.time)}</td>
       <td style="font-size:12px;color:var(--red)">${cancelReason}</td>
     </tr>`;
   }).join('');
@@ -14882,7 +14900,7 @@ function showOrderDetail(id) {
       if(shipFeeDisplay) shipFeeDisplay.style.display = 'none';
     }
   }
-  document.getElementById('od-time').textContent = o.time||'—';
+  document.getElementById('od-time').textContent = formatOrderTimeVN_(o.time)||'—';
   // Wait time
   const waitHours = o.created_at ? Math.round((Date.now()-o.created_at)/3600000) : 0;
   const waitEl = document.getElementById('od-wait');
@@ -16073,7 +16091,7 @@ function renderPrep() {
               <td style="padding:6px 8px;font-family:monospace;color:var(--orange);font-weight:700;cursor:pointer" onclick="closeM('x');showOrderDetail('${o.id}')">${o.id}</td>
               <td style="padding:6px 8px;font-weight:600">${o.customer}</td>
               <td style="padding:6px 8px;text-align:center;font-weight:700;font-size:14px;color:var(--brand)">${o.qty} ${p.unit||''}</td>
-              <td style="padding:6px 8px;color:var(--muted)">${o.time}</td>
+              <td style="padding:6px 8px;color:var(--muted)">${formatOrderTimeVN_(o.time)}</td>
               <td style="padding:6px 8px;text-align:center">
                 <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;background:${statusColors[o.status]||'var(--muted)'}22;color:${statusColors[o.status]||'var(--muted)'}">${o.status}</span>
               </td>
@@ -18530,7 +18548,7 @@ function renderCRMHistory() {
       <div style="width:36px;height:36px;border-radius:50%;background:var(--bg2);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0">🛒</div>
       <div>
         <div style="font-size:13px;font-weight:700">${o.customer||'Khách lẻ'} — ${fmt(o.total||0)}</div>
-        <div style="font-size:11px;color:var(--muted)">${o.items||''} · ${o.time||''}</div>
+        <div style="font-size:11px;color:var(--muted)">${o.items||''} · ${formatOrderTimeVN_(o.time)||''}</div>
         <div style="font-size:11px;color:${isOrderPaid(o)?'var(--green)':'var(--orange)'};font-weight:700">${o.status}</div>
       </div>
     </div>`).join('');
@@ -20250,7 +20268,7 @@ function renderCODReconcile() {
             <td style="padding:7px 12px;color:var(--brand)">${o.id}</td>
             <td style="padding:7px">${o.customer||'—'}</td>
             <td style="padding:7px;text-align:right;font-weight:700;color:var(--green)">${fmt(o.total||0)}</td>
-            <td style="padding:7px;text-align:center;color:var(--muted)">${o.time||''}</td>
+            <td style="padding:7px;text-align:center;color:var(--muted)">${formatOrderTimeVN_(o.time)||''}</td>
           </tr>`).join('')}
         </tbody>
       </table>
