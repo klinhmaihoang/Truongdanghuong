@@ -10693,14 +10693,28 @@ async function zaloMsg(text){
   const t=cfg.zaloToken, c=cfg.zaloChatId;
   if(!t||!c) return; // chưa cấu hình Zalo — im lặng bỏ qua, không ảnh hưởng Telegram
   const entry={time:nowTime(),text:'[Zalo] '+text.split('\n')[0].replace(/[*`]/g,''),ok:false,err:''};
-  try{
-    // Zalo Bot chưa hỗ trợ Markdown như Telegram — gửi plain text, bỏ ký tự * `
-    const plain=text.replace(/[*`]/g,'');
-    const d=await zaloApiCall(t,'sendMessage',{chat_id:c,text:plain});
-    entry.ok = d.ok !== false; // Zalo Bot API trả về khác nhau tuỳ version, ưu tiên coi HTTP 200 là ok
-    entry.text=(entry.ok?'✓ Đã gửi: ':'✗ Lỗi: ')+entry.text;
-    if(!entry.ok) entry.err = d.error?.message || d.description || JSON.stringify(d);
-  }catch(e){entry.text='✗ Lỗi mạng: '+entry.text;entry.err=e.message;}
+  // ★ MỚI (2026-09-14): Zalo Bot API hiện không ổn định — quan sát thực tế cho
+  // thấy cùng 1 token/chat_id, có lúc Zalo nhận có lúc từ chối (404 "Not
+  // Found") cách nhau vài phút, nhiều khả năng do tính năng gửi tin của Bot
+  // Platform vẫn đang trong giai đoạn thử nghiệm phía Zalo — không phải lỗi
+  // cấu hình. Thử lại tối đa 3 lần, cách nhau 2 giây, chỉ ghi log kết quả CUỐI
+  // CÙNG (không ghi log rác cho từng lần thử) để tăng cơ hội bắt đúng lúc Zalo
+  // chấp nhận.
+  const plain=text.replace(/[*`]/g,'');
+  let lastD=null, lastErr=null;
+  for(let attempt=1; attempt<=3; attempt++){
+    try{
+      const d=await zaloApiCall(t,'sendMessage',{chat_id:c,text:plain});
+      lastD=d; lastErr=null;
+      if(d.ok !== false){ entry.ok=true; break; } // thành công — dừng thử lại
+    }catch(e){ lastErr=e; }
+    if(attempt<3) await new Promise(r=>setTimeout(r,2000));
+  }
+  entry.text=(entry.ok?'✓ Đã gửi: ':'✗ Lỗi: ')+entry.text;
+  if(!entry.ok){
+    entry.err = lastErr ? ('Lỗi mạng: '+lastErr.message) : (lastD?.error?.message || lastD?.description || JSON.stringify(lastD));
+    if(lastErr) entry.text='✗ Lỗi mạng: '+entry.text.replace('✗ Lỗi: ','');
+  }
   addLog(entry);
 }
 
