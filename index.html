@@ -9456,19 +9456,32 @@ async function markPaid(){
   if(!invoice)return;
   const ts=nowDT();
   // Trừ kho
+  const stockWarnings=[];
   for(const c of cart){
     const p=D.products.find(x=>x.id===c.pid);if(!p)continue;
+    // ★ FIX (2026-09-14): sản phẩm trộn sẵn theo mẻ (track_stock, VD: Trà mix,
+    // Xí muội đỏ...) — trước đây markPaid() KHÔNG trừ p.qty (chỉ deductStockForOrder()
+    // ở luồng đơn Pancake mới trừ đúng), khiến tồn kho thành phẩm không giảm khi bán
+    // trực tiếp ở màn Bán hàng. Trừ THẲNG tồn kho thành phẩm, không đụng nguyên liệu gốc.
+    if(p.track_stock){
+      p.qty=Math.max(0,Math.round(((p.qty||0)-c.qty)*100)/100);
+      await sbPatch('products',{qty:p.qty},`?id=eq.${p.id}`);
+      continue;
+    }
     const recipeRows=D.recipes.filter(r=>r.product_id===p.id);
     if(recipeRows.length>0){
       for(const r of recipeRows){
         const mat=D.inventory.find(i=>i.id===r.mat_id);
         if(mat){mat.qty=Math.max(0,Math.round((mat.qty-r.mat_use*c.qty)*100)/100);await sbPatch('inventory',{qty:mat.qty},`?id=eq.${mat.id}`);}
+        else stockWarnings.push(`${p.name}: công thức trỏ tới nguyên liệu không tồn tại trong Kho (mat_id=${r.mat_id}) — chưa trừ được kho`);
       }
     } else if(p.mat_id&&p.mat_use>0){
       const mat=D.inventory.find(i=>i.id===p.mat_id);
       if(mat){mat.qty=Math.max(0,Math.round((mat.qty-p.mat_use*c.qty)*100)/100);await sbPatch('inventory',{qty:mat.qty},`?id=eq.${mat.id}`);}
+      else stockWarnings.push(`${p.name}: nguyên liệu gắn với sản phẩm không tồn tại trong Kho (mat_id=${p.mat_id}) — chưa trừ được kho`);
     }
   }
+  if(stockWarnings.length) notify('⚠️ '+stockWarnings.join(' | '),false);
   // Cập nhật hoặc tạo đơn hàng
   const existingOrder=D.orders.find(o=>o.id===invoice.id);
   if(existingOrder){
