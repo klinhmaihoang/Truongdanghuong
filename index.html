@@ -8971,11 +8971,31 @@ async function pancakeAutoMatchSilent_(studentId){
 
 // ── PRODUCTS ──
 function renderProducts(){
+  // ★ FIX (2026-09-14): trước đây số "phần" trên thẻ sản phẩm chỉ tính theo tồn kho
+  // THẬT trong D1 — nên lúc nhân viên mới bỏ hàng vào giỏ (chưa bấm thanh toán xong)
+  // vẫn thấy số cũ, dễ hiểu lầm là "chọn hàng mà không trừ". Giờ trừ thêm phần đang
+  // nằm trong giỏ hàng hiện tại để hiển thị đúng số THỰC SỰ còn lại nếu chốt đơn này
+  // — chỉ là hiển thị tạm thời, CHƯA ghi gì xuống D1 (số thật vẫn chỉ trừ lúc bấm
+  // "Đã thanh toán" ở markPaid(), tránh trừ nhầm nếu khách đổi ý/xóa khỏi giỏ).
+  const cartQtyByProduct={};
+  const cartUsageByMat={};
+  cart.forEach(c=>{
+    cartQtyByProduct[c.pid]=(cartQtyByProduct[c.pid]||0)+c.qty;
+    const p=D.products.find(x=>x.id===c.pid);
+    if(!p||p.track_stock) return;
+    const recipeRows=D.recipes.filter(r=>r.product_id===p.id);
+    if(recipeRows.length>0){
+      recipeRows.forEach(r=>{ cartUsageByMat[r.mat_id]=(cartUsageByMat[r.mat_id]||0)+r.mat_use*c.qty; });
+    } else if(p.mat_id&&p.mat_use>0){
+      cartUsageByMat[p.mat_id]=(cartUsageByMat[p.mat_id]||0)+p.mat_use*c.qty;
+    }
+  });
+
   document.getElementById('prod-grid').innerHTML=D.products.filter(p=>p.price>0).map(p=>{
     let stock=null;
     if(p.track_stock){
       // Sản phẩm trộn sẵn theo mẻ — hiện thẳng tồn kho thành phẩm thật, không tính theo công thức
-      stock=p.qty||0;
+      stock=(p.qty||0)-(cartQtyByProduct[p.id]||0);
     } else {
       // Ưu tiên tính từ recipe nếu có
       const recipeRows=D.recipes.filter(r=>r.product_id===p.id);
@@ -8983,13 +9003,15 @@ function renderProducts(){
         // Số phần = min của tất cả nguyên liệu trong recipe
         stock=Math.min(...recipeRows.map(r=>{
           const mat=D.inventory.find(i=>i.id===r.mat_id);
-          return mat&&r.mat_use>0?Math.floor(mat.qty/r.mat_use):99999;
+          if(!mat||!(r.mat_use>0)) return 99999;
+          return Math.floor((mat.qty-(cartUsageByMat[r.mat_id]||0))/r.mat_use);
         }));
       } else if(p.mat_id&&p.mat_use>0){
         const mat=D.inventory.find(i=>i.id===p.mat_id);
-        stock=mat?Math.floor(mat.qty/p.mat_use):null;
+        stock=mat?Math.floor((mat.qty-(cartUsageByMat[p.mat_id]||0))/p.mat_use):null;
       }
     }
+    if(stock!==null) stock=Math.max(0,stock);
     const low=stock!==null&&stock<5;
     return`<div class="prod-card" onclick="addToCart('${p.id}')" style="${low?'border-color:rgba(192,57,43,.4)':''}">
       <div class="prod-icon">${p.icon||'📦'}</div>
@@ -9312,6 +9334,9 @@ function addToCart(pid){
   renderCart();
 }
 function renderCart(){
+  // Giỏ hàng vừa đổi (thêm/bớt/xóa) → cập nhật lại ngay số "phần" hiển thị trên thẻ
+  // sản phẩm (trừ tạm phần đang nằm trong giỏ), xem giải thích ở renderProducts().
+  if(typeof renderProducts==='function') renderProducts();
   const el=document.getElementById('cart-items');
   if(!cart.length){
     el.innerHTML='<div style="color:var(--muted);text-align:center;padding:18px;font-size:12px">Chưa có sản phẩm</div>';
