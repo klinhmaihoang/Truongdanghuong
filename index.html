@@ -338,6 +338,15 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     </div>
     <div id="dash-checklist-list"></div>
   </div>
+  <!-- ★ MỚI (2026-09-15): Lịch tư vấn 1-1 — đưa lên Tổng quan cho dễ thấy, đỡ quên vì trước đây nằm trong tab con -->
+  <div class="card" id="dash-consult-card" style="margin-bottom:14px;display:none">
+    <div class="card-head">
+      <span class="card-title">🗓️ Lịch tư vấn 1-1 sắp tới</span>
+      <button class="btn btn-ghost btn-sm" onclick="go('pos',null);posTab('consult',document.getElementById('pos-tab-consult'))">Xem tất cả →</button>
+    </div>
+    <table><thead><tr><th>Ngày</th><th>Giờ</th><th>Khách</th><th>Giá</th><th>Trạng thái</th><th></th></tr></thead>
+    <tbody id="dash-consult"></tbody></table>
+  </div>
   <!-- 2 cột: học viên gần đây + đơn bán lẻ gần đây -->
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
     <div class="card" style="margin-bottom:0">
@@ -8285,6 +8294,7 @@ function renderRpStudents(){
 
 function renderDash(){
   renderDashChecklist();
+  renderDashConsult();
   // Show sale performance for admin
   if(AUTH_CURRENT?.role==='admin') {
     const spc = document.getElementById('sale-performance-card');
@@ -14864,6 +14874,7 @@ function renderConsultBookings(){
       <td><span class="tag ${tagClass}">${b.status}</span></td>
       <td class="btn-group" style="gap:4px">
         <button class="btn btn-ghost btn-sm" onclick="exportConsultConfirmImage('${b.id}')" title="Xuất phiếu xác nhận thông tin (ảnh) để gửi khách">🖼️ Phiếu</button>
+        ${b.status==='Đã thanh toán'?`<button class="btn btn-ghost btn-sm" onclick="addConsultToGCal('${b.id}')" title="Thêm lịch hẹn này vào Google Calendar để khỏi quên">📅 GCal</button>`:''}
         ${b.status==='Chờ thanh toán'?`<button class="btn btn-ghost btn-sm" onclick="openConsultQR('${b.id}')">💳 QR</button>`:''}
         ${b.status!=='Đã hủy'?`<button class="btn btn-ghost btn-sm" onclick="cancelConsultBooking('${b.id}')" title="${b.status==='Đã thanh toán'?'Hủy lịch — sẽ hỏi số tiền hoàn lại (0 = không hoàn)':'Hủy lịch giữ chỗ'}">✕ Hủy</button>`:''}
         ${b.status==='Đã hủy'&&b.cancel_policy?`<span style="font-size:11px;color:var(--muted)">${b.cancel_policy}</span>`:''}
@@ -14902,6 +14913,62 @@ async function renderConsultPancakeQueue(){
   }).join('');
 }
 
+// ★ MỚI (2026-09-15): nút "Thêm vào Google Calendar" — mở sẵn trang tạo sự kiện
+// của Google Calendar (điền sẵn tên khách/giờ/ghi chú), nhân viên chỉ cần bấm Lưu
+// bên Google — không cần đăng nhập/API riêng, tránh quên lịch tư vấn đã chốt.
+function buildConsultGCalUrl_(b){
+  const toGCalDT=(d,t)=>{
+    const [y,m,day]=String(d||'').split('-');
+    const [hh,mm]=String(t||'0:0').split(':');
+    if(!y||!m||!day) return '';
+    return `${y}${m.padStart(2,'0')}${day.padStart(2,'0')}T${(hh||'0').padStart(2,'0')}${(mm||'0').padStart(2,'0')}00`;
+  };
+  const start=toGCalDT(b.date,b.start_time);
+  const end=toGCalDT(b.date,b.end_time||b.start_time);
+  const text=encodeURIComponent(`Tư vấn 1-1 — ${b.customer_name||''}`);
+  const details=encodeURIComponent(
+    `Khách: ${b.customer_name||''}${b.phone?' — '+b.phone:''}${b.email?' — '+b.email:''}\n`+
+    `Giá gói: ${fmt(b.price||0)} (đã thanh toán 100%)\n`+
+    `Hình thức: Google Meeting / Zoom\n`+
+    (b.note?`Ghi chú: ${b.note}\n`:'')+
+    `Mã lịch: ${b.id}`
+  );
+  const location=encodeURIComponent('Google Meeting / Zoom');
+  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${start}/${end}&details=${details}&location=${location}`;
+}
+function addConsultToGCal(id){
+  const b=D.consultingBookings.find(x=>x.id===id);
+  if(!b){notify('Không tìm thấy lịch tư vấn này!',false);return;}
+  if(!b.date||!b.start_time){notify('Lịch chưa có ngày/giờ hợp lệ!',false);return;}
+  window.open(buildConsultGCalUrl_(b),'_blank');
+}
+
+// ★ MỚI (2026-09-15): hiện lịch tư vấn 1-1 SẮP TỚI ngay ở Tổng quan (mở app lên
+// là thấy liền), thay vì phải vào POS → tab Tư vấn 1-1 mới thấy — theo yêu cầu
+// MHKL, tránh quên lịch.
+function renderDashConsult(){
+  const card=document.getElementById('dash-consult-card');
+  const el=document.getElementById('dash-consult');
+  if(!card||!el) return;
+  const todayStr=new Date().toISOString().slice(0,10);
+  const upcoming=(D.consultingBookings||[])
+    .filter(b=>b.status!=='Đã hủy' && b.date>=todayStr)
+    .sort((a,b)=>(a.date+a.start_time).localeCompare(b.date+b.start_time))
+    .slice(0,8);
+  card.style.display=upcoming.length?'':'none';
+  if(!upcoming.length){ el.innerHTML=''; return; }
+  el.innerHTML=upcoming.map(b=>{
+    const tagClass=b.status==='Đã thanh toán'?'t-paid':'t-pending';
+    return `<tr>
+      <td style="font-size:12px">${formatDateVN_(b.date)}</td>
+      <td style="font-size:12px">${b.start_time}–${b.end_time||''}</td>
+      <td><strong style="font-size:13px">${b.customer_name}</strong>${b.phone?'<br><span style="font-size:11px;color:var(--muted)">'+b.phone+'</span>':''}</td>
+      <td style="color:var(--brand);font-weight:700;font-size:12px">${fmt(b.price||0)}</td>
+      <td><span class="tag ${tagClass}" style="font-size:10px">${b.status}</span></td>
+      <td>${b.status==='Đã thanh toán'?`<button class="btn btn-ghost btn-sm" onclick="addConsultToGCal('${b.id}')" title="Thêm lịch hẹn này vào Google Calendar">📅 GCal</button>`:''}</td>
+    </tr>`;
+  }).join('');
+}
 
 // Nếu URL hash có #orders, tự mở tab đơn hàng
 window.addEventListener('load', () => {
