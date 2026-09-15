@@ -5210,10 +5210,24 @@ function normalizeRow(r, table) {
   for (const k in out) {
     if (out[k] === 'null' || out[k] === 'NULL') out[k] = null;
   }
-  // Convert boolean fields
+  // ★ FIX (2026-09-15): D1 lưu boolean dạng CHỮ THƯỜNG 'true'/'false' (xem stringifyValue
+  // trong worker.js — đổi từ lúc chuyển sang Cloudflare) — khác quy ước cũ từ Google Sheets
+  // là 'TRUE'/'FALSE' VIẾT HOA. Đoạn dưới trước đây chỉ nhận diện viết hoa, nên giá trị
+  // 'false' (chữ thường, đúng dạng D1 đang lưu) bị BỎ SÓT — vẫn còn là CHUỖI có nội dung
+  // "false", mà chuỗi khác rỗng thì luôn TRUTHY trong JS, nên mọi field boolean lưu là false
+  // lại bị code hiểu NHẦM thành true (VD: is_free của khóa học tự hiện "Miễn phí" dù DB đang
+  // lưu false). Chuyển thẳng chuỗi 'true'/'false' (không phân biệt hoa/thường) sang boolean
+  // thật cho MỌI field — an toàn vì dữ liệu số/chuỗi thật không bao giờ đúng bằng "true"/
+  // "false", nên không lo đụng nhầm field khác.
+  for (const k in out) {
+    if (out[k] === 'true' || out[k] === 'TRUE' || out[k] === 'True') out[k] = true;
+    else if (out[k] === 'false' || out[k] === 'FALSE' || out[k] === 'False') out[k] = false;
+  }
+  // Convert boolean fields (quy ước số cũ 1/0 — chỉ áp dụng cho field đã biết chắc là
+  // boolean, tránh nhầm với field số thật cũng có giá trị 0/1)
   fields.forEach(f => {
-    if (out[f] === 'TRUE' || out[f] === true || out[f] === 1 || out[f] === '1') out[f] = true;
-    else if (out[f] === 'FALSE' || out[f] === false || out[f] === 0 || out[f] === '0' || out[f] === null || out[f] === '') out[f] = false;
+    if (out[f] === true || out[f] === 1 || out[f] === '1') out[f] = true;
+    else if (out[f] === false || out[f] === 0 || out[f] === '0' || out[f] === null || out[f] === '') out[f] = false;
   });
   // Convert numeric strings for known numeric fields
   const numFields = ['fee','total','amount','qty','min','cost','points','total_spent','visit_count','paid1_amount','paid2_amount','fee_original','discount_value','discount_saved'];
