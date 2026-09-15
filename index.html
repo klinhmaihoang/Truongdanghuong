@@ -731,6 +731,18 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
               <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Giá gói (₫) — chỉnh được</label>
               <input id="cst-price" type="number" value="3000000" step="10000" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;margin-top:4px"/>
             </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Kênh Pancake (để gửi tin qua Zalo/FB)</label>
+              <select id="cst-pancake-platform" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;margin-top:4px">
+                <option value="">— Không dùng —</option>
+                <option value="zalo">Zalo</option>
+                <option value="fb">Facebook</option>
+              </select>
+            </div>
+            <div>
+              <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">ID hội thoại Pancake</label>
+              <input id="cst-pancake-convid" placeholder="VD: pzl_u_..." style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;margin-top:4px"/>
+            </div>
             <div style="grid-column:1/-1">
               <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Ghi chú</label>
               <input id="cst-note" placeholder="Nội dung cần tư vấn, kênh liên hệ..." style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;margin-top:4px"/>
@@ -5851,8 +5863,15 @@ function composeDepositConfirmMessage_(s){
   return msg;
 }
 
+// Nhãn hiển thị cho loại tin nhắn trong hàng đợi Pancake
+function pancakeQueueTypeLabel_(type){
+  if(type==='deposit_confirm') return '💰 Xác nhận đặt cọc';
+  if(type==='consult_confirm') return '🗓️ Xác nhận lịch tư vấn 1-1';
+  return '🔔 Nhắc lịch học';
+}
+
 // Thêm 1 tin nhắn vào hàng đợi (KHÔNG gửi ngay — chỉ soạn sẵn, chờ duyệt ở tab
-// "Tin nhắn chờ gửi"). type: 'deposit_confirm' | 'reminder'
+// "Tin nhắn chờ gửi"). type: 'deposit_confirm' | 'reminder' | 'consult_confirm'
 async function queuePancakeMessage_(s, type, content){
   if(!s.pancake_conversation_id){
     console.warn(`Học viên ${s.name} chưa có pancake_conversation_id — bỏ qua soạn tin ${type}.`);
@@ -5885,7 +5904,7 @@ function renderPancakeQueueList(items){
     return;
   }
   listEl.innerHTML=items.map(it=>{
-    const typeLabel=it.type==='deposit_confirm'?'💰 Xác nhận đặt cọc':'🔔 Nhắc lịch học';
+    const typeLabel=pancakeQueueTypeLabel_(it.type);
     const platLabel=it.platform==='fb'?'Facebook':'Zalo';
     return `<div class="card" style="margin-bottom:12px;border:1.5px solid var(--border)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px">
@@ -5921,7 +5940,7 @@ async function renderPancakeStudentPanel(containerId, studentId){
   el.innerHTML=`<div style="border-top:1.5px dashed var(--border);margin:14px 0 4px;padding-top:12px">
     <div style="font-weight:700;color:#8e44ad;font-size:13px;margin-bottom:8px">📨 Tin nhắn Pancake đang chờ duyệt (${items.length})</div>
     ${items.map(it=>{
-      const typeLabel=it.type==='deposit_confirm'?'💰 Xác nhận đặt cọc':'🔔 Nhắc lịch học';
+      const typeLabel=pancakeQueueTypeLabel_(it.type);
       const platLabel=it.platform==='fb'?'Facebook':'Zalo';
       return `<div style="border:1.5px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px">
         <div style="font-size:11px;color:var(--muted);margin-bottom:6px">${typeLabel} — ${platLabel}</div>
@@ -11933,6 +11952,119 @@ function buildDepositConfirmHTML_(s){
   return {styleBlock, bodyHtml};
 }
 
+// ★ MỚI (2026-09-15): Phiếu xác nhận thông tin cho dịch vụ Tư vấn 1-1 — cùng kiểu
+// dáng với phiếu xác nhận đặt cọc của học viên (buildDepositConfirmHTML_ ở trên,
+// tái dùng nguyên bộ class .tdh-inv), cho khách xem lại thông tin cá nhân, ngày
+// giờ hẹn, giá, quét QR chuyển khoản, kèm 3 lưu ý MHKL cung cấp (2026-09-15).
+function buildConsultConfirmHTML_(b){
+  const ps = getPrintSettings();
+  const size = getPageSizeCss_(ps.invoiceSize);
+  const fs = size.fontScale;
+
+  const bankId=cfg.bankId||'', accNo=cfg.bankAcc||'', accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
+  const qrUrl = (bankId&&accNo)
+    ? `https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${b.price}&addInfo=${encodeURIComponent(b.id+' Tu van '+b.customer_name)}&accountName=${encodeURIComponent(accName)}`
+    : '';
+
+  const bodyStyle = `font-family:Arial,sans-serif;font-size:${11*fs}px;color:#222;width:${size.bodyWidth};margin:0;padding:5mm 3mm;background:#fff`;
+  const styleBlock = `
+    *{box-sizing:border-box}
+    .tdh-inv{${bodyStyle}}
+    .tdh-inv .header{background:#FF8C00;color:#fff;text-align:center;padding:10px;border-radius:6px;margin-bottom:14px}
+    .tdh-inv .header h1{font-size:${13*fs}px;font-weight:bold;margin-bottom:2px}
+    .tdh-inv .header p{font-size:${10*fs}px;opacity:.9}
+    .tdh-inv .title{text-align:center;font-size:${12*fs}px;font-weight:bold;color:#FF8C00;margin-bottom:8px;letter-spacing:.5px}
+    .tdh-inv .divider{border:none;border-top:1px solid #ddd;margin:8px 0}
+    .tdh-inv .row{display:flex;justify-content:space-between;padding:4px 0;font-size:${12*fs}px}
+    .tdh-inv .row .label{color:#888}
+    .tdh-inv .row .value{font-weight:500;text-align:right;max-width:60%}
+    .tdh-inv .total-box{background:#fff3e0;border:1.5px solid #FF8C00;border-radius:8px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;margin:12px 0}
+    .tdh-inv .total-box .label{font-size:${13*fs}px;font-weight:bold;color:#cc5500}
+    .tdh-inv .total-box .amount{font-size:${14*fs}px;font-weight:bold;color:#cc5500}
+    .tdh-inv .qr{text-align:center;margin:14px 0;padding:10px;background:#f9f9f9;border-radius:8px}
+    .tdh-inv .qr img{width:${160*fs}px;height:${160*fs}px;border-radius:6px;border:2px solid #FF8C00}
+    .tdh-inv .qr p{font-size:${10*fs}px;color:#555;margin-top:6px;font-weight:600}
+    .tdh-inv .note{font-size:${10*fs}px;color:#a15c00;background:#fff8e6;border:1px dashed #e0b04a;border-radius:6px;padding:8px 10px;margin-top:10px;line-height:1.5}
+    .tdh-inv .policy-warn{font-size:${10*fs}px;color:#a15c00;background:#fff8e6;border:1px dashed #e0b04a;border-radius:6px;padding:8px 10px;margin:10px 0;line-height:1.5}
+    .tdh-inv .policy-box{background:#f9f9f9;border-radius:6px;padding:10px 12px;margin:10px 0}
+    .tdh-inv .policy-box h3{font-size:${11*fs}px;font-weight:bold;margin-bottom:6px;color:#555}
+    .tdh-inv .policy-box ol{margin:0;padding-left:${16*fs}px}
+    .tdh-inv .policy-box li{font-size:${10*fs}px;color:#444;margin-bottom:4px;line-height:1.5}
+    .tdh-inv .footer{text-align:center;font-size:${9*fs}px;color:#aaa;border-top:1px solid #eee;padding-top:8px;margin-top:12px}
+    ${size.pageCss}
+  `;
+
+  const bodyHtml = `<div class="tdh-inv">
+  <div class="header">
+    <h1>${ps.headerTitle}</h1>
+    <p>${ps.headerSub}</p>
+  </div>
+  <div class="title">XÁC NHẬN LỊCH TƯ VẤN 1-1</div>
+  <div class="row"><span class="label">Khách hàng:</span><span class="value">${b.customer_name||''}</span></div>
+  ${b.phone?`<div class="row"><span class="label">SĐT:</span><span class="value">${b.phone}</span></div>`:''}
+  <div class="row"><span class="label">Ngày tư vấn:</span><span class="value">${formatDateVN_(b.date)}</span></div>
+  <div class="row"><span class="label">Giờ tư vấn:</span><span class="value">${b.start_time} – ${b.end_time}</span></div>
+  <div class="row"><span class="label">Hình thức:</span><span class="value">Google Meeting / Zoom</span></div>
+  ${b.note?`<div class="row"><span class="label">Ghi chú:</span><span class="value">${b.note}</span></div>`:''}
+  <hr class="divider"/>
+  <div class="total-box">
+    <span class="label">CẦN THANH TOÁN (100%):</span>
+    <span class="amount">${fmt(b.price||0)}</span>
+  </div>
+  ${qrUrl?`<div class="qr">
+    <div style="font-size:${10*fs}px;color:#888;margin-bottom:6px">Quét mã QR để chuyển khoản giữ lịch tư vấn</div>
+    <img src="${qrUrl}" crossorigin="anonymous" onerror="this.style.display='none'" style="width:${160*fs}px;height:${160*fs}px"/>
+    <div style="margin-top:8px;font-size:${11*fs}px;font-weight:700;color:#cc5500">${fmt(b.price||0)}</div>
+    ${bankId&&accNo?`<div style="font-size:${10*fs}px;color:#555;margin-top:3px">${bankId.toUpperCase()} — ${accNo}</div>`:''}
+    ${accName?`<div style="font-size:${10*fs}px;color:#888">${accName}</div>`:''}
+    <div style="font-size:${10*fs}px;color:#888;margin-top:2px">Nội dung: ${b.id} Tu van ${b.customer_name||''}</div>
+  </div>`:''}
+  <div class="policy-box">
+    <h3>📌 LƯU Ý QUAN TRỌNG</h3>
+    <ol>
+      <li>Vui lòng vào link đúng giờ hẹn, nếu trễ hơn 30 phút đồng nghĩa với việc hủy lịch.</li>
+      <li>Hỗ trợ dời lịch nếu khách hàng có việc bận, báo trước 1 ngày trước ngày hẹn.</li>
+      <li>Nếu khách hủy lịch sát giờ sẽ không được hoàn lại tiền đã thanh toán.</li>
+    </ol>
+  </div>
+  <div class="note">📌 Vui lòng kiểm tra kỹ thông tin ở trên. Nếu đúng, quét mã QR chuyển khoản để giữ lịch tư vấn.</div>
+  <div class="footer">${ps.footerText || 'Trương Dáng Hương Academy — Phiếu xác nhận tự động từ hệ thống'}</div>
+  </div>`;
+  return {styleBlock, bodyHtml};
+}
+
+async function exportConsultConfirmImage(id){
+  const b=D.consultingBookings.find(x=>x.id===id);
+  if(!b){notify('Không tìm thấy lịch tư vấn này!',false);return;}
+  if(typeof html2canvas==='undefined'){notify('Chưa tải được thư viện xuất ảnh, thử lại sau!',false);return;}
+  if(!cfg.bankId||!cfg.bankAcc){notify('Chưa cài đặt tài khoản ngân hàng nhận tiền (mục Cài đặt) — ảnh sẽ thiếu QR!',false);}
+  notify('Đang tạo phiếu xác nhận tư vấn 1-1...');
+  const {styleBlock, bodyHtml} = buildConsultConfirmHTML_(b);
+  const holder = document.createElement('div');
+  holder.style.cssText = 'position:fixed;left:-9999px;top:0;background:#fff;';
+  const styleEl = document.createElement('style');
+  styleEl.textContent = styleBlock;
+  holder.appendChild(styleEl);
+  holder.innerHTML += bodyHtml;
+  document.body.appendChild(holder);
+  try{
+    const imgs = holder.querySelectorAll('img');
+    await Promise.all(Array.from(imgs).map(img=>img.complete?Promise.resolve():new Promise(res=>{img.onload=img.onerror=res;})));
+    const target = holder.querySelector('.tdh-inv');
+    const canvas = await html2canvas(target, {backgroundColor:'#fff', scale:2, useCORS:true});
+    const link = document.createElement('a');
+    const safeName = (b.customer_name||'KhachTuVan').trim().replace(/\s+/g,'_');
+    link.download = 'XacNhanTuVan1-1_'+id+'_'+safeName+'.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    notify('✅ Đã lưu phiếu xác nhận tư vấn 1-1');
+  }catch(e){
+    notify('Lỗi tạo phiếu: '+e.message, false);
+  }finally{
+    document.body.removeChild(holder);
+  }
+}
+
 async function exportDeposit1ConfirmImage(){
   const id = document.getElementById('cf-student-id').value;
   const s = D.students.find(x=>x.id===id);
@@ -14571,6 +14703,8 @@ async function submitConsultBooking(){
   const duration=Math.min(120,+document.getElementById('cst-duration').value||120);
   const price=Math.max(0,+document.getElementById('cst-price').value||0);
   const note=document.getElementById('cst-note').value.trim();
+  const pancakePlatform=document.getElementById('cst-pancake-platform').value;
+  const pancakeConvId=document.getElementById('cst-pancake-convid').value.trim();
   const warnEl=document.getElementById('cst-conflict-warn');
   warnEl.style.display='none';
 
@@ -14589,6 +14723,7 @@ async function submitConsultBooking(){
   const booking={
     customer_name:name, phone, date, start_time:time, end_time:endTime, duration_min:duration,
     price, status:'Chờ thanh toán', note,
+    pancake_platform:pancakePlatform, pancake_conversation_id:pancakeConvId,
     created_by:AUTH_CURRENT?.name||AUTH_CURRENT?.user||'', created_at:Date.now(), paid_at:null,
   };
   await sbUpsert('consulting_bookings',{id, data:booking});
@@ -14627,28 +14762,20 @@ function consultConfirmMsgTemplate_(b){
 Bên em sẽ gửi mình link buổi tư vấn online 1 tiếng trước giờ hẹn nhen ạ. Em cảm ơn anh/chị và hẹn gặp mình vào ngày tư vấn. Xin cảm ơn`;
 }
 
-// Tự tìm hội thoại Pancake theo SĐT khách rồi gửi tin xác nhận — KHÔNG chặn luồng
-// xác nhận thanh toán nếu lỗi/không tìm thấy (giống cách zaloMsg im lặng bỏ qua
-// khi chưa cấu hình), chỉ báo nhẹ để nhân viên biết cần nhắn tay thay.
-async function sendConsultPancakeConfirm_(b){
-  if(!b.phone){ return; } // không có SĐT thì không có gì để tự tìm hội thoại
-  try{
-    const r=await gasCall({action:'pancake_find_conversation', phone:b.phone});
-    const found=r.result;
-    if(!found || !found.ok){
-      notify('ℹ️ Chưa tự gửi được tin Pancake xác nhận lịch tư vấn cho '+b.customer_name+' ('+(found?.error||'không rõ lỗi')+') — nhắn tay giúp khách nhé.',false);
-      return;
-    }
-    const msg=consultConfirmMsgTemplate_(b);
-    const sendR=await pancakeSend(found.platform, found.conversationId, msg);
-    if(sendR && sendR.success){
-      notify('✓ Đã tự gửi tin Pancake xác nhận lịch tư vấn cho '+b.customer_name);
-    } else {
-      notify('⚠️ Gửi tin Pancake xác nhận cho '+b.customer_name+' chưa thành công ('+(sendR?.error||'không rõ lỗi')+'), nhắn tay giúp mình nhé.',false);
-    }
-  }catch(e){
-    notify('⚠️ Lỗi khi tự gửi tin Pancake xác nhận lịch tư vấn: '+e.message,false);
+// ★ SỬA (2026-09-15, theo yêu cầu MHKL): KHÔNG tự gửi thẳng — đưa vào hàng đợi
+// "Tin nhắn chờ gửi" giống hệt luồng xác nhận đặt cọc của học viên: nhân viên có
+// thể xem lại/sửa nội dung, bấm "Gửi thử" (gửi vào hội thoại test để kiểm tra ổn
+// định) rồi mới bấm "Gửi" thật. Chỉ soạn sẵn tin nếu booking đã có sẵn kênh + ID
+// hội thoại Pancake (điền lúc tạo lịch, giống cách gắn Pancake cho học viên).
+async function queueConsultPancakeConfirm_(b){
+  if(!b.pancake_conversation_id){
+    console.warn(`Lịch tư vấn ${b.customer_name} chưa có ID hội thoại Pancake — bỏ qua soạn tin xác nhận.`);
+    return;
   }
+  const fakeStudent={id:b.id, name:b.customer_name, pancake_platform:b.pancake_platform||'zalo', pancake_conversation_id:b.pancake_conversation_id};
+  const msg=consultConfirmMsgTemplate_(b);
+  const okQ=await queuePancakeMessage_(fakeStudent,'consult_confirm',msg);
+  if(okQ) notify('📨 Đã soạn sẵn tin Pancake xác nhận lịch tư vấn — vào tab "Tin nhắn chờ gửi" để Gửi thử/Gửi.');
 }
 
 async function confirmConsultPaid(){
@@ -14669,8 +14796,8 @@ async function confirmConsultPaid(){
   if(typeof renderDash==='function') renderDash();
   notify('✓ Đã xác nhận thanh toán — giữ lịch thành công!');
   tgMsg(`✅ *Xác nhận lịch tư vấn 1-1!*\n\n👤 ${b.customer_name}${b.phone?' — '+b.phone:''}\n🗓 ${formatDateVN_(b.date)}, ${b.start_time}–${b.end_time}\n💰 ${fmt(b.price)} (đã thanh toán 100%)\n${b.note?'📝 '+b.note+'\\n':''}\n_Trương Dáng Hương Academy_`);
-  // Tự động gửi tin Pancake xác nhận cho khách (nếu tìm được hội thoại theo SĐT)
-  sendConsultPancakeConfirm_(b);
+  // Soạn sẵn tin Pancake xác nhận vào hàng đợi (nếu booking có gắn kênh + ID hội thoại)
+  queueConsultPancakeConfirm_(b);
   consultInvoice=null;
 }
 
@@ -14717,6 +14844,7 @@ function renderConsultBookings(){
       <td style="font-weight:700">${fmt(b.price||0)}</td>
       <td><span class="tag ${tagClass}">${b.status}</span></td>
       <td class="btn-group" style="gap:4px">
+        <button class="btn btn-ghost btn-sm" onclick="exportConsultConfirmImage('${b.id}')" title="Xuất phiếu xác nhận thông tin (ảnh) để gửi khách">🖼️ Phiếu</button>
         ${b.status==='Chờ thanh toán'?`<button class="btn btn-ghost btn-sm" onclick="openConsultQR('${b.id}')">💳 QR</button><button class="btn btn-ghost btn-sm" onclick="cancelConsultBooking('${b.id}')">✕ Hủy</button>`:''}
         ${b.status==='Đã thanh toán'?`<button class="btn btn-ghost btn-sm" onclick="cancelConsultBooking('${b.id}','50')" title="Hủy, hoàn 50% tiền đã thu">↩ Hủy 50%</button><button class="btn btn-ghost btn-sm" onclick="cancelConsultBooking('${b.id}','0')" title="Hủy, không hoàn tiền — khách mất tiền cọc">🚫 Hủy mất tiền</button>`:''}
         ${b.status==='Đã hủy'&&b.cancel_policy?`<span style="font-size:11px;color:var(--muted)">${b.cancel_policy}</span>`:''}
