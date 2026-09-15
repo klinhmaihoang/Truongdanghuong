@@ -1346,13 +1346,15 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div id="emp-fields-fulltime">
       <div class="fg" style="margin-bottom:12px"><label>Lương cơ bản (₫/tháng)</label><input id="emp-salary" type="number" placeholder="5000000"/></div>
     </div>
-    <!-- Freelancer theo target cố định -->
+    <!-- Freelancer theo target cố định — nhập TẦN SUẤT/NGÀY, hệ thống tự quy đổi
+         ra target cả tháng theo ĐÚNG số ngày thật của tháng đó (28/30/31 ngày),
+         tránh lệch khi tháng thiếu/tháng đủ. -->
     <div id="emp-fields-freelance-target" style="display:none">
       <div class="form-row">
-        <div class="fg"><label>Target số lượng/tháng</label><input id="emp-fl-target-qty" type="number" placeholder="30" step="1"/></div>
+        <div class="fg"><label>Target (bài/ngày)</label><input id="emp-fl-target-perday" type="number" placeholder="1" step="0.1"/></div>
         <div class="fg"><label>Lương nếu đạt đủ target (₫)</label><input id="emp-fl-target-pay" type="number" placeholder="3000000"/></div>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin:-6px 0 12px">Nếu tháng đó làm không đủ target, lương sẽ tự trừ theo tỷ lệ (VD đủ 25/30 → 2.500.000₫). Ghi nhận số bài/sản phẩm ở tab "🎬 Nghiệm thu freelancer".</div>
+      <div style="font-size:11px;color:var(--muted);margin:-6px 0 12px">VD 1 bài/ngày: tháng 30 ngày target = 30 bài, tháng 31 ngày target = 31 bài, tháng 2 (28 ngày) target = 28 bài — tự tính theo đúng số ngày thật, không bị lệch. Nếu tháng đó làm không đủ target, lương tự trừ theo tỷ lệ. Ghi nhận số bài ở tab "🎬 Nghiệm thu freelancer".</div>
     </div>
     <!-- Freelancer theo sản phẩm -->
     <div id="emp-fields-freelance-piece" style="display:none">
@@ -20056,7 +20058,7 @@ function renderHR() {
       const calc=flCalcPay_(e, monthKey);
       const typeLabel = e.salary_type==='freelance_target' ? '🎯 Freelancer — theo target' : '🎬 Freelancer — theo sản phẩm';
       infoLine = e.salary_type==='freelance_target'
-        ? `${typeLabel} · Target: ${e.fl_target_qty||0}/tháng · Đã làm: ${calc.qty} · Lương tháng này: ${fmt(calc.pay)}`
+        ? `${typeLabel} · ${e.fl_target_per_day||0} bài/ngày (target tháng này: ${calc.targetQty}) · Đã làm: ${calc.qty} · Lương tháng này: ${fmt(calc.pay)}`
         : `${typeLabel} · Đơn giá mặc định: ${fmt(e.fl_unit_price||0)} · Đã làm: ${calc.qty} sản phẩm · Lương tháng này: ${fmt(calc.pay)}`;
       actionsHtml = `<button onclick="go('hr',null);setTimeout(()=>hrTab(document.getElementById('hr-tab-freelance'),'freelance'),60)" class="btn btn-sm" style="font-size:11px;background:#8E44AD;color:#fff">🎬 Nghiệm thu</button>
         <button onclick="hrDeleteEmployee('${e.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px">✕</button>`;
@@ -20103,7 +20105,7 @@ async function hrSaveEmployee() {
     role: document.getElementById('emp-role')?.value||'staff',
     salary_type: salaryType,
     salary: +document.getElementById('emp-salary')?.value||0,
-    fl_target_qty: +document.getElementById('emp-fl-target-qty')?.value||0,
+    fl_target_per_day: +document.getElementById('emp-fl-target-perday')?.value||0,
     fl_target_pay: +document.getElementById('emp-fl-target-pay')?.value||0,
     fl_unit_price: +document.getElementById('emp-fl-unit-price')?.value||0,
     start: document.getElementById('emp-start')?.value||'',
@@ -20114,7 +20116,7 @@ async function hrSaveEmployee() {
   await sbSaveEmployee(emp);
   D.employees.push(emp);
   closeM('modal-add-employee');
-  ['emp-name','emp-phone','emp-salary','emp-email','emp-note','emp-fl-target-qty','emp-fl-target-pay','emp-fl-unit-price'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['emp-name','emp-phone','emp-salary','emp-email','emp-note','emp-fl-target-perday','emp-fl-target-pay','emp-fl-unit-price'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   document.getElementById('emp-salary-type').value='fulltime';
   hrEmpSalaryTypeChanged();
   renderHR();
@@ -20137,15 +20139,27 @@ function flDeliverablesForEmpMonth_(empId, monthKey){
   return loadFreelanceDeliverables().filter(d=>d.emp_id===empId && (d.date||'').slice(0,7)===monthKey && d.status!=='rejected');
 }
 
+// Số ngày thật của tháng monthKey ("2026-09" → 30, "2026-02" → 28...) — dùng để
+// quy đổi target/ngày ra target cả tháng, tự đúng theo từng tháng cụ thể thay vì
+// một con số cố định (30/31 ngày không lệch nhau nữa).
+function daysInMonth_(monthKey){
+  const [y,m]=String(monthKey||'').split('-').map(Number);
+  if(!y||!m) return 30;
+  return new Date(y,m,0).getDate();
+}
+
 // Tính lương freelancer trong tháng monthKey. Content (freelance_target):
-// lương = target_pay × (số lượng đã làm / target_qty), tối đa 100% target_pay
-// (theo yêu cầu MHKL: thiếu target thì trừ tỷ lệ). Editor (freelance_piece):
-// lương = tổng (số lượng × đơn giá) của từng sản phẩm đã ghi nhận.
+// target cả tháng = target/ngày × số ngày THẬT của tháng đó (28/30/31 ngày đều tự
+// đúng) → lương = target_pay × (số lượng đã làm / target cả tháng), tối đa 100%
+// target_pay (theo yêu cầu MHKL: thiếu target thì trừ tỷ lệ). Editor
+// (freelance_piece): lương = tổng (số lượng × đơn giá) của từng sản phẩm.
 function flCalcPay_(emp, monthKey){
   const items = flDeliverablesForEmpMonth_(emp.id, monthKey);
   const qty = items.reduce((s,d)=>s+(+d.qty||0),0);
   if(emp.salary_type==='freelance_target'){
-    const targetQty=+emp.fl_target_qty||0, targetPay=+emp.fl_target_pay||0;
+    const perDay=+emp.fl_target_per_day||0;
+    const targetQty=Math.round(perDay*daysInMonth_(monthKey));
+    const targetPay=+emp.fl_target_pay||0;
     const pay = targetQty>0 ? Math.round(Math.min(1, qty/targetQty)*targetPay) : 0;
     return {qty, pay, targetQty, targetPay};
   }
