@@ -14617,6 +14617,40 @@ function openConsultQR(id){
   showM('modal-consult-qr');
 }
 
+// Tin nhắn Pancake xác nhận đã nhận thanh toán — mẫu do MHKL cung cấp (2026-09-15)
+function consultConfirmMsgTemplate_(b){
+  return `Dạ bên em đã nhận được thanh toán cho dịch vụ tư vấn 1-1 của mình ạ. Em xác nhận lại thông tin buổi tư vấn của mình như sau:
+
+1. Ngày tư vấn mà anh/chị đã book: ${formatDateVN_(b.date)} - từ ${b.start_time} - ${b.end_time}
+2. Hình thức tư vấn: Google Meeting/ Zoom
+
+Bên em sẽ gửi mình link buổi tư vấn online 1 tiếng trước giờ hẹn nhen ạ. Em cảm ơn anh/chị và hẹn gặp mình vào ngày tư vấn. Xin cảm ơn`;
+}
+
+// Tự tìm hội thoại Pancake theo SĐT khách rồi gửi tin xác nhận — KHÔNG chặn luồng
+// xác nhận thanh toán nếu lỗi/không tìm thấy (giống cách zaloMsg im lặng bỏ qua
+// khi chưa cấu hình), chỉ báo nhẹ để nhân viên biết cần nhắn tay thay.
+async function sendConsultPancakeConfirm_(b){
+  if(!b.phone){ return; } // không có SĐT thì không có gì để tự tìm hội thoại
+  try{
+    const r=await gasCall({action:'pancake_find_conversation', phone:b.phone});
+    const found=r.result;
+    if(!found || !found.ok){
+      notify('ℹ️ Chưa tự gửi được tin Pancake xác nhận lịch tư vấn cho '+b.customer_name+' ('+(found?.error||'không rõ lỗi')+') — nhắn tay giúp khách nhé.',false);
+      return;
+    }
+    const msg=consultConfirmMsgTemplate_(b);
+    const sendR=await pancakeSend(found.platform, found.conversationId, msg);
+    if(sendR && sendR.success){
+      notify('✓ Đã tự gửi tin Pancake xác nhận lịch tư vấn cho '+b.customer_name);
+    } else {
+      notify('⚠️ Gửi tin Pancake xác nhận cho '+b.customer_name+' chưa thành công ('+(sendR?.error||'không rõ lỗi')+'), nhắn tay giúp mình nhé.',false);
+    }
+  }catch(e){
+    notify('⚠️ Lỗi khi tự gửi tin Pancake xác nhận lịch tư vấn: '+e.message,false);
+  }
+}
+
 async function confirmConsultPaid(){
   if(!consultInvoice)return;
   const b=consultInvoice;
@@ -14635,29 +14669,39 @@ async function confirmConsultPaid(){
   if(typeof renderDash==='function') renderDash();
   notify('✓ Đã xác nhận thanh toán — giữ lịch thành công!');
   tgMsg(`✅ *Xác nhận lịch tư vấn 1-1!*\n\n👤 ${b.customer_name}${b.phone?' — '+b.phone:''}\n🗓 ${formatDateVN_(b.date)}, ${b.start_time}–${b.end_time}\n💰 ${fmt(b.price)} (đã thanh toán 100%)\n${b.note?'📝 '+b.note+'\\n':''}\n_Trương Dáng Hương Academy_`);
+  // Tự động gửi tin Pancake xác nhận cho khách (nếu tìm được hội thoại theo SĐT)
+  sendConsultPancakeConfirm_(b);
   consultInvoice=null;
 }
 
-async function cancelConsultBooking(id){
+// refundMode: null (chưa thanh toán, không có gì để hoàn) | '50' (hoàn 50%) | '0' (mất tiền, không hoàn)
+async function cancelConsultBooking(id, refundMode){
   const b=D.consultingBookings.find(x=>x.id===id);
   if(!b)return;
   const wasPaid=b.status==='Đã thanh toán';
+  let refundAmount=0, policyLabel='';
+  if(wasPaid){
+    if(refundMode==='50'){ refundAmount=Math.round(b.price*0.5); policyLabel='hoàn 50% ('+fmt(refundAmount)+')'; }
+    else if(refundMode==='0'){ refundAmount=0; policyLabel='KHÔNG hoàn tiền (khách mất tiền cọc)'; }
+    else { notify('Thiếu chính sách hoàn tiền khi hủy lịch đã thanh toán!',false); return; }
+  }
   const confirmMsg=wasPaid
-    ? `Lịch này ĐÃ THANH TOÁN. Hủy sẽ tự ghi 1 khoản HOÀN TIỀN ${fmt(b.price)} vào Thu chi để sổ sách đúng. Hủy lịch của "${b.customer_name}" (${formatDateVN_(b.date)} ${b.start_time})?`
+    ? `Lịch này ĐÃ THANH TOÁN. Hủy theo chính sách: ${policyLabel}. Xác nhận hủy lịch của "${b.customer_name}" (${formatDateVN_(b.date)} ${b.start_time})?`
     : `Hủy lịch tư vấn của "${b.customer_name}" (${formatDateVN_(b.date)} ${b.start_time})?`;
   if(!confirm(confirmMsg))return;
   b.status='Đã hủy';
+  b.cancel_policy=wasPaid?(refundMode==='50'?'Hoàn 50%':'Không hoàn'):null;
   const {id:_id, ...data}=b;
   await sbPatch('consulting_bookings',{data},`?id=eq.${id}`);
-  if(wasPaid){
+  if(wasPaid && refundAmount>0){
     const ts=nowDT();
-    const tx={id:'tx_consult_refund_'+id+'_'+Date.now(),type:'chi',category:'Hoàn tiền tư vấn 1-1',amount:b.price,
-      note:`Hoàn tiền hủy lịch tư vấn — ${b.customer_name} — ${formatDateVN_(b.date)} ${b.start_time}`,time:ts,auto:1,created_at:Date.now()};
+    const tx={id:'tx_consult_refund_'+id+'_'+Date.now(),type:'chi',category:'Hoàn tiền tư vấn 1-1',amount:refundAmount,
+      note:`Hoàn 50% hủy lịch tư vấn — ${b.customer_name} — ${formatDateVN_(b.date)} ${b.start_time}`,time:ts,auto:1,created_at:Date.now()};
     try{ await sbUpsert('transactions',tx); D.transactions.push(tx); }catch(e){}
   }
   renderConsultBookings();
   if(typeof renderDash==='function') renderDash();
-  notify('Đã hủy lịch — khung giờ này giờ đã mở lại cho khách khác'+(wasPaid?' (đã ghi hoàn tiền vào Thu chi)':''));
+  notify('Đã hủy lịch — khung giờ này giờ đã mở lại cho khách khác'+(refundAmount>0?' (đã ghi hoàn tiền vào Thu chi)':''));
 }
 
 function renderConsultBookings(){
@@ -14674,7 +14718,8 @@ function renderConsultBookings(){
       <td><span class="tag ${tagClass}">${b.status}</span></td>
       <td class="btn-group" style="gap:4px">
         ${b.status==='Chờ thanh toán'?`<button class="btn btn-ghost btn-sm" onclick="openConsultQR('${b.id}')">💳 QR</button><button class="btn btn-ghost btn-sm" onclick="cancelConsultBooking('${b.id}')">✕ Hủy</button>`:''}
-        ${b.status==='Đã thanh toán'?`<button class="btn btn-ghost btn-sm" onclick="cancelConsultBooking('${b.id}')">✕ Hủy</button>`:''}
+        ${b.status==='Đã thanh toán'?`<button class="btn btn-ghost btn-sm" onclick="cancelConsultBooking('${b.id}','50')" title="Hủy, hoàn 50% tiền đã thu">↩ Hủy 50%</button><button class="btn btn-ghost btn-sm" onclick="cancelConsultBooking('${b.id}','0')" title="Hủy, không hoàn tiền — khách mất tiền cọc">🚫 Hủy mất tiền</button>`:''}
+        ${b.status==='Đã hủy'&&b.cancel_policy?`<span style="font-size:11px;color:var(--muted)">${b.cancel_policy}</span>`:''}
       </td>
     </tr>`;
   }).join('')||'<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--muted)">Chưa có lịch tư vấn nào</td></tr>';
