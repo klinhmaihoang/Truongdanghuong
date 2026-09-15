@@ -712,6 +712,10 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
               <input id="cst-phone" placeholder="090xxxxxxx" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;margin-top:4px"/>
             </div>
             <div>
+              <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Email</label>
+              <input id="cst-email" type="email" placeholder="ten@email.com" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;margin-top:4px"/>
+            </div>
+            <div>
               <label style="font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Ngày tư vấn *</label>
               <input id="cst-date" type="date" style="width:100%;padding:8px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:inherit;outline:none;margin-top:4px"/>
             </div>
@@ -758,6 +762,10 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
           <div class="card-head"><span class="card-title">📋 Lịch tư vấn đã đặt</span></div>
           <table><thead><tr><th>Ngày</th><th>Giờ</th><th>Khách</th><th>Giá</th><th>Trạng thái</th><th></th></tr></thead>
           <tbody id="consult-bookings"></tbody></table>
+        </div>
+        <div class="card" style="margin-top:14px">
+          <div class="card-head"><span class="card-title">📨 Tin nhắn Pancake chờ gửi (tư vấn)</span></div>
+          <div id="consult-pancake-queue"></div>
         </div>
       </div>
     </div>
@@ -12002,6 +12010,7 @@ function buildConsultConfirmHTML_(b){
   <div class="title">XÁC NHẬN LỊCH TƯ VẤN 1-1</div>
   <div class="row"><span class="label">Khách hàng:</span><span class="value">${b.customer_name||''}</span></div>
   ${b.phone?`<div class="row"><span class="label">SĐT:</span><span class="value">${b.phone}</span></div>`:''}
+  ${b.email?`<div class="row"><span class="label">Email:</span><span class="value">${b.email}</span></div>`:''}
   <div class="row"><span class="label">Ngày tư vấn:</span><span class="value">${formatDateVN_(b.date)}</span></div>
   <div class="row"><span class="label">Giờ tư vấn:</span><span class="value">${b.start_time} – ${b.end_time}</span></div>
   <div class="row"><span class="label">Hình thức:</span><span class="value">Google Meeting / Zoom</span></div>
@@ -14698,6 +14707,7 @@ function findConsultConflict(date, startTime, durationMin, excludeId){
 async function submitConsultBooking(){
   const name=document.getElementById('cst-name').value.trim();
   const phone=document.getElementById('cst-phone').value.trim();
+  const email=document.getElementById('cst-email').value.trim();
   const date=document.getElementById('cst-date').value;
   const time=document.getElementById('cst-time').value;
   const duration=Math.min(120,+document.getElementById('cst-duration').value||120);
@@ -14721,7 +14731,7 @@ async function submitConsultBooking(){
   const id='TV'+Date.now().toString().slice(-8);
   const endTime=_consultMinToTime(_consultTimeToMin(time)+duration);
   const booking={
-    customer_name:name, phone, date, start_time:time, end_time:endTime, duration_min:duration,
+    customer_name:name, phone, email, date, start_time:time, end_time:endTime, duration_min:duration,
     price, status:'Chờ thanh toán', note,
     pancake_platform:pancakePlatform, pancake_conversation_id:pancakeConvId,
     created_by:AUTH_CURRENT?.name||AUTH_CURRENT?.user||'', created_at:Date.now(), paid_at:null,
@@ -14747,6 +14757,7 @@ function openConsultQR(id){
   document.getElementById('cst-qr-info').innerHTML=`
     <div><span>Mã lịch hẹn</span><span style="color:var(--gold2)">${b.id}</span></div>
     <div><span>Khách hàng</span><span>${b.customer_name}</span></div>
+    ${b.email?`<div><span>Email</span><span>${b.email}</span></div>`:''}
     <div><span>Ngày giờ</span><span>${formatDateVN_(b.date)}, ${b.start_time}–${b.end_time}</span></div>
     <div><span>Thanh toán (100%)</span><span style="color:var(--gold2);font-size:16px">${fmt(b.price)}</span></div>`;
   showM('modal-consult-qr');
@@ -14763,10 +14774,12 @@ Bên em sẽ gửi mình link buổi tư vấn online 1 tiếng trước giờ h
 }
 
 // ★ SỬA (2026-09-15, theo yêu cầu MHKL): KHÔNG tự gửi thẳng — đưa vào hàng đợi
-// "Tin nhắn chờ gửi" giống hệt luồng xác nhận đặt cọc của học viên: nhân viên có
-// thể xem lại/sửa nội dung, bấm "Gửi thử" (gửi vào hội thoại test để kiểm tra ổn
-// định) rồi mới bấm "Gửi" thật. Chỉ soạn sẵn tin nếu booking đã có sẵn kênh + ID
-// hội thoại Pancake (điền lúc tạo lịch, giống cách gắn Pancake cho học viên).
+// chung "pancake_queue" giống hệt luồng xác nhận đặt cọc của học viên: nhân viên
+// có thể xem lại/sửa nội dung, bấm "Gửi thử" (gửi vào hội thoại test để kiểm tra
+// ổn định) rồi mới bấm "Gửi" thật. Chỉ soạn sẵn tin nếu booking đã có sẵn kênh +
+// ID hội thoại Pancake (điền lúc tạo lịch, giống cách gắn Pancake cho học viên).
+// ★ SỬA (2026-09-15 #2): hiện NGAY trong tab "Tư vấn 1-1" (renderConsultPancakeQueue)
+// thay vì phải qua tab học viên → "Tin nhắn chờ gửi" mới thấy — theo yêu cầu MHKL.
 async function queueConsultPancakeConfirm_(b){
   if(!b.pancake_conversation_id){
     console.warn(`Lịch tư vấn ${b.customer_name} chưa có ID hội thoại Pancake — bỏ qua soạn tin xác nhận.`);
@@ -14775,7 +14788,8 @@ async function queueConsultPancakeConfirm_(b){
   const fakeStudent={id:b.id, name:b.customer_name, pancake_platform:b.pancake_platform||'zalo', pancake_conversation_id:b.pancake_conversation_id};
   const msg=consultConfirmMsgTemplate_(b);
   const okQ=await queuePancakeMessage_(fakeStudent,'consult_confirm',msg);
-  if(okQ) notify('📨 Đã soạn sẵn tin Pancake xác nhận lịch tư vấn — vào tab "Tin nhắn chờ gửi" để Gửi thử/Gửi.');
+  if(okQ) notify('📨 Đã soạn sẵn tin Pancake xác nhận lịch tư vấn — xem ngay bên dưới bảng lịch tư vấn để Gửi thử/Gửi.');
+  if(typeof renderConsultPancakeQueue==='function') renderConsultPancakeQueue();
 }
 
 async function confirmConsultPaid(){
@@ -14802,28 +14816,33 @@ async function confirmConsultPaid(){
 }
 
 // refundMode: null (chưa thanh toán, không có gì để hoàn) | '50' (hoàn 50%) | '0' (mất tiền, không hoàn)
-async function cancelConsultBooking(id, refundMode){
+// ★ SỬA (2026-09-15, theo yêu cầu MHKL): thay vì 2 nút cứng "Hoàn 50%"/"Mất tiền",
+// giờ hỏi TRỰC TIẾP số tiền muốn hoàn (₫) — nhập 0 nghĩa là KHÔNG hoàn. Cho phép
+// nhân viên tự quyết theo từng trường hợp thay vì chỉ 2 lựa chọn cố định.
+async function cancelConsultBooking(id){
   const b=D.consultingBookings.find(x=>x.id===id);
   if(!b)return;
   const wasPaid=b.status==='Đã thanh toán';
-  let refundAmount=0, policyLabel='';
+  let refundAmount=0, policyLabel=null;
   if(wasPaid){
-    if(refundMode==='50'){ refundAmount=Math.round(b.price*0.5); policyLabel='hoàn 50% ('+fmt(refundAmount)+')'; }
-    else if(refundMode==='0'){ refundAmount=0; policyLabel='KHÔNG hoàn tiền (khách mất tiền cọc)'; }
-    else { notify('Thiếu chính sách hoàn tiền khi hủy lịch đã thanh toán!',false); return; }
+    const input=prompt(`Lịch này ĐÃ THANH TOÁN ${fmt(b.price||0)}.\nNhập số tiền HOÀN LẠI cho khách (₫) — nhập 0 nếu KHÔNG hoàn:`,'0');
+    if(input===null) return; // bấm Hủy ở hộp nhập → không hủy lịch
+    refundAmount=Math.max(0,Math.round(Number(String(input).replace(/[^\d]/g,''))||0));
+    if(refundAmount>(b.price||0)){ notify('Số tiền hoàn không được lớn hơn số tiền đã thu ('+fmt(b.price||0)+')!',false); return; }
+    policyLabel=refundAmount>0?`Đã hoàn ${fmt(refundAmount)}`:'Không hoàn tiền';
   }
   const confirmMsg=wasPaid
-    ? `Lịch này ĐÃ THANH TOÁN. Hủy theo chính sách: ${policyLabel}. Xác nhận hủy lịch của "${b.customer_name}" (${formatDateVN_(b.date)} ${b.start_time})?`
+    ? `Hủy lịch của "${b.customer_name}" (${formatDateVN_(b.date)} ${b.start_time})? ${refundAmount>0?('Sẽ hoàn '+fmt(refundAmount)+' cho khách.'):'Sẽ KHÔNG hoàn tiền (khách mất tiền đã thanh toán).'}`
     : `Hủy lịch tư vấn của "${b.customer_name}" (${formatDateVN_(b.date)} ${b.start_time})?`;
   if(!confirm(confirmMsg))return;
   b.status='Đã hủy';
-  b.cancel_policy=wasPaid?(refundMode==='50'?'Hoàn 50%':'Không hoàn'):null;
+  b.cancel_policy=wasPaid?policyLabel:null;
   const {id:_id, ...data}=b;
   await sbPatch('consulting_bookings',{data},`?id=eq.${id}`);
   if(wasPaid && refundAmount>0){
     const ts=nowDT();
     const tx={id:'tx_consult_refund_'+id+'_'+Date.now(),type:'chi',category:'Hoàn tiền tư vấn 1-1',amount:refundAmount,
-      note:`Hoàn 50% hủy lịch tư vấn — ${b.customer_name} — ${formatDateVN_(b.date)} ${b.start_time}`,time:ts,auto:1,created_at:Date.now()};
+      note:`Hoàn tiền hủy lịch tư vấn — ${b.customer_name} — ${formatDateVN_(b.date)} ${b.start_time}`,time:ts,auto:1,created_at:Date.now()};
     try{ await sbUpsert('transactions',tx); D.transactions.push(tx); }catch(e){}
   }
   renderConsultBookings();
@@ -14845,12 +14864,42 @@ function renderConsultBookings(){
       <td><span class="tag ${tagClass}">${b.status}</span></td>
       <td class="btn-group" style="gap:4px">
         <button class="btn btn-ghost btn-sm" onclick="exportConsultConfirmImage('${b.id}')" title="Xuất phiếu xác nhận thông tin (ảnh) để gửi khách">🖼️ Phiếu</button>
-        ${b.status==='Chờ thanh toán'?`<button class="btn btn-ghost btn-sm" onclick="openConsultQR('${b.id}')">💳 QR</button><button class="btn btn-ghost btn-sm" onclick="cancelConsultBooking('${b.id}')">✕ Hủy</button>`:''}
-        ${b.status==='Đã thanh toán'?`<button class="btn btn-ghost btn-sm" onclick="cancelConsultBooking('${b.id}','50')" title="Hủy, hoàn 50% tiền đã thu">↩ Hủy 50%</button><button class="btn btn-ghost btn-sm" onclick="cancelConsultBooking('${b.id}','0')" title="Hủy, không hoàn tiền — khách mất tiền cọc">🚫 Hủy mất tiền</button>`:''}
+        ${b.status==='Chờ thanh toán'?`<button class="btn btn-ghost btn-sm" onclick="openConsultQR('${b.id}')">💳 QR</button>`:''}
+        ${b.status!=='Đã hủy'?`<button class="btn btn-ghost btn-sm" onclick="cancelConsultBooking('${b.id}')" title="${b.status==='Đã thanh toán'?'Hủy lịch — sẽ hỏi số tiền hoàn lại (0 = không hoàn)':'Hủy lịch giữ chỗ'}">✕ Hủy</button>`:''}
         ${b.status==='Đã hủy'&&b.cancel_policy?`<span style="font-size:11px;color:var(--muted)">${b.cancel_policy}</span>`:''}
       </td>
     </tr>`;
   }).join('')||'<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--muted)">Chưa có lịch tư vấn nào</td></tr>';
+  if(typeof renderConsultPancakeQueue==='function') renderConsultPancakeQueue();
+}
+
+// ★ MỚI (2026-09-15): hiện tin nhắn Pancake đang chờ duyệt CỦA CÁC LỊCH TƯ VẤN
+// ngay trong tab "Tư vấn 1-1" — khỏi phải qua tab học viên → "Tin nhắn chờ gửi".
+async function renderConsultPancakeQueue(){
+  const el=document.getElementById('consult-pancake-queue');
+  if(!el) return;
+  const consultIds=new Set(D.consultingBookings.map(b=>b.id));
+  let items=[];
+  try{ items=await sbGet('pancake_queue',''); }catch(e){ items=[]; }
+  items=(items||[]).filter(x=>x.status==='pending' && consultIds.has(x.student_id)).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  if(!items.length){ el.innerHTML='<div style="text-align:center;padding:16px;color:var(--muted);font-size:12.5px">Không có tin nhắn nào đang chờ gửi.</div>'; return; }
+  el.innerHTML=items.map(it=>{
+    const typeLabel=pancakeQueueTypeLabel_(it.type);
+    const platLabel=it.platform==='fb'?'Facebook':'Zalo';
+    return `<div style="border:1.5px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:6px">
+        <div><b>${it.student_name}</b> <span style="font-size:11px;color:var(--muted)">— ${typeLabel} — ${platLabel}</span></div>
+        <div style="font-size:11px;color:var(--muted)">${it.created_at?new Date(it.created_at).toLocaleString('vi-VN'):''}</div>
+      </div>
+      <textarea id="pcq-text-${it.id}" style="width:100%;min-height:120px;padding:8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:12.5px" onchange="pancakeQueueEditContent('${it.id}',this.value)">${it.content||''}</textarea>
+      <div id="pcq-result-${it.id}" style="font-size:11px;margin-top:4px"></div>
+      <div class="btn-group" style="margin-top:6px">
+        <button class="btn btn-ghost btn-sm" onclick="pancakeSendTest('${it.id}', ()=>renderConsultPancakeQueue())">🧪 Gửi thử</button>
+        <button class="btn btn-sm" style="background:#27ae60;color:#fff" onclick="pancakeSendReal('${it.id}', ()=>renderConsultPancakeQueue())">✅ Gửi</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="pancakeQueueDelete('${it.id}', ()=>renderConsultPancakeQueue())">🗑 Xóa</button>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 
