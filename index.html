@@ -1247,6 +1247,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div class="tab active" id="hr-tab-employees" onclick="hrTab(this,'employees')">👤 Nhân viên</div>
     <div class="tab" id="hr-tab-attendance" onclick="hrTab(this,'attendance')">📅 Chấm công</div>
     <div class="tab" id="hr-tab-salary" onclick="hrTab(this,'salary')">💰 Bảng lương</div>
+    <div class="tab" id="hr-tab-freelance" onclick="hrTab(this,'freelance')">🎬 Nghiệm thu freelancer</div>
   </div>
 
   <div id="hr-panel-employees">
@@ -1278,6 +1279,38 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       </div>
     </div>
   </div>
+
+  <!-- ★ MỚI: Nghiệm thu sản phẩm freelancer (content/editor) — chỉ mình MHKL dùng,
+       nhập link + số lượng ngay khi nhận bài/video, tự tính vào lương freelancer. -->
+  <div id="hr-panel-freelance" style="display:none">
+    <div class="card" style="margin-bottom:14px">
+      <div class="card-head"><span class="card-title">➕ Ghi nhận sản phẩm đã nhận</span></div>
+      <div class="form-row">
+        <div class="fg"><label>Freelancer *</label>
+          <select id="fl-emp" onchange="hrFlEmpChanged()" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+            <option value="">Chọn freelancer...</option>
+          </select>
+        </div>
+        <div class="fg"><label>Ngày ghi nhận *</label><input id="fl-date" type="date"/></div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Link bài đăng / video *</label><input id="fl-link" placeholder="https://..."/></div>
+        <div class="fg"><label>Số lượng</label><input id="fl-qty" type="number" value="1" min="1" step="1"/></div>
+      </div>
+      <div class="form-row" id="fl-price-row" style="display:none">
+        <div class="fg"><label>Đơn giá (₫/sản phẩm) — sửa được riêng cho sản phẩm này</label><input id="fl-price" type="number"/></div>
+      </div>
+      <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="fl-note" placeholder="Ghi chú (không bắt buộc)"/></div>
+      <button class="btn btn-sm" onclick="hrAddDeliverable()">💾 Ghi nhận</button>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <span class="card-title">📋 Sản phẩm đã ghi nhận</span>
+        <select id="hr-freelance-month" onchange="hrRenderFreelanceList()" style="padding:5px 10px;border-radius:6px;border:1px solid var(--border);font-size:12px;font-family:inherit;background:var(--bg2)"></select>
+      </div>
+      <div id="hr-freelance-list"></div>
+    </div>
+  </div>
 </div>
 
 <!-- Modal thêm nhân viên -->
@@ -1298,11 +1331,33 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
           <option value="manager">Quản lý</option>
         </select>
       </div>
-      <div class="fg"><label>Lương cơ bản (₫/tháng)</label><input id="emp-salary" type="number" placeholder="5000000"/></div>
-    </div>
-    <div class="form-row">
       <div class="fg"><label>Ngày vào làm</label><input id="emp-start" type="date"/></div>
-      <div class="fg"><label>Email</label><input id="emp-email" type="email" placeholder="email@..."/></div>
+    </div>
+    <div class="fg" style="margin-bottom:12px"><label>Email</label><input id="emp-email" type="email" placeholder="email@..."/></div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>Hình thức tính lương</label>
+      <select id="emp-salary-type" onchange="hrEmpSalaryTypeChanged()" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;width:100%">
+        <option value="fulltime">👤 Nhân viên chính thức — tính theo ngày công/chấm công</option>
+        <option value="freelance_target">🎯 Freelancer — theo target cố định (VD: content)</option>
+        <option value="freelance_piece">🎬 Freelancer — theo sản phẩm/đơn giá (VD: editor)</option>
+      </select>
+    </div>
+    <!-- Nhân viên chính thức -->
+    <div id="emp-fields-fulltime">
+      <div class="fg" style="margin-bottom:12px"><label>Lương cơ bản (₫/tháng)</label><input id="emp-salary" type="number" placeholder="5000000"/></div>
+    </div>
+    <!-- Freelancer theo target cố định -->
+    <div id="emp-fields-freelance-target" style="display:none">
+      <div class="form-row">
+        <div class="fg"><label>Target số lượng/tháng</label><input id="emp-fl-target-qty" type="number" placeholder="30" step="1"/></div>
+        <div class="fg"><label>Lương nếu đạt đủ target (₫)</label><input id="emp-fl-target-pay" type="number" placeholder="3000000"/></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin:-6px 0 12px">Nếu tháng đó làm không đủ target, lương sẽ tự trừ theo tỷ lệ (VD đủ 25/30 → 2.500.000₫). Ghi nhận số bài/sản phẩm ở tab "🎬 Nghiệm thu freelancer".</div>
+    </div>
+    <!-- Freelancer theo sản phẩm -->
+    <div id="emp-fields-freelance-piece" style="display:none">
+      <div class="fg" style="margin-bottom:6px"><label>Đơn giá mặc định (₫/sản phẩm)</label><input id="emp-fl-unit-price" type="number" placeholder="150000"/></div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px">Đơn giá mặc định khi ghi nhận sản phẩm mới — vẫn sửa được riêng cho từng sản phẩm nếu cần. Ghi nhận số lượng ở tab "🎬 Nghiệm thu freelancer".</div>
     </div>
     <div class="fg" style="margin-bottom:12px"><label>Ghi chú</label><input id="emp-note" placeholder="Ghi chú..."/></div>
     <div class="btn-group">
@@ -5418,7 +5473,7 @@ const sbDel = async (t, f) => {
 // ══════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════
-let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[],transactions:[],quotations:[],salesOrders:[],soActivities:[],classAttendance:[],consultingBookings:[]};
+let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[],transactions:[],quotations:[],salesOrders:[],soActivities:[],classAttendance:[],consultingBookings:[],freelanceDeliverables:[]};
 let cfg = {tgToken:'',tgChatId:'',zaloToken:'',zaloChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',accPhone:'0984830303',gsUrl:GAS_URL,
   pancakeToken:'',pancakeFbPageId:'',pancakeZaloPageId:'',pancakeTestConvId:'',pancakeTestPlatform:'zalo',pancakeTokenSavedAt:'',
   pancakeFbPageToken:'',pancakeZaloPageToken:'',pancakeAutoSend:false};
@@ -5536,6 +5591,7 @@ async function boot(){
             {table:'sales_orders',      order:{col:'created_at',dir:'desc'}, limit:100},
             {table:'so_activities',     order:{col:'created_at',dir:'desc'}, limit:200},
             {table:'consulting_bookings', order:{col:'created_at',dir:'desc'}, limit:500},
+            {table:'freelance_deliverables', order:{col:'created_at',dir:'desc'}, limit:1000},
           ]),
         ]);
         const inventory       = _bulk2a.inventory       || [];
@@ -5560,6 +5616,7 @@ async function boot(){
         const salesOrdersRaw  = _bulk2b.sales_orders    || [];
         const soActivitiesRaw = _bulk2b.so_activities   || [];
         const consultRaw      = _bulk2b.consulting_bookings || [];
+        const flDeliverRaw    = _bulk2b.freelance_deliverables || [];
 
         D.inventory = inventory&&inventory.length ? inventory : DEFAULTS.inventory;
         D.products  = (products&&products.length ? products : DEFAULTS.products).map(p=>({unit:'', ...p}));
@@ -5585,6 +5642,14 @@ async function boot(){
           return {id:r.id, ...(d||{})};
         });
         if(typeof renderConsultBookings==='function') renderConsultBookings();
+        // Nghiệm thu sản phẩm freelancer — cùng dạng id/data (JSON blob), tự tạo bảng
+        // lần đầu ghi (xem ensureTable() trong worker.js), không cần deploy/migrate D1.
+        D.freelanceDeliverables = (flDeliverRaw||[]).map(r=>{
+          let d=r.data;
+          if(typeof d==='string'){ try{d=JSON.parse(d);}catch(e){d={};} }
+          return {id:r.id, ...(d||{})};
+        });
+        if(typeof hrRenderFreelanceList==='function') hrRenderFreelanceList();
         // CRM from Supabase — fallback to localStorage
         try {
           const rawTasks = crmTasksRaw?.[0]?.data;
@@ -19939,12 +20004,13 @@ async function sbSaveAttendance(empId, monthKey, day, status) {
 function hrTab(el, tab) {
   document.querySelectorAll('#page-hr .tab').forEach(t=>t.classList.remove('active'));
   if(el) el.classList.add('active');
-  ['employees','attendance','salary'].forEach(t=>{
+  ['employees','attendance','salary','freelance'].forEach(t=>{
     const p=document.getElementById('hr-panel-'+t);
     if(p) p.style.display=t===tab?'':'none';
   });
   if(tab==='attendance') hrRenderAttendance();
   if(tab==='salary') hrRenderSalary();
+  if(tab==='freelance'){ hrRenderFreelanceEmpOptions_(); hrRenderFreelanceList(); }
 }
 
 function renderHR() {
@@ -19957,8 +20023,13 @@ function renderHR() {
   const se=(id,v)=>{const el=document.getElementById(id);if(el)el.textContent=v;};
   se('hr-total-emp', emps.length);
 
-  let totalSalary=0, totalLate=0, totalDays=0;
+  let totalSalary=0, totalLate=0, totalDays=0, attendEmpCount=0;
   emps.forEach(e=>{
+    if(isFreelanceEmp_(e)){
+      totalSalary += flCalcPay_(e, monthKey).pay;
+      return;
+    }
+    attendEmpCount++;
     const att = (attend[monthKey]||{})[e.id]||{};
     const days = Object.values(att).filter(v=>v==='present'||v==='late').length;
     const late = Object.values(att).filter(v=>v==='late').length;
@@ -19968,7 +20039,7 @@ function renderHR() {
     totalSalary += salary;
   });
   se('hr-total-salary', fmt(totalSalary));
-  se('hr-avg-attend', emps.length>0?Math.round(totalDays/emps.length):0);
+  se('hr-avg-attend', attendEmpCount>0?Math.round(totalDays/attendEmpCount):0);
   se('hr-late-count', totalLate);
 
   // Employee list
@@ -19980,34 +20051,61 @@ function renderHR() {
   }
   const roleLabel = {staff:'Nhân viên',sale:'Sale',teacher:'Giảng viên',warehouse:'Thủ kho',manager:'Quản lý'};
   el.innerHTML = emps.map(e => {
-    const att = (attend[monthKey]||{})[e.id]||{};
-    const days = Object.values(att).filter(v=>v==='present'||v==='late').length;
-    const salaryCalc = Math.round((e.salary||0)/26*days);
+    let infoLine, actionsHtml;
+    if(isFreelanceEmp_(e)){
+      const calc=flCalcPay_(e, monthKey);
+      const typeLabel = e.salary_type==='freelance_target' ? '🎯 Freelancer — theo target' : '🎬 Freelancer — theo sản phẩm';
+      infoLine = e.salary_type==='freelance_target'
+        ? `${typeLabel} · Target: ${e.fl_target_qty||0}/tháng · Đã làm: ${calc.qty} · Lương tháng này: ${fmt(calc.pay)}`
+        : `${typeLabel} · Đơn giá mặc định: ${fmt(e.fl_unit_price||0)} · Đã làm: ${calc.qty} sản phẩm · Lương tháng này: ${fmt(calc.pay)}`;
+      actionsHtml = `<button onclick="go('hr',null);setTimeout(()=>hrTab(document.getElementById('hr-tab-freelance'),'freelance'),60)" class="btn btn-sm" style="font-size:11px;background:#8E44AD;color:#fff">🎬 Nghiệm thu</button>
+        <button onclick="hrDeleteEmployee('${e.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px">✕</button>`;
+    } else {
+      const att = (attend[monthKey]||{})[e.id]||{};
+      const days = Object.values(att).filter(v=>v==='present'||v==='late').length;
+      const salaryCalc = Math.round((e.salary||0)/26*days);
+      infoLine = `Lương CB: ${fmt(e.salary||0)} · Đã công: ${days} ngày · Dự tính: ${fmt(salaryCalc)}`;
+      actionsHtml = `<button onclick="hrCheckIn('${e.id}')" class="btn btn-green btn-sm" style="font-size:11px">✓ Check-in</button>
+        <button onclick="hrDeleteEmployee('${e.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px">✕</button>`;
+    }
     return `
     <div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--border)">
       <div style="width:40px;height:40px;border-radius:50%;background:var(--brand);color:#fff;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;flex-shrink:0">${e.name.charAt(0)}</div>
       <div style="flex:1">
         <div style="font-weight:700;font-size:14px">${e.name}</div>
         <div style="font-size:11px;color:var(--muted)">${roleLabel[e.role]||e.role} · ${e.phone||''}</div>
-        <div style="font-size:11px;color:var(--muted)">Lương CB: ${fmt(e.salary||0)} · Đã công: ${days} ngày · Dự tính: ${fmt(salaryCalc)}</div>
+        <div style="font-size:11px;color:var(--muted)">${infoLine}</div>
       </div>
       <div style="display:flex;gap:6px">
-        <button onclick="hrCheckIn('${e.id}')" class="btn btn-green btn-sm" style="font-size:11px">✓ Check-in</button>
-        <button onclick="hrDeleteEmployee('${e.id}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:12px">✕</button>
+        ${actionsHtml}
       </div>
     </div>`;
   }).join('');
 }
 
+// ★ MỚI: chuyển hiện/ẩn khối field theo hình thức tính lương đã chọn khi thêm NV.
+function hrEmpSalaryTypeChanged() {
+  const type = document.getElementById('emp-salary-type')?.value||'fulltime';
+  const show = (id, on) => { const el=document.getElementById(id); if(el) el.style.display = on?'':'none'; };
+  show('emp-fields-fulltime', type==='fulltime');
+  show('emp-fields-freelance-target', type==='freelance_target');
+  show('emp-fields-freelance-piece', type==='freelance_piece');
+}
+
 async function hrSaveEmployee() {
   const name = document.getElementById('emp-name')?.value?.trim();
   if(!name) { notify('Nhập tên nhân viên!', false); return; }
+  const salaryType = document.getElementById('emp-salary-type')?.value||'fulltime';
   const emp = {
     id: 'emp_'+Date.now(),
     name,
     phone: document.getElementById('emp-phone')?.value||'',
     role: document.getElementById('emp-role')?.value||'staff',
+    salary_type: salaryType,
     salary: +document.getElementById('emp-salary')?.value||0,
+    fl_target_qty: +document.getElementById('emp-fl-target-qty')?.value||0,
+    fl_target_pay: +document.getElementById('emp-fl-target-pay')?.value||0,
+    fl_unit_price: +document.getElementById('emp-fl-unit-price')?.value||0,
     start: document.getElementById('emp-start')?.value||'',
     email: document.getElementById('emp-email')?.value||'',
     note: document.getElementById('emp-note')?.value||'',
@@ -20016,9 +20114,136 @@ async function hrSaveEmployee() {
   await sbSaveEmployee(emp);
   D.employees.push(emp);
   closeM('modal-add-employee');
-  ['emp-name','emp-phone','emp-salary','emp-email','emp-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['emp-name','emp-phone','emp-salary','emp-email','emp-note','emp-fl-target-qty','emp-fl-target-pay','emp-fl-unit-price'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('emp-salary-type').value='fulltime';
+  hrEmpSalaryTypeChanged();
   renderHR();
   notify('✅ Đã thêm nhân viên: '+name);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// FREELANCER — Nghiệm thu sản phẩm & tính lương (content theo target /
+// editor theo sản phẩm). Chỉ MHKL dùng app này: mỗi khi nhận bài/video
+// từ freelancer, MHKL tự nhập link + số lượng vào đây — ghi nhận xong
+// là tính luôn vào lương tháng đó (không có bước "duyệt" riêng vì
+// freelancer không tự vào app), nhưng vẫn giữ được nút "Loại bỏ" nếu
+// lỡ nhập nhầm/không tính (không xóa hẳn — giữ lịch sử).
+// ═══════════════════════════════════════════════════════════════
+function loadFreelanceDeliverables(){ return D.freelanceDeliverables||[]; }
+
+function isFreelanceEmp_(e){ return e && (e.salary_type==='freelance_target' || e.salary_type==='freelance_piece'); }
+
+function flDeliverablesForEmpMonth_(empId, monthKey){
+  return loadFreelanceDeliverables().filter(d=>d.emp_id===empId && (d.date||'').slice(0,7)===monthKey && d.status!=='rejected');
+}
+
+// Tính lương freelancer trong tháng monthKey. Content (freelance_target):
+// lương = target_pay × (số lượng đã làm / target_qty), tối đa 100% target_pay
+// (theo yêu cầu MHKL: thiếu target thì trừ tỷ lệ). Editor (freelance_piece):
+// lương = tổng (số lượng × đơn giá) của từng sản phẩm đã ghi nhận.
+function flCalcPay_(emp, monthKey){
+  const items = flDeliverablesForEmpMonth_(emp.id, monthKey);
+  const qty = items.reduce((s,d)=>s+(+d.qty||0),0);
+  if(emp.salary_type==='freelance_target'){
+    const targetQty=+emp.fl_target_qty||0, targetPay=+emp.fl_target_pay||0;
+    const pay = targetQty>0 ? Math.round(Math.min(1, qty/targetQty)*targetPay) : 0;
+    return {qty, pay, targetQty, targetPay};
+  }
+  if(emp.salary_type==='freelance_piece'){
+    const pay = items.reduce((s,d)=>s+(+d.qty||0)*(+d.unit_price||0),0);
+    return {qty, pay};
+  }
+  return {qty:0, pay:0};
+}
+
+function hrRenderFreelanceEmpOptions_(){
+  const sel=document.getElementById('fl-emp');
+  if(!sel) return;
+  const cur=sel.value;
+  const freelancers=loadEmployees().filter(isFreelanceEmp_);
+  sel.innerHTML='<option value="">Chọn freelancer...</option>'+freelancers.map(e=>
+    `<option value="${e.id}">${e.name} (${e.salary_type==='freelance_target'?'🎯 Theo target':'🎬 Theo sản phẩm'})</option>`
+  ).join('');
+  if(freelancers.some(e=>e.id===cur)) sel.value=cur;
+  hrFlEmpChanged();
+  if(!document.getElementById('fl-date').value) document.getElementById('fl-date').value=new Date().toISOString().slice(0,10);
+}
+
+function hrFlEmpChanged(){
+  const emp=loadEmployees().find(e=>e.id===document.getElementById('fl-emp')?.value);
+  const priceRow=document.getElementById('fl-price-row');
+  if(!priceRow) return;
+  if(emp && emp.salary_type==='freelance_piece'){
+    priceRow.style.display='';
+    const priceEl=document.getElementById('fl-price');
+    if(priceEl && !priceEl.value) priceEl.value=emp.fl_unit_price||'';
+  } else {
+    priceRow.style.display='none';
+  }
+}
+
+async function hrAddDeliverable(){
+  const empId=document.getElementById('fl-emp')?.value;
+  const emp=loadEmployees().find(e=>e.id===empId);
+  if(!emp){ notify('Chọn freelancer!',false); return; }
+  const date=document.getElementById('fl-date')?.value;
+  if(!date){ notify('Chọn ngày ghi nhận!',false); return; }
+  const link=document.getElementById('fl-link')?.value?.trim();
+  if(!link){ notify('Nhập link bài đăng/video!',false); return; }
+  const qty=Math.max(1,+document.getElementById('fl-qty')?.value||1);
+  const note=document.getElementById('fl-note')?.value?.trim()||'';
+  const item={
+    id:'fld_'+Date.now(), emp_id:emp.id, emp_name:emp.name, date, link, qty, note, status:'valid',
+    created_by:AUTH_CURRENT?.name||AUTH_CURRENT?.user||'', created_at:Date.now()
+  };
+  if(emp.salary_type==='freelance_piece'){
+    const priceEl=document.getElementById('fl-price');
+    item.unit_price = priceEl && priceEl.value!=='' ? +priceEl.value : (+emp.fl_unit_price||0);
+  }
+  await sbUpsert('freelance_deliverables',{id:item.id, data:item});
+  if(!D.freelanceDeliverables) D.freelanceDeliverables=[];
+  D.freelanceDeliverables.unshift(item);
+  ['fl-link','fl-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  hrRenderFreelanceList();
+  notify(`✅ Đã ghi nhận cho ${emp.name}: ${qty} sản phẩm`);
+}
+
+async function hrToggleDeliverable(id){
+  const d=loadFreelanceDeliverables().find(x=>x.id===id);
+  if(!d) return;
+  d.status = d.status==='rejected' ? 'valid' : 'rejected';
+  const {id:_id, ...data}=d;
+  await sbPatch('freelance_deliverables',{data},`?id=eq.${id}`);
+  hrRenderFreelanceList();
+}
+
+function hrRenderFreelanceList(){
+  const el=document.getElementById('hr-freelance-list');
+  if(!el) return;
+  const monthKey=document.getElementById('hr-freelance-month')?.value || new Date().toISOString().slice(0,7);
+  const freelancers=loadEmployees().filter(isFreelanceEmp_);
+  if(!freelancers.length){ el.innerHTML='<div style="text-align:center;padding:24px;color:var(--muted)">Chưa có freelancer nào — thêm nhân viên với hình thức lương "Freelancer" trước.</div>'; return; }
+  el.innerHTML=freelancers.map(e=>{
+    const items=(loadFreelanceDeliverables()||[]).filter(d=>d.emp_id===e.id && (d.date||'').slice(0,7)===monthKey).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+    const calc=flCalcPay_(e, monthKey);
+    const progressLabel = e.salary_type==='freelance_target'
+      ? `${calc.qty}/${calc.targetQty||0} sản phẩm — ${fmt(calc.pay)}${calc.targetQty&&calc.qty<calc.targetQty?' (chưa đủ target, đã trừ tỷ lệ)':''}`
+      : `${calc.qty} sản phẩm — ${fmt(calc.pay)}`;
+    return `<div style="border-bottom:1px solid var(--border);padding:12px 16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">
+        <div><strong style="font-size:14px">${e.name}</strong> <span style="font-size:11px;color:var(--muted)">${e.salary_type==='freelance_target'?'🎯 Theo target':'🎬 Theo sản phẩm'}</span></div>
+        <div style="font-weight:800;color:var(--green);font-size:13px">${progressLabel}</div>
+      </div>
+      ${items.length?items.map(d=>`
+        <div style="display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12.5px;${d.status==='rejected'?'opacity:.5;text-decoration:line-through':''}">
+          <span style="color:var(--muted);width:75px;flex-shrink:0">${formatDateVN_(d.date)}</span>
+          <a href="${d.link}" target="_blank" rel="noopener" style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--brand)">${d.link}</a>
+          <span style="flex-shrink:0">SL: ${d.qty}${d.unit_price!=null?' × '+fmt(d.unit_price):''}</span>
+          ${d.note?`<span style="color:var(--muted);flex-shrink:0">— ${d.note}</span>`:''}
+          <button class="btn btn-ghost btn-sm" style="flex-shrink:0;${d.status==='rejected'?'':'color:var(--red)'}" onclick="hrToggleDeliverable('${d.id}')">${d.status==='rejected'?'↩ Khôi phục':'🗑 Loại bỏ'}</button>
+        </div>`).join(''):'<div style="color:var(--muted);font-size:12px;padding:4px 0">Chưa có sản phẩm nào trong tháng này</div>'}
+    </div>`;
+  }).join('');
 }
 
 async function hrDeleteEmployee(id) {
@@ -20051,7 +20276,7 @@ function hrFillMonthSelects() {
     const k = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');
     months.push(k);
   }
-  ['hr-attend-month','hr-salary-month'].forEach(id=>{
+  ['hr-attend-month','hr-salary-month','hr-freelance-month'].forEach(id=>{
     const el=document.getElementById(id); if(!el) return;
     const cur=el.value||months[0];
     el.innerHTML=months.map(m=>{const[y,mo]=m.split('-');return `<option value="${m}" ${m===cur?'selected':''}>Tháng ${+mo}/${y}</option>`;}).join('');
@@ -20129,22 +20354,32 @@ function hrRenderSalary() {
     </tr></thead>
     <tbody>
     ${emps.map(e=>{
-      const att=(attend[monthKey]||{})[e.id]||{};
-      const days=Object.values(att).filter(v=>v==='present'||v==='late').length;
-      const lateCount=Object.values(att).filter(v=>v==='late').length;
-      const baseSalary=e.salary||0;
-      const deduct=Math.round(baseSalary/26*lateCount*0.1);
-      const actual=Math.round(baseSalary/26*days)-deduct;
-      totalPay+=actual;
       const roleLabel={staff:'NV',sale:'Sale',teacher:'GV',warehouse:'Kho',manager:'QL'};
       const paidKey='salary_paid_'+monthKey+'_'+e.id;
       const paid=(D.salaryRecords||[]).some(r=>r.emp_id===e.id&&r.month===monthKey&&r.paid) || localStorage.getItem(paidKey)==='1';
+      let baseCol, midCols, actual;
+      if(isFreelanceEmp_(e)){
+        const calc=flCalcPay_(e, monthKey);
+        actual=calc.pay;
+        baseCol = e.salary_type==='freelance_target' ? fmt(e.fl_target_pay||0) : `${fmt(e.fl_unit_price||0)}/sp`;
+        const progress = e.salary_type==='freelance_target' ? `${calc.qty}/${calc.targetQty||0} sp` : `${calc.qty} sp`;
+        midCols = `<td style="padding:10px;text-align:center;font-weight:700" colspan="2">${progress} <span style="font-size:10px;color:var(--muted)">(${e.salary_type==='freelance_target'?'🎯 target':'🎬 sản phẩm'})</span></td>`;
+      } else {
+        const att=(attend[monthKey]||{})[e.id]||{};
+        const days=Object.values(att).filter(v=>v==='present'||v==='late').length;
+        const lateCount=Object.values(att).filter(v=>v==='late').length;
+        const baseSalary=e.salary||0;
+        const deduct=Math.round(baseSalary/26*lateCount*0.1);
+        actual=Math.round(baseSalary/26*days)-deduct;
+        baseCol = fmt(baseSalary);
+        midCols = `<td style="padding:10px;text-align:center;font-weight:700">${days}/26</td><td style="padding:10px;text-align:center;color:var(--orange)">${lateCount>0?lateCount:''}</td>`;
+      }
+      totalPay+=actual;
       return `<tr style="border-bottom:1px solid var(--border)">
         <td style="padding:10px 12px;font-weight:700">${e.name}<br><span style="font-size:10px;color:var(--muted)">${e.phone||''}</span></td>
         <td style="padding:10px;text-align:center;font-size:12px">${roleLabel[e.role]||e.role}</td>
-        <td style="padding:10px;text-align:right;font-size:12px">${fmt(baseSalary)}</td>
-        <td style="padding:10px;text-align:center;font-weight:700">${days}/26</td>
-        <td style="padding:10px;text-align:center;color:var(--orange)">${lateCount>0?lateCount:''}</td>
+        <td style="padding:10px;text-align:right;font-size:12px">${baseCol}</td>
+        ${midCols}
         <td style="padding:10px;text-align:right;font-weight:800;font-size:14px;color:var(--green)">${fmt(actual)}</td>
         <td style="padding:10px;text-align:center">
           ${paid?'<span style="color:var(--green);font-weight:700">✅ Đã trả</span>':
