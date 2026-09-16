@@ -2821,7 +2821,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <button class="btn btn-tg btn-sm" onclick="testTomorrowReport()">📤 Gửi thử ngay</button>
     </div>
     <div class="guide" style="margin-bottom:0">
-      Báo cáo này chạy <b>tự động phía server</b> mỗi tối (không cần mở app), liệt kê số học viên, tên, khóa học, giờ học, loại và số tiền đã thu — gửi cùng lúc lên cả Telegram và Zalo. Để bật chạy tự động: vào <b>Apps Script → Trình kích hoạt (⏰) → + Thêm trình kích hoạt → chọn hàm <code>sendTomorrowClassReport</code> → Time-driven → Day timer → chọn khung giờ (VD 20:00–21:00)</b>. Nút bên phải để gửi thử ngay, kiểm tra nội dung trước khi bật lịch tự động.
+      Báo cáo này chạy <b>tự động phía server qua Cloudflare Cron Trigger</b> lúc 19h30 mỗi tối (không cần mở app), liệt kê số học viên, tên, khóa học, giờ học, loại và số tiền đã thu — gửi cùng lúc lên cả Telegram và Zalo. Lịch chạy tự động đã cấu hình sẵn trong <code>wrangler.toml</code>, không cần set gì thêm. Nút bên phải để gửi thử ngay, kiểm tra nội dung bất cứ lúc nào.
     </div>
     <div id="tomorrow-report-debug" style="display:none;margin-top:10px;padding:10px;background:#0d1117;border-radius:8px;font-family:monospace;font-size:11px;color:#9fdb9f;white-space:pre-wrap;word-break:break-all;max-height:220px;overflow:auto"></div>
   </div>
@@ -2833,7 +2833,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <button class="btn btn-tg btn-sm" onclick="testMorningReport()">📤 Gửi thử ngay</button>
     </div>
     <div class="guide" style="margin-bottom:0">
-      Báo cáo này chạy <b>tự động phía server</b> mỗi sáng, tổng hợp: học viên đang học, đơn hàng chờ thu tiền, kho nguyên liệu sắp hết — gửi cùng lúc lên cả Telegram và Zalo. Để bật chạy tự động: vào <b>Apps Script → Trình kích hoạt (⏰) → + Thêm trình kích hoạt → chọn hàm <code>sendMorningReport</code> → Time-driven → Day timer → chọn khung giờ (VD 8:00–9:00)</b>. Nút bên phải để gửi thử ngay, kiểm tra nội dung trước khi bật lịch tự động.
+      Báo cáo này chạy <b>tự động phía server qua Cloudflare Cron Trigger</b> lúc 8h30 mỗi sáng, tổng hợp: học viên đang học, đơn hàng chờ thu tiền, kho nguyên liệu sắp hết — gửi cùng lúc lên cả Telegram và Zalo. Lịch chạy tự động đã cấu hình sẵn trong <code>wrangler.toml</code>, không cần set gì thêm. Nút bên phải để gửi thử ngay, kiểm tra nội dung bất cứ lúc nào.
     </div>
     <div id="morning-report-debug" style="display:none;margin-top:10px;padding:10px;background:#0d1117;border-radius:8px;font-family:monospace;font-size:11px;color:#9fdb9f;white-space:pre-wrap;word-break:break-all;max-height:220px;overflow:auto"></div>
   </div>
@@ -3761,13 +3761,10 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <!-- Auto 8am daily reminder -->
       <div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--border)">
         <div style="font-size:13px;font-weight:700;color:var(--brown);margin-bottom:10px">⏰ Nhắc tự động hàng ngày</div>
-        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;margin-bottom:8px">
-          <input type="checkbox" id="at-daily-remind" style="accent-color:var(--gold);width:15px;height:15px"> Gửi báo cáo tóm tắt lúc 8h sáng mỗi ngày
-        </label>
         <div style="font-size:12px;color:var(--muted);margin-bottom:10px;padding:8px 12px;background:var(--bg2);border-radius:8px">
-          ℹ️ Báo cáo gồm: học viên đang học, đơn chờ thu tiền, kho sắp hết. Cần để tab app mở 8h sáng, hoặc set trigger trong <strong>Google Apps Script</strong> để chạy kể cả khi đóng app.
+          ℹ️ Báo cáo sáng (8h30) và nhắc lịch học ngày mai (19h30) giờ chạy <strong>tự động phía server (Cloudflare Cron)</strong> — không cần mở app, không cần Google Apps Script nữa. Nút bên dưới gửi thử ngay để kiểm tra nội dung (xem chi tiết đầy đủ ở trang <strong>Lịch học</strong>).
         </div>
-        <button class="btn btn-tg btn-sm" onclick="sendDailyReport()">📊 Gửi báo cáo ngay để test</button>
+        <button class="btn btn-tg btn-sm" onclick="testMorningReport()">📊 Gửi báo cáo sáng ngay để test</button>
         <button class="btn btn-sm" onclick="sendWeeklyFlash()" style="background:#8E44AD;color:#fff">📊 Gửi Weekly Flash</button>
       </div>
       <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px"><input type="checkbox" id="at-student" checked style="accent-color:var(--gold);width:15px;height:15px"> Báo khi thêm/sửa/xóa học viên</label>
@@ -11230,6 +11227,11 @@ function confirmAct(title,msg,cb){
 // ══════════════════════════════════════════════════
 // BÁO CÁO TỰ ĐỘNG 8H SÁNG
 // ══════════════════════════════════════════════════
+// ★ LƯU Ý (2026-09-16): hàm này là bản CŨ chạy phía client (từ thời Google Apps
+// Script, trước khi có Cloudflare Worker Cron) — không còn được nút nào trong UI
+// gọi tới nữa (đã đổi nút "Gửi báo cáo ngay để test" sang gọi thẳng server qua
+// testMorningReport(), phản ánh đúng logic đã sửa lỗi đếm học viên). Giữ lại hàm
+// này (đã vá lỗi tương tự) chỉ để phòng còn chỗ nào lỡ gọi tới, không xóa hẳn.
 function sendDailyReport(){
   const active=D.students.filter(s=>s.status==='Đang học'&&!s.deleted_at);
   const unpaid=D.students.filter(s=>!s.deleted_at&&(s.fee||0)>0&&isStudentUnpaid(s));
@@ -11248,7 +11250,8 @@ function sendDailyReport(){
   let msg='🌅 *BÁO CÁO SÁNG — '+today+'*\n';
   msg+='━━━━━━━━━━━━━━━━\n\n';
   if(studentsTomoRow.length){
-    msg+='📚 *HỌC VIÊN NGÀY MAI ('+studentsTomoRow.length+' người)*\n';
+    const tomoPeopleCount=studentsTomoRow.reduce((s,x)=>s+Math.max(1,+x.student_count||1),0);
+    msg+='📚 *HỌC VIÊN NGÀY MAI ('+tomoPeopleCount+' người)*\n';
     studentsTomoRow.forEach(s=>{
       const course=D.courses.find(c=>c.id===s.course_id);
       const cName=course?course.name:(s.course||'—');
@@ -11256,14 +11259,14 @@ function sendDailyReport(){
       const dep=s.paid1_amount||Math.round(fee*0.3);
       const rest=s.paid2_amount||(fee-dep);
       const paidStr=s.paid2?'✅ Đã TT đủ':s.paid1?'✅ Đã cọc '+fmt(dep)+' — còn '+fmt(rest):'❌ Chưa cọc — cần thu '+fmt(dep);
-      msg+='• 👤 '+s.name+' — '+cName+' ('+( s.type||'Offline')+')\n';
+      msg+='• 👤 '+s.name+(s.student_count>1?' (👥 '+s.student_count+' học viên)':'')+' — '+cName+' ('+( s.type||'Offline')+')\n';
       if(s.class_time) msg+='  🕐 '+s.class_time+'\n';
       msg+='  💰 '+paidStr+'\n';
     });
     msg+='\n';
   }
   msg+='🎓 *HỌC VIÊN*\n';
-  msg+='• Đang học: '+active.length+' người\n';
+  msg+='• Đang học: '+active.reduce((s,x)=>s+Math.max(1,+x.student_count||1),0)+' người\n';
   if(unpaid.length) msg+='• ⚠️ Chưa thu học phí: '+unpaid.length+' người\n';
   if(todayRev>0){
     msg+='\n🛍️ *HÔM NAY*\n';
@@ -22849,7 +22852,8 @@ function sendWeeklyFlash() {
   const weekAgo = now - 7*24*60*60*1000;
   const weekOrders = orders.filter(o=>isOrderPaid(o)&&(o.created_at||0)>weekAgo);
   const weekRev = weekOrders.reduce((s,o)=>s+(o.total||0),0);
-  const activeStudents = (D.students||[]).filter(s=>s.status==='Đang học').length;
+  // ★ SỬA (2026-09-16): cộng dồn student_count — 1 dòng có thể đại diện nhiều người.
+  const activeStudents = (D.students||[]).filter(s=>s.status==='Đang học').reduce((s,x)=>s+Math.max(1,+x.student_count||1),0);
   const inv = D.inventory||[];
   const alerts = inv.filter(i=>(i.qty||0)<=(i.min_qty||0)).length;
   const msg = `📊 *WEEKLY FLASH — ${new Date().toLocaleDateString('vi-VN')}*\n\n`+
