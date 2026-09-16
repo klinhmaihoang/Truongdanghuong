@@ -8373,7 +8373,9 @@ function renderDash(){
   const retailRev=retailOrders.filter(isOrderPaid).reduce((a,o)=>a+(o.total||0),0);
   const tuitionRev=tuitionOrders.filter(isOrderPaid).reduce((a,o)=>a+(o.total||0),0);
 
-  document.getElementById('s0').textContent=activeStudents.length;
+  // ★ SỬA (2026-09-16): cộng dồn student_count — 1 dòng có thể đại diện nhiều
+  // người (đăng ký nhóm/combo), giống các chỗ khác trong app (renderStudents...).
+  document.getElementById('s0').textContent=activeStudents.reduce((s,x)=>s+Math.max(1,+x.student_count||1),0);
   document.getElementById('s1').textContent=((retailRev+tuitionRev)/1000000).toFixed(1)+'M';
   document.getElementById('s2').textContent=retailOrders.length;
   document.getElementById('s3').textContent=D.inventory.filter(i=>i.qty<=i.min).length;
