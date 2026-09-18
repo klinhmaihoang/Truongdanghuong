@@ -5254,8 +5254,20 @@ const NEON_TOKEN   = '';
 //   https://script.google.com/macros/s/AKfycbwk6oBp1yjg8E4AexktyJ2VQpdUImsdBVl47xWBUGtY4Y7Be7kwZIKBf8cOGM6A31oh/exec
 const GAS_URL = 'https://tdh-erp-api.klinh-maihoang.workers.dev';
 
+// ★ FIX (2026-09-18): TRƯỚC ĐÂY hàm này ưu tiên cfg.gsUrl (ô "Google Sheet
+// Webhook URL" trong Cài đặt — chỉ dùng cho tính năng đồng bộ Google Sheet CŨ,
+// hiện đã TẮT hẳn, xem gsSend() ở dưới) để quyết định gọi API tới đâu — nghĩa là
+// NẾU trình duyệt của ai đó còn lưu (trong localStorage 'tdh_cfg', từ TRƯỚC ngày
+// cutover 2026-09-13) 1 giá trị gsUrl là URL Apps Script CŨ, thì gasCall() — kể cả
+// action 'login' — sẽ ÂM THẦM gửi tới Apps Script cũ thay vì Cloudflare Worker
+// hiện tại, dẫn tới lỗi khó hiểu như "Action không xác định" (từ backend cũ,
+// không tồn tại trong code hiện tại) và KHÔNG ĐĂNG NHẬP ĐƯỢC dù mật khẩu đúng —
+// chỉ xảy ra trên thiết bị/trình duyệt cụ thể còn lưu cache cũ đó. Từ nay: API
+// backend LUÔN LUÔN là GAS_URL (Cloudflare Worker) — cfg.gsUrl chỉ còn dùng cho
+// tính năng Sheet Webhook riêng (gsSend*, đang tắt), không được phép ghi đè URL
+// gọi API chính nữa.
 function getGasUrl() {
-  return cfg?.gsUrl || GAS_URL;
+  return GAS_URL;
 }
 
 // Gọi Apps Script (GET với payload vì GAS không hỗ trợ POST CORS)
@@ -5472,7 +5484,7 @@ const sbDel = async (t, f) => {
 // ══════════════════════════════════════════════════
 // STATE
 // ══════════════════════════════════════════════════
-let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[],transactions:[],quotations:[],salesOrders:[],soActivities:[],classAttendance:[],consultingBookings:[],freelanceDeliverables:[]};
+let D = {students:[],inventory:[],products:[],orders:[],stockLog:[],recipes:[],courses:[],customers:[],transactions:[],quotations:[],salesOrders:[],soActivities:[],classAttendance:[],consultingBookings:[],freelanceDeliverables:[],classChecklists:[]};
 let cfg = {tgToken:'',tgChatId:'',zaloToken:'',zaloChatId:'',bankAcc:'',bankId:'VCB',accName:'TRUONG DANG HUONG',accPhone:'0984830303',gsUrl:GAS_URL,
   pancakeToken:'',pancakeFbPageId:'',pancakeZaloPageId:'',pancakeTestConvId:'',pancakeTestPlatform:'zalo',pancakeTokenSavedAt:'',
   pancakeFbPageToken:'',pancakeZaloPageToken:'',pancakeAutoSend:false};
@@ -7136,7 +7148,12 @@ async function deleteChecklist(clId){
 function renderChecklists(){
   const el = document.getElementById('checklist-list');
   if(!el) return;
-  const list = [...D.classChecklists].filter(cl=>!cl.deleted_at).sort((a,b)=>a.class_date.localeCompare(b.class_date));
+  // ★ FIX (2026-09-18): D.classChecklists chưa tồn tại (undefined) lúc boot() gọi
+  // render() lần đầu — dữ liệu này chỉ có sau khi "nhóm 2" tải xong (async). Trước
+  // đây spread thẳng "[...D.classChecklists]" nên bị lỗi "not iterable", crash cả
+  // chuỗi boot() (uncaught promise) → có thể khiến các bước khởi tạo sau đó không
+  // chạy hết. Dùng (D.classChecklists||[]) để an toàn khi dữ liệu chưa kịp tải.
+  const list = [...(D.classChecklists||[])].filter(cl=>!cl.deleted_at).sort((a,b)=>a.class_date.localeCompare(b.class_date));
   if(!list.length){
     el.innerHTML = '<div style="color:var(--muted);font-size:13px;text-align:center;padding:20px">Chưa có checklist nào — bấm "+ Thêm checklist" để bắt đầu</div>';
     return;
