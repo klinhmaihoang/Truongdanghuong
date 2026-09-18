@@ -7322,7 +7322,16 @@ async function autoUpdateStudentStatus(){
 function render(){
   if(typeof renderCostCalc==="function"&&document.getElementById("cc-list"))setTimeout(renderCostCalc,50);
 autoUpdateStudentStatus();renderDash();renderStudents();
-  startRealTimeUpdates();renderDeletedStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();renderCourses();renderCustomers();fillMatSelects();}
+  startRealTimeUpdates();renderDeletedStudents();renderProducts();renderProductList();renderInventory();renderOrders();renderStockLog();renderCourses();renderCustomers();fillMatSelects();
+  // ★ SỬA (2026-09-18): render() KHÔNG hề gọi renderChecklists() — nên nếu ai đó mở
+  // tab "Lịch học" TRƯỚC KHI nhóm data 2 (gồm class_checklists) tải xong ngầm phía
+  // sau, danh sách checklist sẽ đứng yên ở trạng thái rỗng vĩnh viễn cho tới khi
+  // rời tab rồi quay lại — dễ xảy ra hơn trên mạng chậm (điện thoại/di động), khiến
+  // trông như "chỉ hiện trên 1 thiết bị" dù dữ liệu đã lưu đúng trên server. Gọi lại
+  // ở đây mỗi lần render() chạy (kể cả lần chạy lại sau khi nhóm 2 tải xong) để
+  // luôn khớp dữ liệu mới nhất — hàm này đã tự kiểm tra element tồn tại hay chưa.
+  if(typeof renderChecklists==='function') renderChecklists();
+}
 
 // ══════════════════════════════════════════════════
 // CUSTOMERS
