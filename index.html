@@ -4592,7 +4592,15 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       <div class="fg"><label>Số lượng ban đầu</label><input id="am-qty" type="number" placeholder="0" min="0" step="0.01"/></div>
       <div class="fg"><label>Tồn kho tối thiểu</label><input id="am-min" type="number" placeholder="1" min="0" step="0.01"/></div>
     </div>
-    <div class="fg" style="margin-bottom:12px"><label>Giá nhập (₫/đv)</label><input id="am-cost" type="number" placeholder="50000"/></div>
+    <div class="form-row">
+      <div class="fg"><label>Giá nhập (₫/đv)</label><input id="am-cost" type="number" placeholder="50000"/></div>
+      <div class="fg"><label>Loại</label>
+        <select id="am-category">
+          <option value="nguyen_lieu">🧂 Nguyên liệu</option>
+          <option value="bao_bi">📦 Bao bì (chỉ tính cost)</option>
+        </select>
+      </div>
+    </div>
     <div class="btn-group">
       <button class="btn btn-green btn-sm" onclick="addMaterial()">Thêm vào kho</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-add-mat')">Hủy</button>
@@ -4617,7 +4625,15 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       <div class="fg"><label>Tồn kho hiện tại</label><input id="em-qty" type="number" min="0" step="0.01"/></div>
       <div class="fg"><label>Tồn kho tối thiểu</label><input id="em-min" type="number" min="0" step="0.01"/></div>
     </div>
-    <div class="fg" style="margin-bottom:12px"><label>Giá nhập (₫/đv)</label><input id="em-cost" type="number" placeholder="50000"/></div>
+    <div class="form-row">
+      <div class="fg"><label>Giá nhập (₫/đv)</label><input id="em-cost" type="number" placeholder="50000"/></div>
+      <div class="fg"><label>Loại</label>
+        <select id="em-category">
+          <option value="nguyen_lieu">🧂 Nguyên liệu</option>
+          <option value="bao_bi">📦 Bao bì (chỉ tính cost)</option>
+        </select>
+      </div>
+    </div>
     <div class="btn-group">
       <button class="btn btn-green btn-sm" onclick="saveEditMat()">💾 Lưu thay đổi</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-edit-mat')">Hủy</button>
@@ -4825,7 +4841,7 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     <div class="modal-title">🧪 Công thức phối trộn</div>
     <div class="modal-sub" id="mr-mat-name"></div>
     <input type="hidden" id="mr-mat-id"/>
-    <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Dùng cho nguyên liệu được trộn sẵn từ nhiều nguyên liệu gốc khác (VD: Trà mix = trộn Hồng trà + Trà bá tước). Khai báo công thức xong, dùng phần "Nhập kho theo công thức" bên dưới mỗi khi trộn 1 mẻ mới — hệ thống tự trừ nguyên liệu gốc & cộng vào tồn kho của nguyên liệu này.</div>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Dùng cho nguyên liệu được trộn sẵn từ nhiều nguyên liệu gốc khác (VD: Trà mix = trộn Hồng trà cám + Trà bá tước). Có thể thêm cả bao bì (bao đựng trà, tem logo, tem loại trà...) vào công thức để tính đúng giá cost — đánh dấu nguyên liệu là "📦 Bao bì" khi thêm/sửa trong Kho nguyên liệu. Khai báo công thức xong, dùng phần "Nhập kho theo công thức" bên dưới mỗi khi trộn 1 mẻ mới — hệ thống tự trừ nguyên liệu gốc & bao bì đã dùng, cộng vào tồn kho của nguyên liệu này.</div>
     <div id="mr-rows" style="margin-bottom:12px"></div>
     <div style="background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
       <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:8px">Thêm nguyên liệu gốc — tính theo mẻ mẫu cho dễ hình dung</div>
@@ -10545,6 +10561,7 @@ function renderInventory(){
       <td><span style="font-size:11px;font-weight:600;color:var(--brand);background:rgba(255,140,0,.1);padding:2px 6px;border-radius:4px">${sku}</span></td>
       <td>
         <strong>${item.name}</strong>
+        ${item.category==='bao_bi'?`<span style="font-size:10px;font-weight:600;color:var(--orange);background:rgba(255,140,0,.1);padding:1px 6px;border-radius:4px;margin-left:4px">📦 Bao bì</span>`:''}
         ${item.supplier?`<br><span style="font-size:10px;color:var(--muted)">🏭 ${item.supplier}</span>`:''}
       </td>
       <td style="color:var(--muted)">${item.unit}</td>
@@ -10580,6 +10597,7 @@ async function addMaterial(){
     qty:parseFloat(document.getElementById('am-qty').value)||0,
     min:parseFloat(document.getElementById('am-min').value)||0,
     cost:parseFloat(document.getElementById('am-cost').value)||0,
+    category:document.getElementById('am-category').value||'nguyen_lieu',
     created_at:Date.now()};
   try{
     await sbUpsert('inventory',mat);
@@ -10588,6 +10606,7 @@ async function addMaterial(){
     ['am-name','am-unit','am-qty','am-min','am-cost','am-sku','am-supplier'].forEach(id=>{
       const el=document.getElementById(id);if(el)el.value='';
     });
+    document.getElementById('am-category').value='nguyen_lieu';
     fillMatSelects();renderInventory();renderDash();
     notify('✓ Đã thêm: '+name+' ('+sku+')');
     if(document.getElementById('at-mat').checked)
@@ -10911,8 +10930,12 @@ function openMaterialRecipe(matId){
   const mat=D.inventory.find(x=>x.id===matId);if(!mat)return;
   document.getElementById('mr-mat-id').value=matId;
   document.getElementById('mr-mat-name').textContent='Nguyên liệu: '+mat.name;
-  const matOpts=D.inventory.filter(i=>i.id!==matId).map(i=>`<option value="${i.id}">${i.name} (${i.unit})</option>`).join('');
-  document.getElementById('mr-mat').innerHTML=matOpts;
+  const others=D.inventory.filter(i=>i.id!==matId);
+  const nlOpts=others.filter(i=>i.category!=='bao_bi').map(i=>`<option value="${i.id}">${i.name} (${i.unit})</option>`).join('');
+  const bbOpts=others.filter(i=>i.category==='bao_bi').map(i=>`<option value="${i.id}">${i.name} (${i.unit})</option>`).join('');
+  document.getElementById('mr-mat').innerHTML=
+    (nlOpts?`<optgroup label="🧂 Nguyên liệu">${nlOpts}</optgroup>`:'')+
+    (bbOpts?`<optgroup label="📦 Bao bì (chỉ tính cost)">${bbOpts}</optgroup>`:'');
   document.getElementById('mr-output-unit-label').textContent=mat.unit||'đơn vị';
   document.getElementById('mr-produce-unit-label').textContent=mat.unit||'đơn vị';
   document.getElementById('mr-output-qty').value='';
@@ -10948,16 +10971,21 @@ function renderMaterialRecipeRows(matId){
     el.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:10px">Chưa có công thức — thêm nguyên liệu gốc bên dưới</div>';
     return;
   }
-  el.innerHTML=rows.map(r=>{
+  const nlRows=rows.filter(r=>{const m=D.inventory.find(i=>i.id===r.mat_id);return !m||m.category!=='bao_bi';});
+  const bbRows=rows.filter(r=>{const m=D.inventory.find(i=>i.id===r.mat_id);return m&&m.category==='bao_bi';});
+  const rowHtml=r=>{
     const mat=D.inventory.find(i=>i.id===r.mat_id);
     const rowCost=mat&&mat.cost?Math.round(mat.cost*r.mat_use):null;
+    const badge=mat&&mat.category==='bao_bi'?`<span style="font-size:10px;font-weight:600;color:var(--orange);background:rgba(255,140,0,.1);padding:1px 6px;border-radius:4px;margin-right:6px">📦</span>`:'';
     return`<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border-radius:8px;margin-bottom:6px">
-      <span style="flex:1;font-size:13px;font-weight:600">${mat?mat.name:'?'}</span>
+      <span style="flex:1;font-size:13px;font-weight:600">${badge}${mat?mat.name:'?'}</span>
       <span style="color:var(--gold2);font-weight:700">${r.mat_use} ${mat?mat.unit:''} / đơn vị ra</span>
       <span style="font-size:11.5px;color:var(--muted);min-width:80px;text-align:right">${rowCost!==null?fmt(rowCost)+'/đv':'⚠️ chưa có giá nhập'}</span>
       <button class="btn btn-red btn-sm" onclick="deleteMaterialRecipeRow('${r.id}','${matId}')">🗑</button>
     </div>`;
-  }).join('')
+  };
+  el.innerHTML=(nlRows.length?`<div style="font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">🧂 Nguyên liệu</div>`+nlRows.map(rowHtml).join(''):'')
+  + (bbRows.length?`<div style="font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;margin:8px 0 4px">📦 Bao bì (chỉ tính cost)</div>`+bbRows.map(rowHtml).join(''):'')
   + `<div style="text-align:right;font-size:13px;font-weight:700;color:var(--brand);padding:6px 10px">
       💰 Giá cost ước tính: ${fmt(Math.round(costPerUnit))}/${target?.unit||'đơn vị'}
       ${missingCost.length?`<div style="font-size:11px;font-weight:400;color:var(--red);text-align:right">⚠️ Chưa có giá nhập: ${missingCost.join(', ')} — vào Kho, bấm ✏️ Sửa để nhập giá thì cost mới tính đúng</div>`:''}
@@ -11755,6 +11783,7 @@ function openEditMat(id){
   document.getElementById('em-qty').value=m.qty||0;
   document.getElementById('em-min').value=m.min||0;
   document.getElementById('em-cost').value=m.cost||0;
+  document.getElementById('em-category').value=m.category||'nguyen_lieu';
   showM('modal-edit-mat');
 }
 
@@ -11771,6 +11800,7 @@ async function saveEditMat(){
     qty:parseFloat(document.getElementById('em-qty').value)||0,
     min:parseFloat(document.getElementById('em-min').value)||0,
     cost:parseFloat(document.getElementById('em-cost').value)||0,
+    category:document.getElementById('em-category').value||'nguyen_lieu',
   };
   try{
     // ★ Chụp lại dữ liệu CŨ trước khi ghi đè, để dựng thông báo trước/sau
