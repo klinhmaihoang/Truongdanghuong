@@ -4801,6 +4801,10 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
         <div class="fg"><label>Muốn ra bao nhiêu <span id="mr-produce-unit-label">đơn vị</span></label><input id="mr-produce-qty" type="number" step="0.001" placeholder="30" oninput="previewMaterialProduce()"/></div>
       </div>
       <div id="mr-produce-preview" style="font-size:12px;margin-bottom:8px"></div>
+      <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;margin-bottom:10px">
+        <input type="checkbox" id="mr-update-cost" checked style="width:14px;height:14px"/>
+        Cập nhật "Giá nhập" của nguyên liệu này theo giá cost vừa tính (khuyên dùng — để tính đúng giá vốn/lãi các món dùng nguyên liệu này)
+      </label>
       <button class="btn btn-green btn-sm" onclick="produceMaterialBatch()">✅ Xác nhận sản xuất — trừ NVL gốc & cộng tồn kho</button>
     </div>
     <div class="btn-group">
@@ -10873,8 +10877,26 @@ function openMaterialRecipe(matId){
   showM('modal-material-recipe');
 }
 
-function renderMaterialRecipeRows(matId){
+// ★ THÊM (2026-09-20): tự tính giá cost cho 1 đơn vị thành phẩm = tổng (giá nhập
+// từng nguyên liệu gốc × lượng dùng/đơn vị ra) — lấy giá nhập từ trường "cost"
+// của nguyên liệu (Kho nguyên liệu). Dòng nào chưa có giá nhập tính là 0 và được
+// liệt kê riêng trong missingCost, tránh hiểu lầm giá cost thấp hơn thực tế. Dùng
+// chung cho cả phần hiển thị công thức và phần xem trước/xác nhận sản xuất.
+function getMaterialRecipeCost_(matId){
   const rows=D.recipes.filter(r=>r.product_id===matId&&r.parent_type==='material');
+  let costPerUnit=0, missingCost=[];
+  rows.forEach(r=>{
+    const mat=D.inventory.find(i=>i.id===r.mat_id);
+    if(!mat) return;
+    if(!mat.cost){ missingCost.push(mat.name); return; }
+    costPerUnit += mat.cost * r.mat_use;
+  });
+  return {rows, costPerUnit, missingCost};
+}
+
+function renderMaterialRecipeRows(matId){
+  const target=D.inventory.find(i=>i.id===matId);
+  const {rows, costPerUnit, missingCost}=getMaterialRecipeCost_(matId);
   const el=document.getElementById('mr-rows');
   if(!rows.length){
     el.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:10px">Chưa có công thức — thêm nguyên liệu gốc bên dưới</div>';
@@ -10882,12 +10904,18 @@ function renderMaterialRecipeRows(matId){
   }
   el.innerHTML=rows.map(r=>{
     const mat=D.inventory.find(i=>i.id===r.mat_id);
+    const rowCost=mat&&mat.cost?Math.round(mat.cost*r.mat_use):null;
     return`<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border-radius:8px;margin-bottom:6px">
       <span style="flex:1;font-size:13px;font-weight:600">${mat?mat.name:'?'}</span>
       <span style="color:var(--gold2);font-weight:700">${r.mat_use} ${mat?mat.unit:''} / đơn vị ra</span>
+      <span style="font-size:11.5px;color:var(--muted);min-width:80px;text-align:right">${rowCost!==null?fmt(rowCost)+'/đv':'⚠️ chưa có giá nhập'}</span>
       <button class="btn btn-red btn-sm" onclick="deleteMaterialRecipeRow('${r.id}','${matId}')">🗑</button>
     </div>`;
-  }).join('');
+  }).join('')
+  + `<div style="text-align:right;font-size:13px;font-weight:700;color:var(--brand);padding:6px 10px">
+      💰 Giá cost ước tính: ${fmt(Math.round(costPerUnit))}/${target?.unit||'đơn vị'}
+      ${missingCost.length?`<div style="font-size:11px;font-weight:400;color:var(--red);text-align:right">⚠️ Chưa có giá nhập: ${missingCost.join(', ')} — vào Kho, bấm ✏️ Sửa để nhập giá thì cost mới tính đúng</div>`:''}
+    </div>`;
 }
 
 function updateMaterialRecipeRatioPreview(){
@@ -10934,11 +10962,12 @@ async function deleteMaterialRecipeRow(id,matId){
 // Xem trước: mẻ này cần bao nhiêu NVL gốc, có đủ kho không
 function previewMaterialProduce(){
   const matId=document.getElementById('mr-mat-id').value;
+  const target=D.inventory.find(i=>i.id===matId);
   const outQty=+document.getElementById('mr-produce-qty').value||0;
   const el=document.getElementById('mr-produce-preview');
   if(!el) return;
   if(!outQty){el.innerHTML='';return;}
-  const rows=D.recipes.filter(r=>r.product_id===matId&&r.parent_type==='material');
+  const {rows, costPerUnit, missingCost}=getMaterialRecipeCost_(matId);
   if(!rows.length){el.innerHTML='<span style="color:var(--red)">Chưa có công thức — thêm nguyên liệu gốc ở trên trước đã.</span>';return;}
   const lines=rows.map(r=>{
     const mat=D.inventory.find(i=>i.id===r.mat_id);
@@ -10947,7 +10976,14 @@ function previewMaterialProduce(){
     const enough=mat.qty>=need;
     return `<div style="color:${enough?'var(--muted)':'var(--red)'}">${enough?'✓':'⚠️'} ${mat.name}: cần ${need}${mat.unit} — kho còn ${mat.qty}${mat.unit}${enough?'':' (KHÔNG ĐỦ)'}</div>`;
   }).join('');
-  el.innerHTML=lines;
+  // ★ THÊM (2026-09-20): hiện luôn tổng giá NVL cho mẻ này + giá cost/đơn vị,
+  // tính từ giá nhập từng nguyên liệu gốc trong công thức.
+  const totalCost=Math.round(costPerUnit*outQty);
+  const costLine=`<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);font-weight:700;color:var(--brand)">
+    💰 Tổng giá NVL cho mẻ này: ${fmt(totalCost)} — tương đương ${fmt(Math.round(costPerUnit))}/${target?.unit||'đơn vị'}
+    ${missingCost.length?`<div style="font-size:11px;font-weight:400;color:var(--red)">⚠️ Chưa có giá nhập: ${missingCost.join(', ')} — cost trên chưa tính đủ, vào Kho nhập giá cho các nguyên liệu này trước</div>`:''}
+  </div>`;
+  el.innerHTML=lines+costLine;
 }
 
 // Xác nhận sản xuất 1 mẻ: trừ NVL gốc trong kho, cộng vào tồn kho nguyên liệu đích,
@@ -10966,6 +11002,11 @@ async function produceMaterialBatch(){
     const need=Math.round(r.mat_use*outQty*1000)/1000;
     if(mat.qty<need){notify(`⚠️ Không đủ ${mat.name}: cần ${need}${mat.unit}, kho chỉ còn ${mat.qty}${mat.unit}`,false);return;}
   }
+  // ★ THÊM (2026-09-20): tính giá cost/đơn vị TRƯỚC khi trừ kho (dùng đúng giá nhập
+  // hiện tại của từng NVL gốc), để nếu người dùng chọn cập nhật "Giá nhập" cho
+  // nguyên liệu đích thì có số chính xác — không phụ thuộc thứ tự trừ kho bên dưới.
+  const {costPerUnit}=getMaterialRecipeCost_(matId);
+  const updateCost=document.getElementById('mr-update-cost')?.checked;
   try{
     for(const r of rows){
       const mat=D.inventory.find(i=>i.id===r.mat_id);
@@ -10977,16 +11018,20 @@ async function produceMaterialBatch(){
       await sbUpsert('stock_log',log);D.stockLog.unshift(log);
     }
     target.qty=Math.round(((target.qty||0)+outQty)*1000)/1000;
-    await sbPatch('inventory',{qty:target.qty},`?id=eq.${matId}`);
+    const patch={qty:target.qty};
+    const roundedCost=Math.round(costPerUnit);
+    if(updateCost&&roundedCost>0){ target.cost=roundedCost; patch.cost=roundedCost; }
+    await sbPatch('inventory',patch,`?id=eq.${matId}`);
     const log={id:uid(),time:nowDT(),name:target.name,type:'Nhập',qty:outQty,unit:target.unit||'',
-      note:'Nhập kho theo công thức phối trộn',mat_id:target.id,mat_qty:outQty,created_at:Date.now()};
+      note:'Nhập kho theo công thức phối trộn'+(updateCost&&roundedCost>0?` — giá cost: ${fmt(roundedCost)}/${target.unit||''}`:''),
+      mat_id:target.id,mat_qty:outQty,created_at:Date.now()};
     await sbUpsert('stock_log',log);D.stockLog.unshift(log);
     document.getElementById('mr-produce-qty').value='';
     document.getElementById('mr-produce-preview').innerHTML='';
     renderInventory();
-    notify(`✅ Đã sản xuất ${outQty}${target.unit||''} ${target.name} — tồn kho: ${target.qty}${target.unit||''}`);
+    notify(`✅ Đã sản xuất ${outQty}${target.unit||''} ${target.name} — tồn kho: ${target.qty}${target.unit||''}${updateCost&&roundedCost>0?`, giá nhập: ${fmt(roundedCost)}/${target.unit||''}`:''}`);
     if(document.getElementById('at-import')?.checked)
-      tgMsg(`🏭 *Nhập kho theo công thức!*\n\n📦 ${target.name}: +${outQty}${target.unit||''}\n🔢 Tồn kho: ${target.qty}${target.unit||''}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+      tgMsg(`🏭 *Nhập kho theo công thức!*\n\n📦 ${target.name}: +${outQty}${target.unit||''}\n🔢 Tồn kho: ${target.qty}${target.unit||''}\n${updateCost&&roundedCost>0?'💰 Giá cost: '+fmt(roundedCost)+'/'+(target.unit||'')+'\n':''}🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
     gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
   }catch(e){notify('Lỗi khi sản xuất: '+e.message,false);}
 }
