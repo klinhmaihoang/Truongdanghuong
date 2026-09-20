@@ -4845,7 +4845,7 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     <div id="mr-rows" style="margin-bottom:12px"></div>
     <div style="background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
       <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:8px">Thêm nguyên liệu gốc — tính theo mẻ mẫu cho dễ hình dung</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px" id="mr-hint">VD: "Mẻ này dùng 20kg Hồng trà cám + 10kg Trà bá tước, ra 30kg Trà mix" → nhập từng nguyên liệu 1 dòng, cùng 1 số "ra thành phẩm". Riêng bao bì (📦) sẽ tính cố định — không nhân theo sản lượng.</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px" id="mr-hint">VD: "Mẻ này dùng 20kg Hồng trà cám + 10kg Trà bá tước, ra 30kg Trà mix" → nhập từng nguyên liệu 1 dòng, cùng 1 số "ra thành phẩm". Bao bì (📦) cũng tính theo tỉ lệ y như nguyên liệu — VD: mẻ 1kg dùng 1 bao đựng trà + 1 tem logo + 1 tem loại trà → nhập "dùng 1" / "ra 1kg", hệ thống tự nhân đúng theo sản lượng thực tế mỗi lần sản xuất.</div>
       <div class="form-row">
         <div class="fg"><label>Nguyên liệu gốc / bao bì</label><select id="mr-mat" onchange="onMrMatChange()"></select></div>
         <div class="fg"><label id="mr-use-label">Dùng bao nhiêu trong mẻ này</label><input id="mr-use" type="number" step="0.001" placeholder="20" oninput="updateMaterialRecipeRatioPreview()"/></div>
@@ -10960,90 +10960,68 @@ function openMaterialRecipe(matId){
 //    nhiều vẫn chỉ tốn đúng từng đó bao bì (VD: 1 bao lớn, 1 tem cho cả mẻ).
 // costPerUnit chỉ tính từ các dòng "ratio". fixedBatchCost là tổng chi phí bao bì
 // cố định của 1 lần sản xuất, cộng thêm riêng khi biết sản lượng cụ thể.
+// ★ SỬA (2026-09-20): bao bì (bao đựng trà, tem logo, tem loại trà...) thực tế
+// cũng tỉ lệ thuận với sản lượng mẻ y hệt nguyên liệu gốc — VD: mẻ 1kg Trà mix
+// dùng đúng 1 bao đựng trà + 1 tem logo + 1 tem loại trà; nếu mẻ 5kg (đóng 5 bao
+// 1kg) thì cần 5 bao + 5 tem. Nên bỏ kiểu "cố định/lần sản xuất" trước đó — TẤT
+// CẢ các dòng công thức (cả nguyên liệu lẫn bao bì) đều dùng chung 1 công thức:
+// mat_use = lượng dùng CHO MỖI 1 đơn vị thành phẩm ra lò, nhân với sản lượng khi
+// tính/sản xuất. Tổng giá cost gộp chung NL + bao bì thành 1 con số duy nhất.
 function getMaterialRecipeCost_(matId){
   const rows=D.recipes.filter(r=>r.product_id===matId&&r.parent_type==='material');
-  const ratioRows=rows.filter(r=>r.batch_mode!=='fixed');
-  const fixedRows=rows.filter(r=>r.batch_mode==='fixed');
-  let costPerUnit=0, fixedBatchCost=0, missingCost=[];
-  ratioRows.forEach(r=>{
+  let costPerUnit=0, missingCost=[];
+  rows.forEach(r=>{
     const mat=D.inventory.find(i=>i.id===r.mat_id);
     if(!mat) return;
     if(!mat.cost){ missingCost.push(mat.name); return; }
     costPerUnit += mat.cost * r.mat_use;
   });
-  fixedRows.forEach(r=>{
-    const mat=D.inventory.find(i=>i.id===r.mat_id);
-    if(!mat) return;
-    if(!mat.cost){ missingCost.push(mat.name); return; }
-    fixedBatchCost += mat.cost * r.mat_use;
-  });
-  return {rows, ratioRows, fixedRows, costPerUnit, fixedBatchCost, missingCost};
+  return {rows, costPerUnit, missingCost};
 }
 
 function renderMaterialRecipeRows(matId){
   const target=D.inventory.find(i=>i.id===matId);
-  const {rows, ratioRows, fixedRows, costPerUnit, fixedBatchCost, missingCost}=getMaterialRecipeCost_(matId);
+  const {rows, costPerUnit, missingCost}=getMaterialRecipeCost_(matId);
   const el=document.getElementById('mr-rows');
   if(!rows.length){
     el.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:10px">Chưa có công thức — thêm nguyên liệu gốc bên dưới</div>';
     return;
   }
-  const ratioRowHtml=r=>{
+  const nlRows=rows.filter(r=>{const m=D.inventory.find(i=>i.id===r.mat_id);return !m||m.category!=='bao_bi';});
+  const bbRows=rows.filter(r=>{const m=D.inventory.find(i=>i.id===r.mat_id);return m&&m.category==='bao_bi';});
+  const rowHtml=r=>{
     const mat=D.inventory.find(i=>i.id===r.mat_id);
     const rowCost=mat&&mat.cost?Math.round(mat.cost*r.mat_use):null;
+    const badge=mat&&mat.category==='bao_bi'?`<span style="font-size:10px;font-weight:600;color:var(--orange);background:rgba(255,140,0,.1);padding:1px 6px;border-radius:4px;margin-right:6px">📦</span>`:'';
     return`<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border-radius:8px;margin-bottom:6px">
-      <span style="flex:1;font-size:13px;font-weight:600">${mat?mat.name:'?'}</span>
+      <span style="flex:1;font-size:13px;font-weight:600">${badge}${mat?mat.name:'?'}</span>
       <span style="color:var(--gold2);font-weight:700">${r.mat_use} ${mat?mat.unit:''} / đơn vị ra</span>
       <span style="font-size:11.5px;color:var(--muted);min-width:80px;text-align:right">${rowCost!==null?fmt(rowCost)+'/đv':'⚠️ chưa có giá nhập'}</span>
       <button class="btn btn-red btn-sm" onclick="deleteMaterialRecipeRow('${r.id}','${matId}')">🗑</button>
     </div>`;
   };
-  const fixedRowHtml=r=>{
-    const mat=D.inventory.find(i=>i.id===r.mat_id);
-    const rowCost=mat&&mat.cost?Math.round(mat.cost*r.mat_use):null;
-    return`<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border-radius:8px;margin-bottom:6px">
-      <span style="flex:1;font-size:13px;font-weight:600">📦 ${mat?mat.name:'?'}</span>
-      <span style="color:var(--gold2);font-weight:700">${r.mat_use} ${mat?mat.unit:''} / lần sản xuất (cố định)</span>
-      <span style="font-size:11.5px;color:var(--muted);min-width:80px;text-align:right">${rowCost!==null?fmt(rowCost)+'/lần':'⚠️ chưa có giá nhập'}</span>
-      <button class="btn btn-red btn-sm" onclick="deleteMaterialRecipeRow('${r.id}','${matId}')">🗑</button>
-    </div>`;
-  };
-  el.innerHTML=(ratioRows.length?`<div style="font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">🧂 Nguyên liệu (theo tỉ lệ sản lượng)</div>`+ratioRows.map(ratioRowHtml).join(''):'')
-  + (fixedRows.length?`<div style="font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;margin:8px 0 4px">📦 Bao bì (cố định mỗi lần sản xuất)</div>`+fixedRows.map(fixedRowHtml).join(''):'')
+  el.innerHTML=(nlRows.length?`<div style="font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:4px">🧂 Nguyên liệu</div>`+nlRows.map(rowHtml).join(''):'')
+  + (bbRows.length?`<div style="font-size:10.5px;color:var(--muted);font-weight:600;text-transform:uppercase;margin:8px 0 4px">📦 Bao bì</div>`+bbRows.map(rowHtml).join(''):'')
   + `<div style="text-align:right;font-size:13px;font-weight:700;color:var(--brand);padding:6px 10px">
-      💰 Giá NL ước tính: ${fmt(Math.round(costPerUnit))}/${target?.unit||'đơn vị'}
-      ${fixedRows.length?`<br>📦 Chi phí bao bì: ${fmt(Math.round(fixedBatchCost))}/lần sản xuất (không đổi theo sản lượng — mẻ càng lớn thì chia ra mỗi đơn vị càng rẻ)`:''}
+      💰 Giá cost ước tính (đã gồm NL + bao bì): ${fmt(Math.round(costPerUnit))}/${target?.unit||'đơn vị'}
       ${missingCost.length?`<div style="font-size:11px;font-weight:400;color:var(--red);text-align:right">⚠️ Chưa có giá nhập: ${missingCost.join(', ')} — vào Kho, bấm ✏️ Sửa để nhập giá thì cost mới tính đúng</div>`:''}
     </div>`;
 }
 
-// Bao bì được chọn ở dropdown "mr-mat"? → ẩn ô "ra bao nhiêu", đổi nhãn sang
-// "dùng cố định mỗi lần sản xuất" vì bao bì không cân theo cân nặng thành phẩm.
+// Giữ hàm này để tương thích ngược (không còn đổi giao diện theo loại nữa —
+// bao bì và nguyên liệu giờ nhập giống hệt nhau, đều theo tỉ lệ sản lượng).
 function onMrMatChange(){
-  const ingId=document.getElementById('mr-mat').value;
-  const mat=D.inventory.find(i=>i.id===ingId);
-  const isPkg=mat&&mat.category==='bao_bi';
-  const wrap=document.getElementById('mr-output-wrap');
-  const label=document.getElementById('mr-use-label');
-  if(wrap) wrap.style.display=isPkg?'none':'';
-  if(label) label.textContent=isPkg?'Dùng cố định mỗi lần sản xuất (không đổi theo sản lượng)':'Dùng bao nhiêu trong mẻ này';
-  document.getElementById('mr-output-qty').value='';
   updateMaterialRecipeRatioPreview();
 }
 
 function updateMaterialRecipeRatioPreview(){
-  const ingId=document.getElementById('mr-mat')?.value;
-  const mat=D.inventory.find(i=>i.id===ingId);
-  const isPkg=mat&&mat.category==='bao_bi';
   const use=+document.getElementById('mr-use')?.value||0;
   const out=+document.getElementById('mr-output-qty')?.value||0;
   const el=document.getElementById('mr-ratio-preview');
   if(!el) return;
-  if(isPkg){
-    el.textContent=use>0?`→ Mỗi lần sản xuất (bất kể ra bao nhiêu) tốn cố định ${use} ${mat?mat.unit:''} bao bì này`:'';
-  } else if(use>0&&out>0){
+  if(use>0&&out>0){
     const ratio=use/out;
-    el.textContent=`→ Tỉ lệ: mỗi 1 đơn vị thành phẩm cần ${ratio.toFixed(4)} nguyên liệu này`;
+    el.textContent=`→ Tỉ lệ: mỗi 1 đơn vị thành phẩm cần ${ratio.toFixed(4)} nguyên liệu/bao bì này`;
   } else {
     el.textContent='';
   }
@@ -11053,21 +11031,13 @@ async function addMaterialRecipeRow(){
   const matId=document.getElementById('mr-mat-id').value;
   const ingId=document.getElementById('mr-mat').value;
   const useInBatch=+document.getElementById('mr-use').value;
-  const ingMat=D.inventory.find(i=>i.id===ingId);
-  const isPkg=ingMat&&ingMat.category==='bao_bi';
-  if(!ingId||!useInBatch||useInBatch<=0){notify(isPkg?'Chọn bao bì và nhập số lượng dùng cố định mỗi lần sản xuất!':'Chọn nguyên liệu gốc và nhập lượng dùng trong mẻ!',false);return;}
+  const outputQty=+document.getElementById('mr-output-qty').value;
+  if(!ingId||!useInBatch||useInBatch<=0){notify('Chọn nguyên liệu/bao bì và nhập lượng dùng trong mẻ!',false);return;}
+  if(!outputQty||outputQty<=0){notify('Nhập "Mẻ này ra bao nhiêu"!',false);return;}
   if(ingId===matId){notify('Không thể chọn chính nguyên liệu này làm nguyên liệu gốc!',false);return;}
   if(D.recipes.find(r=>r.product_id===matId&&r.mat_id===ingId&&r.parent_type==='material')){notify('Nguyên liệu/bao bì này đã có trong công thức!',false);return;}
-  let row;
-  if(isPkg){
-    // Bao bì: cố định mỗi lần sản xuất, không chia theo sản lượng
-    row={id:uid(),product_id:matId,mat_id:ingId,mat_use:useInBatch,batch_mode:'fixed',created_at:Date.now(),parent_type:'material'};
-  } else {
-    const outputQty=+document.getElementById('mr-output-qty').value;
-    if(!outputQty||outputQty<=0){notify('Nhập "Mẻ này ra bao nhiêu"!',false);return;}
-    const use = useInBatch / outputQty;
-    row={id:uid(),product_id:matId,mat_id:ingId,mat_use:use,batch_mode:'ratio',created_at:Date.now(),parent_type:'material'};
-  }
+  const use = useInBatch / outputQty;
+  const row={id:uid(),product_id:matId,mat_id:ingId,mat_use:use,created_at:Date.now(),parent_type:'material'};
   try{
     await sbUpsert('recipes',row);
     D.recipes.push(row);
@@ -11093,27 +11063,20 @@ function previewMaterialProduce(){
   const el=document.getElementById('mr-produce-preview');
   if(!el) return;
   if(!outQty){el.innerHTML='';return;}
-  const {rows, costPerUnit, fixedBatchCost, missingCost}=getMaterialRecipeCost_(matId);
+  const {rows, costPerUnit, missingCost}=getMaterialRecipeCost_(matId);
   if(!rows.length){el.innerHTML='<span style="color:var(--red)">Chưa có công thức — thêm nguyên liệu gốc ở trên trước đã.</span>';return;}
   const lines=rows.map(r=>{
     const mat=D.inventory.find(i=>i.id===r.mat_id);
     if(!mat) return '';
-    const isPkg=r.batch_mode==='fixed';
-    const need=isPkg?r.mat_use:Math.round(r.mat_use*outQty*1000)/1000;
+    const isPkg=mat.category==='bao_bi';
+    const need=Math.round(r.mat_use*outQty*1000)/1000;
     const enough=mat.qty>=need;
-    const tag=isPkg?' (cố định/lần)':'';
-    return `<div style="color:${enough?'var(--muted)':'var(--red)'}">${enough?'✓':'⚠️'} ${isPkg?'📦 ':''}${mat.name}: cần ${need}${mat.unit}${tag} — kho còn ${mat.qty}${mat.unit}${enough?'':' (KHÔNG ĐỦ)'}</div>`;
+    return `<div style="color:${enough?'var(--muted)':'var(--red)'}">${enough?'✓':'⚠️'} ${isPkg?'📦 ':''}${mat.name}: cần ${need}${mat.unit} — kho còn ${mat.qty}${mat.unit}${enough?'':' (KHÔNG ĐỦ)'}</div>`;
   }).join('');
-  // ★ SỬA (2026-09-20): tổng giá cho mẻ này = giá NL theo tỉ lệ (costPerUnit × sản
-  // lượng) + chi phí bao bì cố định (không nhân theo sản lượng) — rồi mới chia lại
-  // ra giá/đơn vị bình quân, vì bao bì cố định nên mẻ càng lớn thì bao bì "loãng" ra
-  // càng rẻ mỗi đơn vị, KHÔNG nhân giá bao bì lên theo sản lượng như trước.
-  const materialsCost=Math.round(costPerUnit*outQty);
-  const totalCost=materialsCost+Math.round(fixedBatchCost);
-  const avgPerUnit=outQty>0?Math.round(totalCost/outQty):0;
+  // Tổng giá cho mẻ này = costPerUnit (đã gồm NL + bao bì) × sản lượng.
+  const totalCost=Math.round(costPerUnit*outQty);
   const costLine=`<div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--border);font-weight:700;color:var(--brand)">
-    💰 Giá NL cho mẻ này: ${fmt(materialsCost)}${fixedBatchCost?` + 📦 Bao bì: ${fmt(Math.round(fixedBatchCost))}`:''} = ${fmt(totalCost)}
-    <br>→ Tương đương ${fmt(avgPerUnit)}/${target?.unit||'đơn vị'} cho mẻ ${outQty}${target?.unit||''} này
+    💰 Tổng giá cho mẻ này (đã gồm NL + bao bì): ${fmt(totalCost)} — tương đương ${fmt(Math.round(costPerUnit))}/${target?.unit||'đơn vị'}
     ${missingCost.length?`<div style="font-size:11px;font-weight:400;color:var(--red)">⚠️ Chưa có giá nhập: ${missingCost.join(', ')} — cost trên chưa tính đủ, vào Kho nhập giá cho các nguyên liệu này trước</div>`:''}
   </div>`;
   el.innerHTML=lines+costLine;
@@ -11128,32 +11091,32 @@ async function produceMaterialBatch(){
   if(!outQty||outQty<=0){notify('Nhập số lượng muốn sản xuất!',false);return;}
   const rows=D.recipes.filter(r=>r.product_id===matId&&r.parent_type==='material');
   if(!rows.length){notify('Chưa có công thức phối trộn cho nguyên liệu này!',false);return;}
-  // Kiểm tra đủ NVL gốc & bao bì trước khi trừ bất kỳ dòng nào. Bao bì (batch_mode
-  // 'fixed') dùng đúng số cố định mỗi lần sản xuất, KHÔNG nhân theo outQty.
+  // Kiểm tra đủ NVL gốc & bao bì trước khi trừ bất kỳ dòng nào — cả 2 đều theo tỉ
+  // lệ với sản lượng mẻ (mat_use × outQty), vì bao bì cũng đóng gói tỉ lệ thuận
+  // với sản lượng (VD: mẻ 1kg dùng 1 bao, mẻ 5kg dùng 5 bao).
   for(const r of rows){
     const mat=D.inventory.find(i=>i.id===r.mat_id);
     if(!mat){notify('Không tìm thấy nguyên liệu/bao bì trong công thức!',false);return;}
-    const need=r.batch_mode==='fixed'?r.mat_use:Math.round(r.mat_use*outQty*1000)/1000;
+    const need=Math.round(r.mat_use*outQty*1000)/1000;
     if(mat.qty<need){notify(`⚠️ Không đủ ${mat.name}: cần ${need}${mat.unit}, kho chỉ còn ${mat.qty}${mat.unit}`,false);return;}
   }
-  // ★ SỬA (2026-09-20): giá cost/đơn vị = (giá NL theo tỉ lệ × outQty + chi phí bao
-  // bì cố định) / outQty — tính TRƯỚC khi trừ kho (dùng đúng giá nhập hiện tại).
-  const {costPerUnit, fixedBatchCost}=getMaterialRecipeCost_(matId);
-  const avgCostPerUnit=outQty>0?(costPerUnit*outQty+fixedBatchCost)/outQty:0;
+  // Giá cost/đơn vị = costPerUnit (đã gồm NL + bao bì) — tính TRƯỚC khi trừ kho
+  // (dùng đúng giá nhập hiện tại của từng dòng).
+  const {costPerUnit}=getMaterialRecipeCost_(matId);
   const updateCost=document.getElementById('mr-update-cost')?.checked;
   try{
     for(const r of rows){
       const mat=D.inventory.find(i=>i.id===r.mat_id);
-      const need=r.batch_mode==='fixed'?r.mat_use:Math.round(r.mat_use*outQty*1000)/1000;
+      const need=Math.round(r.mat_use*outQty*1000)/1000;
       mat.qty=Math.max(0,Math.round((mat.qty-need)*1000)/1000);
       await sbPatch('inventory',{qty:mat.qty},`?id=eq.${mat.id}`);
       const log={id:uid(),time:nowDT(),name:mat.name,type:'Xuất',qty:need,unit:mat.unit||'',
-        note:`Phối trộn mẻ ${target.name} x${outQty}${target.unit||''}`+(r.batch_mode==='fixed'?' (bao bì, cố định/lần)':''),mat_id:mat.id,mat_qty:need,created_at:Date.now()};
+        note:`Phối trộn mẻ ${target.name} x${outQty}${target.unit||''}`,mat_id:mat.id,mat_qty:need,created_at:Date.now()};
       await sbUpsert('stock_log',log);D.stockLog.unshift(log);
     }
     target.qty=Math.round(((target.qty||0)+outQty)*1000)/1000;
     const patch={qty:target.qty};
-    const roundedCost=Math.round(avgCostPerUnit);
+    const roundedCost=Math.round(costPerUnit);
     if(updateCost&&roundedCost>0){ target.cost=roundedCost; patch.cost=roundedCost; }
     await sbPatch('inventory',patch,`?id=eq.${matId}`);
     const log={id:uid(),time:nowDT(),name:target.name,type:'Nhập',qty:outQty,unit:target.unit||'',
