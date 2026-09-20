@@ -4579,6 +4579,35 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
   </div>
 </div>
 
+<!-- ★ THÊM (2026-09-20): Điều chỉnh tồn kho — dành riêng cho việc SỬA LẠI số tồn
+     kho khi phát hiện sai lệch (kiểm kê thực tế khác với hệ thống), khác với "✏️
+     Sửa nguyên liệu" (sửa thông tin chung) ở chỗ: có ghi log rõ ràng (tăng/giảm
+     bao nhiêu, lý do), để sau này xem lại lịch sử biết vì sao tồn kho thay đổi. -->
+<div class="overlay" id="modal-adjust-stock">
+  <div class="modal">
+    <div class="modal-title">⚖️ Điều chỉnh tồn kho</div>
+    <div class="modal-sub" id="as-mat-name"></div>
+    <input type="hidden" id="as-mat-id"/>
+    <div class="fg" style="margin-bottom:12px">
+      <label>Tồn kho hiện tại trong hệ thống</label>
+      <input id="as-old-qty" type="number" readonly style="opacity:.65;background:var(--bg)"/>
+    </div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>Tồn kho thực tế (kiểm đếm được) *</label>
+      <input id="as-new-qty" type="number" step="0.001" placeholder="Nhập số lượng đếm thực tế" oninput="previewAdjustStock()"/>
+      <div id="as-diff-preview" style="font-size:12px;margin-top:4px;font-weight:600"></div>
+    </div>
+    <div class="fg" style="margin-bottom:12px">
+      <label>Lý do điều chỉnh</label>
+      <input id="as-reason" placeholder="VD: Kiểm kê cuối tháng, thất thoát, nhập sai trước đó..."/>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-green btn-sm" onclick="adjustStock()">💾 Lưu điều chỉnh</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-adjust-stock')">Hủy</button>
+    </div>
+  </div>
+</div>
+
 <!-- Import -->
 <div class="overlay" id="modal-import">
   <div class="modal">
@@ -10482,6 +10511,7 @@ function renderInventory(){
       <td class="btn-group" style="gap:4px">
         <button class="btn btn-green btn-sm" onclick="showM('modal-import');setTimeout(()=>{const el=document.getElementById('im-mat');if(el){el.value='${item.id}';imCalcTotal();}},50)" title="Nhập kho (mua trực tiếp)">📥</button>
         <button class="btn btn-ghost btn-sm" onclick="openMaterialRecipe('${item.id}')" title="Công thức phối trộn — dùng cho NVL trộn sẵn như Trà mix, Bột sữa">🧪</button>
+        <button class="btn btn-ghost btn-sm" onclick="openAdjustStock('${item.id}')" title="Điều chỉnh tồn kho — sửa lại số cho đúng khi kiểm kê thực tế bị lệch">⚖️</button>
         <button class="btn btn-ghost btn-sm" onclick="openEditMat('${item.id}')">✏️</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteMat('${item.id}')">🗑</button>
       </td>
@@ -10959,6 +10989,63 @@ async function produceMaterialBatch(){
       tgMsg(`🏭 *Nhập kho theo công thức!*\n\n📦 ${target.name}: +${outQty}${target.unit||''}\n🔢 Tồn kho: ${target.qty}${target.unit||''}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
     gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
   }catch(e){notify('Lỗi khi sản xuất: '+e.message,false);}
+}
+
+// ── ĐIỀU CHỈNH TỒN KHO (kiểm kê thực tế lệch với hệ thống) ──────────────────
+// ★ THÊM (2026-09-20): khác với Nhập/Xuất kho (ghi rõ mua bao nhiêu/dùng vào
+// việc gì) — đây là sửa thẳng số tồn cho khớp với kiểm đếm thực tế, có ghi log
+// (dạng Nhập/Xuất tuỳ tăng hay giảm) để sau này xem lại biết đã điều chỉnh khi
+// nào, lệch bao nhiêu, lý do gì — và vẫn xóa/hoàn tác được như log thường (dùng
+// chung deleteLog() đã có sẵn).
+function openAdjustStock(matId){
+  const mat=D.inventory.find(x=>x.id===matId);if(!mat)return;
+  document.getElementById('as-mat-id').value=matId;
+  document.getElementById('as-mat-name').textContent=`${mat.name} (${mat.unit||''})`;
+  document.getElementById('as-old-qty').value=mat.qty||0;
+  document.getElementById('as-new-qty').value='';
+  document.getElementById('as-reason').value='';
+  document.getElementById('as-diff-preview').innerHTML='';
+  showM('modal-adjust-stock');
+}
+
+function previewAdjustStock(){
+  const oldQty=+document.getElementById('as-old-qty').value||0;
+  const newQtyStr=document.getElementById('as-new-qty').value;
+  const el=document.getElementById('as-diff-preview');
+  if(!el) return;
+  if(newQtyStr===''){el.innerHTML='';return;}
+  const newQty=+newQtyStr||0;
+  const diff=Math.round((newQty-oldQty)*1000)/1000;
+  if(diff===0){el.innerHTML='<span style="color:var(--muted)">Không thay đổi</span>';}
+  else if(diff>0){el.innerHTML=`<span style="color:var(--teal)">+${diff} — tồn kho sẽ TĂNG</span>`;}
+  else{el.innerHTML=`<span style="color:var(--red)">${diff} — tồn kho sẽ GIẢM</span>`;}
+}
+
+async function adjustStock(){
+  const matId=document.getElementById('as-mat-id').value;
+  const mat=D.inventory.find(x=>x.id===matId);if(!mat)return;
+  const newQtyStr=document.getElementById('as-new-qty').value;
+  if(newQtyStr===''){notify('Nhập số lượng thực tế!',false);return;}
+  const newQty=+newQtyStr||0;
+  if(newQty<0){notify('Số lượng không thể âm!',false);return;}
+  const oldQty=mat.qty||0;
+  const diff=Math.round((newQty-oldQty)*1000)/1000;
+  const reason=document.getElementById('as-reason').value.trim();
+  if(diff===0){notify('Số lượng không đổi — không cần điều chỉnh',false);return;}
+  try{
+    mat.qty=newQty;
+    await sbPatch('inventory',{qty:newQty},`?id=eq.${matId}`);
+    const noteBase=`Điều chỉnh tồn kho: ${oldQty}${mat.unit||''} → ${newQty}${mat.unit||''}`;
+    const log={id:uid(),time:nowDT(),name:mat.name,type:diff>0?'Nhập':'Xuất',qty:Math.abs(diff),unit:mat.unit||'',
+      note:reason?`${noteBase} (${reason})`:noteBase,mat_id:mat.id,mat_qty:Math.abs(diff),created_at:Date.now()};
+    await sbUpsert('stock_log',log);D.stockLog.unshift(log);
+    closeM('modal-adjust-stock');
+    renderInventory();
+    notify(`✅ Đã điều chỉnh ${mat.name}: ${oldQty}${mat.unit||''} → ${newQty}${mat.unit||''}`);
+    if(document.getElementById('at-import')?.checked)
+      tgMsg(`⚖️ *Điều chỉnh tồn kho!*\n\n📦 ${mat.name}: ${oldQty}${mat.unit||''} → ${newQty}${mat.unit||''}\n${reason?'📝 Lý do: '+reason+'\n':''}🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+    gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
+  }catch(e){notify('Lỗi khi điều chỉnh: '+e.message,false);}
 }
 
 // ══════════════════════════════════════════════════
