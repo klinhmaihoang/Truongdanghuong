@@ -4742,6 +4742,44 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
   </div>
 </div>
 
+<!-- ★ THÊM (2026-09-20): Công thức phối trộn CHO NGUYÊN LIỆU trong kho (VD: Trà
+     mix, Bột sữa — nguyên liệu tự trộn từ các nguyên liệu gốc khác, khác với
+     modal-recipe ở trên vốn dành cho công thức pha 1 SẢN PHẨM bán ra). -->
+<div class="overlay" id="modal-material-recipe">
+  <div class="modal wide">
+    <div class="modal-title">🧪 Công thức phối trộn</div>
+    <div class="modal-sub" id="mr-mat-name"></div>
+    <input type="hidden" id="mr-mat-id"/>
+    <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">Dùng cho nguyên liệu được trộn sẵn từ nhiều nguyên liệu gốc khác (VD: Trà mix = trộn Hồng trà + Trà bá tước). Khai báo công thức xong, dùng phần "Nhập kho theo công thức" bên dưới mỗi khi trộn 1 mẻ mới — hệ thống tự trừ nguyên liệu gốc & cộng vào tồn kho của nguyên liệu này.</div>
+    <div id="mr-rows" style="margin-bottom:12px"></div>
+    <div style="background:var(--bg);border:1px dashed var(--border);border-radius:8px;padding:12px;margin-bottom:12px">
+      <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;margin-bottom:8px">Thêm nguyên liệu gốc — tính theo mẻ mẫu cho dễ hình dung</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">VD: "Mẻ này dùng 20kg Hồng trà cám + 10kg Trà bá tước, ra 30kg Trà mix" → nhập từng nguyên liệu 1 dòng, cùng 1 số "ra thành phẩm".</div>
+      <div class="form-row">
+        <div class="fg"><label>Nguyên liệu gốc</label><select id="mr-mat"></select></div>
+        <div class="fg"><label>Dùng bao nhiêu trong mẻ này</label><input id="mr-use" type="number" step="0.001" placeholder="20" oninput="updateMaterialRecipeRatioPreview()"/></div>
+      </div>
+      <div class="fg" style="margin-bottom:0">
+        <label>Mẻ này ra bao nhiêu <span id="mr-output-unit-label">đơn vị</span></label>
+        <input id="mr-output-qty" type="number" step="0.001" placeholder="30" oninput="updateMaterialRecipeRatioPreview()"/>
+        <div id="mr-ratio-preview" style="font-size:11.5px;color:var(--teal);margin-top:4px"></div>
+      </div>
+      <button class="btn btn-green btn-sm" style="margin-top:10px" onclick="addMaterialRecipeRow()">+ Thêm</button>
+    </div>
+    <div style="background:#fff8ec;border:1px solid var(--brand);border-radius:8px;padding:12px;margin-bottom:12px">
+      <div style="font-weight:700;font-size:13px;margin-bottom:6px">🏭 Nhập kho theo công thức (trộn 1 mẻ)</div>
+      <div class="form-row">
+        <div class="fg"><label>Muốn ra bao nhiêu <span id="mr-produce-unit-label">đơn vị</span></label><input id="mr-produce-qty" type="number" step="0.001" placeholder="30" oninput="previewMaterialProduce()"/></div>
+      </div>
+      <div id="mr-produce-preview" style="font-size:12px;margin-bottom:8px"></div>
+      <button class="btn btn-green btn-sm" onclick="produceMaterialBatch()">✅ Xác nhận sản xuất — trừ NVL gốc & cộng tồn kho</button>
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-ghost btn-sm" onclick="closeM('modal-material-recipe')">Đóng</button>
+    </div>
+  </div>
+</div>
+
 <!-- Sửa đơn hàng -->
 <div class="overlay" id="modal-edit-order">
   <div class="modal wide">
@@ -9194,55 +9232,64 @@ async function pancakeAutoMatchSilent_(studentId){
 }
 
 // ── PRODUCTS ──
-function renderProducts(){
-  // ★ FIX (2026-09-14): trước đây số "phần" trên thẻ sản phẩm chỉ tính theo tồn kho
-  // THẬT trong D1 — nên lúc nhân viên mới bỏ hàng vào giỏ (chưa bấm thanh toán xong)
-  // vẫn thấy số cũ, dễ hiểu lầm là "chọn hàng mà không trừ". Giờ trừ thêm phần đang
-  // nằm trong giỏ hàng hiện tại để hiển thị đúng số THỰC SỰ còn lại nếu chốt đơn này
-  // — chỉ là hiển thị tạm thời, CHƯA ghi gì xuống D1 (số thật vẫn chỉ trừ lúc bấm
-  // "Đã thanh toán" ở markPaid(), tránh trừ nhầm nếu khách đổi ý/xóa khỏi giỏ).
+// ★ REFACTOR (2026-09-20): tách phần tính "còn bao nhiêu phần bán được" ra hàm
+// riêng getProductStock() — dùng CHUNG cho renderProducts() (hiển thị) VÀ
+// addToCart()/chgQty() (chặn bán khi hết hàng, xem ghi chú ở 2 hàm đó). Trước
+// đây chỉ tính lúc render, addToCart() không hề kiểm tra nên hết hàng vẫn bấm
+// mua bình thường.
+function getProductStock(pid){
+  const p=D.products.find(x=>x.id===pid);
+  if(!p) return null;
+  // ★ FIX (2026-09-14): trừ thêm phần đang nằm trong giỏ hàng hiện tại để hiển thị
+  // đúng số THỰC SỰ còn lại nếu chốt đơn này — chỉ là tính tạm thời, CHƯA ghi gì
+  // xuống D1 (số thật vẫn chỉ trừ lúc bấm "Đã thanh toán" ở markPaid()).
   const cartQtyByProduct={};
   const cartUsageByMat={};
   cart.forEach(c=>{
     cartQtyByProduct[c.pid]=(cartQtyByProduct[c.pid]||0)+c.qty;
-    const p=D.products.find(x=>x.id===c.pid);
-    if(!p||p.track_stock) return;
-    const recipeRows=D.recipes.filter(r=>r.product_id===p.id);
+    const cp=D.products.find(x=>x.id===c.pid);
+    if(!cp||cp.track_stock) return;
+    const recipeRows=D.recipes.filter(r=>r.product_id===cp.id);
     if(recipeRows.length>0){
       recipeRows.forEach(r=>{ cartUsageByMat[r.mat_id]=(cartUsageByMat[r.mat_id]||0)+r.mat_use*c.qty; });
-    } else if(p.mat_id&&p.mat_use>0){
-      cartUsageByMat[p.mat_id]=(cartUsageByMat[p.mat_id]||0)+p.mat_use*c.qty;
+    } else if(cp.mat_id&&cp.mat_use>0){
+      cartUsageByMat[cp.mat_id]=(cartUsageByMat[cp.mat_id]||0)+cp.mat_use*c.qty;
     }
   });
-
-  document.getElementById('prod-grid').innerHTML=D.products.filter(p=>p.price>0).map(p=>{
-    let stock=null;
-    if(p.track_stock){
-      // Sản phẩm trộn sẵn theo mẻ — hiện thẳng tồn kho thành phẩm thật, không tính theo công thức
-      stock=(p.qty||0)-(cartQtyByProduct[p.id]||0);
-    } else {
-      // Ưu tiên tính từ recipe nếu có
-      const recipeRows=D.recipes.filter(r=>r.product_id===p.id);
-      if(recipeRows.length>0){
-        // Số phần = min của tất cả nguyên liệu trong recipe
-        stock=Math.min(...recipeRows.map(r=>{
-          const mat=D.inventory.find(i=>i.id===r.mat_id);
-          if(!mat||!(r.mat_use>0)) return 99999;
-          return Math.floor((mat.qty-(cartUsageByMat[r.mat_id]||0))/r.mat_use);
-        }));
-      } else if(p.mat_id&&p.mat_use>0){
-        const mat=D.inventory.find(i=>i.id===p.mat_id);
-        stock=mat?Math.floor((mat.qty-(cartUsageByMat[p.mat_id]||0))/p.mat_use):null;
-      }
+  let stock=null;
+  if(p.track_stock){
+    // Sản phẩm trộn sẵn theo mẻ — hiện thẳng tồn kho thành phẩm thật, không tính theo công thức
+    stock=(p.qty||0)-(cartQtyByProduct[p.id]||0);
+  } else {
+    // Ưu tiên tính từ recipe nếu có
+    const recipeRows=D.recipes.filter(r=>r.product_id===p.id);
+    if(recipeRows.length>0){
+      // Số phần = min của tất cả nguyên liệu trong recipe
+      stock=Math.min(...recipeRows.map(r=>{
+        const mat=D.inventory.find(i=>i.id===r.mat_id);
+        if(!mat||!(r.mat_use>0)) return 99999;
+        return Math.floor((mat.qty-(cartUsageByMat[r.mat_id]||0))/r.mat_use);
+      }));
+    } else if(p.mat_id&&p.mat_use>0){
+      const mat=D.inventory.find(i=>i.id===p.mat_id);
+      stock=mat?Math.floor((mat.qty-(cartUsageByMat[p.mat_id]||0))/p.mat_use):null;
     }
-    if(stock!==null) stock=Math.max(0,stock);
+  }
+  if(stock!==null) stock=Math.max(0,stock);
+  return stock;
+}
+
+function renderProducts(){
+  document.getElementById('prod-grid').innerHTML=D.products.filter(p=>p.price>0).map(p=>{
+    const stock=getProductStock(p.id);
     const low=stock!==null&&stock<5;
-    return`<div class="prod-card" onclick="addToCart('${p.id}')" style="${low?'border-color:rgba(192,57,43,.4)':''}">
+    const out=stock===0;
+    return`<div class="prod-card" onclick="addToCart('${p.id}')" style="${low?'border-color:rgba(192,57,43,.4)':''}${out?';opacity:.55;cursor:not-allowed':''}">
       <div class="prod-icon">${p.icon||'📦'}</div>
       <div class="prod-name">${p.name}</div>
       <div class="prod-price">${fmt(p.price)}</div>
       ${p.vat?`<div style="font-size:10px;color:#2980b9;font-weight:500">Gồm VAT ${p.vat}%: ${fmt(Math.round(p.price*(1+(p.vat||0)/100)))}</div>`:''}
-      <div class="prod-stock" style="color:${low?'var(--red)':stock===0?'var(--red)':'inherit'}">${stock!==null?stock+(p.track_stock?(p.unit||''):' phần'):'Không giới hạn'}</div>
+      <div class="prod-stock" style="color:${low?'var(--red)':stock===0?'var(--red)':'inherit'}">${out?'⚠️ Hết hàng':stock!==null?stock+(p.track_stock?(p.unit||''):' phần'):'Không giới hạn'}</div>
     </div>`;
   }).join('');
 }
@@ -9256,7 +9303,15 @@ function renderProductList(){
     const profitColor=profit===null?'var(--muted)':profit>0?'var(--teal)':'var(--red)';
     return`<tr>
       <td style="font-size:22px">${p.icon||'📦'}</td>
-      <td><strong>${p.name}</strong>${p.track_stock?`<br><span style="font-size:11px;font-weight:600;color:${(p.qty||0)>0?'var(--teal)':'var(--red)'}">📦 Tồn: ${p.qty||0}${p.unit||''}</span>`:''}</td>
+      <td><strong>${p.name}</strong>${(()=>{
+        // ★ THÊM (2026-09-20): trước đây chỉ hiện tồn kho cho sản phẩm track_stock —
+        // sản phẩm pha theo công thức (recipe) không hề thấy còn bán được bao nhiêu
+        // "phần" ở trang quản lý này (chỉ thấy ở POS). Dùng chung getProductStock().
+        const stock=getProductStock(p.id);
+        if(stock===null) return '';
+        const label=p.track_stock?(p.unit||''):' phần';
+        return `<br><span style="font-size:11px;font-weight:600;color:${stock>0?'var(--teal)':'var(--red)'}">📦 Còn bán được: ${stock}${label}</span>`;
+      })()}</td>
       <td style="color:var(--gold2);font-weight:700">${fmt(p.price)}</td>
       <td class="hide-mobile" style="font-weight:600">${cost>0?fmt(cost):'<span style="color:var(--muted)">—</span>'}</td>
       <td class="hide-mobile" style="font-weight:700;color:${profitColor}">${profit===null?'—':fmt(profit)}</td>
@@ -9551,9 +9606,18 @@ function filterProducts(){
 }
 
 function addToCart(pid){
+  const p=D.products.find(x=>x.id===pid);if(!p)return;
+  // ★ THÊM (2026-09-20): chặn hẳn không cho thêm vào giỏ nếu đã hết hàng (tồn
+  // kho — tính theo track_stock hoặc theo công thức — trừ luôn phần đang có sẵn
+  // trong giỏ, xem getProductStock()). Trước đây không kiểm tra gì nên hết hàng
+  // vẫn bấm mua bình thường.
+  const stock=getProductStock(pid);
+  if(stock!==null&&stock<=0){
+    notify(`⚠️ ${p.name} đã hết hàng — không thể thêm vào giỏ! Nhập thêm hàng/nguyên liệu trước đã.`,false);
+    return;
+  }
   const ex=cart.find(c=>c.pid===pid);
   if(ex){ex.qty++;renderCart();return;}
-  const p=D.products.find(x=>x.id===pid);if(!p)return;
   cart.push({pid,name:p.name,price:p.price,qty:1,unit:p.unit||'',vat:p.vat||0,discount:p.discount||0});
   renderCart();
 }
@@ -9641,14 +9705,43 @@ function updateCartTotal(){
 }
 
 
-function chgQty(i,d){cart[i].qty+=d;if(cart[i].qty<=0)cart.splice(i,1);renderCart();}
+function chgQty(i,d){
+  // ★ THÊM (2026-09-20): bấm "+" trong giỏ cũng phải kiểm tra tồn kho như addToCart(),
+  // không thì vẫn lách được việc chặn hết hàng bằng cách tăng số lượng thay vì bấm lại thẻ SP.
+  if(d>0&&cart[i]){
+    const stock=getProductStock(cart[i].pid);
+    if(stock!==null&&stock<=0){
+      notify(`⚠️ ${cart[i].name} đã hết hàng — không thể tăng thêm số lượng!`,false);
+      return;
+    }
+  }
+  cart[i].qty+=d;if(cart[i].qty<=0)cart.splice(i,1);renderCart();
+}
 function setItemDiscount(i,v){
   if(!cart[i])return;
   cart[i].discount=Math.min(100,Math.max(0,parseInt(v)||0));
   renderCart();
 }
 
-function setQty(i,v){if(v===''||v===null||v===undefined)return;const n=parseInt(v)||1;if(n<=0){cart.splice(i,1);}else if(cart[i]){cart[i].qty=n;}renderCart();}
+function setQty(i,v){
+  if(v===''||v===null||v===undefined)return;
+  const n=parseInt(v)||1;
+  if(n<=0){cart.splice(i,1);renderCart();return;}
+  if(cart[i]){
+    // ★ THÊM (2026-09-20): gõ tay số lượng vượt quá tồn kho thực tế còn lại
+    // (tính cả phần đang có sẵn trong dòng này) → tự giới hạn về đúng số tối đa
+    // bán được, không cho vượt.
+    const oldQty=cart[i].qty;
+    const stockExcludingThis=(getProductStock(cart[i].pid)??Infinity)+oldQty;
+    if(n>stockExcludingThis){
+      cart[i].qty=Math.max(1,stockExcludingThis);
+      notify(`⚠️ ${cart[i].name} chỉ còn ${cart[i].qty} — đã giới hạn lại số lượng`,false);
+    } else {
+      cart[i].qty=n;
+    }
+  }
+  renderCart();
+}
 
 // ── CHECKOUT + VIETQR ──
 async function checkout(){
@@ -10387,7 +10480,8 @@ function renderInventory(){
         <div style="font-size:10px;color:var(--muted);margin-top:2px">${pct}%</div>
       </td>
       <td class="btn-group" style="gap:4px">
-        <button class="btn btn-green btn-sm" onclick="showM('modal-import');setTimeout(()=>{const el=document.getElementById('im-mat');if(el){el.value='${item.id}';imCalcTotal();}},50)">📥</button>
+        <button class="btn btn-green btn-sm" onclick="showM('modal-import');setTimeout(()=>{const el=document.getElementById('im-mat');if(el){el.value='${item.id}';imCalcTotal();}},50)" title="Nhập kho (mua trực tiếp)">📥</button>
+        <button class="btn btn-ghost btn-sm" onclick="openMaterialRecipe('${item.id}')" title="Công thức phối trộn — dùng cho NVL trộn sẵn như Trà mix, Bột sữa">🧪</button>
         <button class="btn btn-ghost btn-sm" onclick="openEditMat('${item.id}')">✏️</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteMat('${item.id}')">🗑</button>
       </td>
@@ -10726,6 +10820,145 @@ async function deleteRecipeRow(id,pid){
     D.recipes=D.recipes.filter(x=>x.id!==id);
     renderRecipeRows(pid);notify('Đã xóa khỏi công thức');
   }catch(e){notify('Lỗi: '+e.message,false);}
+}
+
+// ── CÔNG THỨC PHỐI TRỘN CHO NGUYÊN LIỆU (VD: Trà mix, Bột sữa) ──────────────
+// ★ THÊM (2026-09-20): khác với recipes ở trên (công thức SẢN PHẨM bán ra),
+// đây là công thức cho 1 NGUYÊN LIỆU TRONG KHO được trộn sẵn từ các nguyên
+// liệu gốc khác — dùng chung bảng "recipes" nhưng đánh dấu parent_type='material'
+// và product_id trỏ tới id nguyên liệu (không phải id sản phẩm).
+function openMaterialRecipe(matId){
+  const mat=D.inventory.find(x=>x.id===matId);if(!mat)return;
+  document.getElementById('mr-mat-id').value=matId;
+  document.getElementById('mr-mat-name').textContent='Nguyên liệu: '+mat.name;
+  const matOpts=D.inventory.filter(i=>i.id!==matId).map(i=>`<option value="${i.id}">${i.name} (${i.unit})</option>`).join('');
+  document.getElementById('mr-mat').innerHTML=matOpts;
+  document.getElementById('mr-output-unit-label').textContent=mat.unit||'đơn vị';
+  document.getElementById('mr-produce-unit-label').textContent=mat.unit||'đơn vị';
+  document.getElementById('mr-output-qty').value='';
+  document.getElementById('mr-produce-qty').value='';
+  document.getElementById('mr-ratio-preview').textContent='';
+  document.getElementById('mr-produce-preview').innerHTML='';
+  renderMaterialRecipeRows(matId);
+  showM('modal-material-recipe');
+}
+
+function renderMaterialRecipeRows(matId){
+  const rows=D.recipes.filter(r=>r.product_id===matId&&r.parent_type==='material');
+  const el=document.getElementById('mr-rows');
+  if(!rows.length){
+    el.innerHTML='<div style="color:var(--muted);font-size:12px;text-align:center;padding:10px">Chưa có công thức — thêm nguyên liệu gốc bên dưới</div>';
+    return;
+  }
+  el.innerHTML=rows.map(r=>{
+    const mat=D.inventory.find(i=>i.id===r.mat_id);
+    return`<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg);border-radius:8px;margin-bottom:6px">
+      <span style="flex:1;font-size:13px;font-weight:600">${mat?mat.name:'?'}</span>
+      <span style="color:var(--gold2);font-weight:700">${r.mat_use} ${mat?mat.unit:''} / đơn vị ra</span>
+      <button class="btn btn-red btn-sm" onclick="deleteMaterialRecipeRow('${r.id}','${matId}')">🗑</button>
+    </div>`;
+  }).join('');
+}
+
+function updateMaterialRecipeRatioPreview(){
+  const use=+document.getElementById('mr-use')?.value||0;
+  const out=+document.getElementById('mr-output-qty')?.value||0;
+  const el=document.getElementById('mr-ratio-preview');
+  if(!el) return;
+  if(use>0&&out>0){
+    const ratio=use/out;
+    el.textContent=`→ Tỉ lệ: mỗi 1 đơn vị thành phẩm cần ${ratio.toFixed(4)} nguyên liệu này`;
+  } else {
+    el.textContent='';
+  }
+}
+
+async function addMaterialRecipeRow(){
+  const matId=document.getElementById('mr-mat-id').value;
+  const ingId=document.getElementById('mr-mat').value;
+  const useInBatch=+document.getElementById('mr-use').value;
+  const outputQty=+document.getElementById('mr-output-qty').value;
+  if(!ingId||!useInBatch||useInBatch<=0){notify('Chọn nguyên liệu gốc và nhập lượng dùng trong mẻ!',false);return;}
+  if(!outputQty||outputQty<=0){notify('Nhập "Mẻ này ra bao nhiêu"!',false);return;}
+  if(ingId===matId){notify('Không thể chọn chính nguyên liệu này làm nguyên liệu gốc!',false);return;}
+  if(D.recipes.find(r=>r.product_id===matId&&r.mat_id===ingId&&r.parent_type==='material')){notify('Nguyên liệu này đã có trong công thức!',false);return;}
+  const use = useInBatch / outputQty;
+  const row={id:uid(),product_id:matId,mat_id:ingId,mat_use:use,created_at:Date.now(),parent_type:'material'};
+  try{
+    await sbUpsert('recipes',row);
+    D.recipes.push(row);
+    document.getElementById('mr-use').value='';
+    document.getElementById('mr-ratio-preview').textContent='';
+    renderMaterialRecipeRows(matId);notify('Đã thêm vào công thức phối trộn');
+  }catch(e){notify('Lỗi: '+e.message,false);}
+}
+
+async function deleteMaterialRecipeRow(id,matId){
+  try{
+    await sbDel('recipes',`?id=eq.${id}`);
+    D.recipes=D.recipes.filter(x=>x.id!==id);
+    renderMaterialRecipeRows(matId);notify('Đã xóa khỏi công thức');
+  }catch(e){notify('Lỗi: '+e.message,false);}
+}
+
+// Xem trước: mẻ này cần bao nhiêu NVL gốc, có đủ kho không
+function previewMaterialProduce(){
+  const matId=document.getElementById('mr-mat-id').value;
+  const outQty=+document.getElementById('mr-produce-qty').value||0;
+  const el=document.getElementById('mr-produce-preview');
+  if(!el) return;
+  if(!outQty){el.innerHTML='';return;}
+  const rows=D.recipes.filter(r=>r.product_id===matId&&r.parent_type==='material');
+  if(!rows.length){el.innerHTML='<span style="color:var(--red)">Chưa có công thức — thêm nguyên liệu gốc ở trên trước đã.</span>';return;}
+  const lines=rows.map(r=>{
+    const mat=D.inventory.find(i=>i.id===r.mat_id);
+    if(!mat) return '';
+    const need=Math.round(r.mat_use*outQty*1000)/1000;
+    const enough=mat.qty>=need;
+    return `<div style="color:${enough?'var(--muted)':'var(--red)'}">${enough?'✓':'⚠️'} ${mat.name}: cần ${need}${mat.unit} — kho còn ${mat.qty}${mat.unit}${enough?'':' (KHÔNG ĐỦ)'}</div>`;
+  }).join('');
+  el.innerHTML=lines;
+}
+
+// Xác nhận sản xuất 1 mẻ: trừ NVL gốc trong kho, cộng vào tồn kho nguyên liệu đích,
+// ghi log xuất/nhập đầy đủ — tương tự deductStockForOrder() nhưng cho phối trộn NVL.
+async function produceMaterialBatch(){
+  const matId=document.getElementById('mr-mat-id').value;
+  const target=D.inventory.find(x=>x.id===matId);if(!target)return;
+  const outQty=+document.getElementById('mr-produce-qty').value||0;
+  if(!outQty||outQty<=0){notify('Nhập số lượng muốn sản xuất!',false);return;}
+  const rows=D.recipes.filter(r=>r.product_id===matId&&r.parent_type==='material');
+  if(!rows.length){notify('Chưa có công thức phối trộn cho nguyên liệu này!',false);return;}
+  // Kiểm tra đủ NVL gốc trước khi trừ bất kỳ dòng nào
+  for(const r of rows){
+    const mat=D.inventory.find(i=>i.id===r.mat_id);
+    if(!mat){notify('Không tìm thấy nguyên liệu gốc trong công thức!',false);return;}
+    const need=Math.round(r.mat_use*outQty*1000)/1000;
+    if(mat.qty<need){notify(`⚠️ Không đủ ${mat.name}: cần ${need}${mat.unit}, kho chỉ còn ${mat.qty}${mat.unit}`,false);return;}
+  }
+  try{
+    for(const r of rows){
+      const mat=D.inventory.find(i=>i.id===r.mat_id);
+      const need=Math.round(r.mat_use*outQty*1000)/1000;
+      mat.qty=Math.max(0,Math.round((mat.qty-need)*1000)/1000);
+      await sbPatch('inventory',{qty:mat.qty},`?id=eq.${mat.id}`);
+      const log={id:uid(),time:nowDT(),name:mat.name,type:'Xuất',qty:need,unit:mat.unit||'',
+        note:`Phối trộn mẻ ${target.name} x${outQty}${target.unit||''}`,mat_id:mat.id,mat_qty:need,created_at:Date.now()};
+      await sbUpsert('stock_log',log);D.stockLog.unshift(log);
+    }
+    target.qty=Math.round(((target.qty||0)+outQty)*1000)/1000;
+    await sbPatch('inventory',{qty:target.qty},`?id=eq.${matId}`);
+    const log={id:uid(),time:nowDT(),name:target.name,type:'Nhập',qty:outQty,unit:target.unit||'',
+      note:'Nhập kho theo công thức phối trộn',mat_id:target.id,mat_qty:outQty,created_at:Date.now()};
+    await sbUpsert('stock_log',log);D.stockLog.unshift(log);
+    document.getElementById('mr-produce-qty').value='';
+    document.getElementById('mr-produce-preview').innerHTML='';
+    renderInventory();
+    notify(`✅ Đã sản xuất ${outQty}${target.unit||''} ${target.name} — tồn kho: ${target.qty}${target.unit||''}`);
+    if(document.getElementById('at-import')?.checked)
+      tgMsg(`🏭 *Nhập kho theo công thức!*\n\n📦 ${target.name}: +${outQty}${target.unit||''}\n🔢 Tồn kho: ${target.qty}${target.unit||''}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
+    gsSend({sheet:'TonKho',rows:D.inventory,time:nowDT()});
+  }catch(e){notify('Lỗi khi sản xuất: '+e.message,false);}
 }
 
 // ══════════════════════════════════════════════════
