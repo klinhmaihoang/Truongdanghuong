@@ -2323,6 +2323,16 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       <input id="mat-edit-note" placeholder="VD: 1kg/gói, giá cập nhật 12/2024..."/>
     </div>
 
+    <!-- ★ THÊM (2026-09-20): phân loại Nguyên liệu / Bao bì — bao bì chỉ dùng để
+         tính cost món nước, KHÔNG phải NVL pha chế, không liên quan Kho/bán lẻ. -->
+    <div class="fg" style="margin-bottom:14px">
+      <label>Loại</label>
+      <select id="mat-edit-loai" style="border:1.5px solid var(--border);border-radius:8px;padding:9px 12px;font-size:13px;font-family:inherit;background:#fff;outline:none;width:100%">
+        <option value="nguyen_lieu">🧂 Nguyên liệu pha chế</option>
+        <option value="bao_bi">📦 Bao bì (ly, nắp, ống hút... — chỉ để tính cost)</option>
+      </select>
+    </div>
+
     <div class="btn-group">
       <button class="btn btn-green btn-sm" onclick="saveMat()">💾 Lưu nguyên liệu</button>
       <button class="btn btn-ghost btn-sm" onclick="closeM('modal-mat-edit')">Hủy</button>
@@ -2557,7 +2567,7 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
           style="display:none;width:100%;border:1.5px solid var(--brand);border-radius:7px;padding:5px 8px;font-size:15px;font-weight:700;font-family:inherit;text-align:center;outline:none;background:#fff;color:var(--brown)"/>
       </div>
       <div>
-        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost NL</div>
+        <div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Tổng cost</div>
         <div id="bom-cost" style="font-size:20px;font-weight:800;color:var(--brand)"></div>
         <div id="bom-pct" style="font-size:13px;font-weight:700"></div>
       </div>
@@ -2585,10 +2595,36 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
       </tr></thead>
       <tbody id="bom-ing-rows"></tbody>
       <tfoot><tr>
-        <td colspan="4" style="font-weight:700;text-align:right;padding:8px 10px;border-top:2px solid var(--border)">Tổng cost</td>
-        <td style="font-weight:800;color:var(--brand);text-align:right;padding:8px 10px;border-top:2px solid var(--border)" id="bom-total-cost"></td>
+        <td colspan="4" style="font-weight:700;text-align:right;padding:8px 10px;border-top:2px solid var(--border)">Cost nguyên liệu</td>
+        <td style="font-weight:800;color:var(--brand);text-align:right;padding:8px 10px;border-top:2px solid var(--border)" id="bom-ing-subtotal"></td>
       </tr></tfoot>
     </table>
+
+    <!-- ★ THÊM (2026-09-20): Bao bì — chỉ để tính cost, KHÔNG phải NVL pha chế -->
+    <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 7px">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">📦 Bao bì (chỉ tính cost)</div>
+      <button id="bom-add-pkg-btn" onclick="bomAddPkgRow()" style="display:none"
+        class="btn btn-ghost btn-sm" style="font-size:11px">+ Thêm bao bì</button>
+    </div>
+    <table style="margin-bottom:4px">
+      <thead><tr>
+        <th style="width:38%">Bao bì</th>
+        <th style="text-align:right;width:16%">Định lượng</th>
+        <th style="text-align:right;width:16%">Đơn vị</th>
+        <th style="text-align:right;width:16%">Đơn giá</th>
+        <th style="text-align:right;width:14%">Thành tiền</th>
+      </tr></thead>
+      <tbody id="bom-pkg-rows"></tbody>
+      <tfoot><tr>
+        <td colspan="4" style="font-weight:700;text-align:right;padding:8px 10px;border-top:2px solid var(--border)">Cost bao bì</td>
+        <td style="font-weight:800;color:#8e44ad;text-align:right;padding:8px 10px;border-top:2px solid var(--border)" id="bom-pkg-subtotal"></td>
+      </tr></tfoot>
+    </table>
+
+    <div style="display:flex;justify-content:flex-end;gap:8px;align-items:center;padding:6px 10px;margin-bottom:4px">
+      <span style="font-size:12.5px;font-weight:700;color:var(--muted)">Tổng cost (NL + bao bì):</span>
+      <span style="font-size:15px;font-weight:800;color:var(--brand)" id="bom-total-cost"></span>
+    </div>
 
     <!-- Thử nghiệm giá (chỉ hiện view mode) -->
     <div id="bom-trial-box" style="background:var(--bg);border-radius:8px;padding:10px 12px;margin:10px 0">
@@ -2637,13 +2673,23 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
         </select>
       </div>
     </div>
-    <div style="font-size:13px;font-weight:700;color:var(--brown);margin:12px 0 8px">🧂 Nguyên liệu (tự động lấy giá từ DMHH)</div>
+    <div style="font-size:13px;font-weight:700;color:var(--brown);margin:12px 0 8px">🧂 Nguyên liệu pha chế (tự động lấy giá từ DMHH)</div>
     <div id="drink-ingredient-rows" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
     <button class="btn btn-ghost btn-sm" onclick="addDrinkIngredient()" style="width:100%;margin-bottom:14px">+ Thêm nguyên liệu</button>
+    <!-- ★ THÊM (2026-09-20): Bao bì (ly, nắp, ống hút...) — tách riêng khỏi nguyên
+         liệu pha chế, chỉ để cộng vào giá cost, KHÔNG liên quan Kho/bán lẻ. Lấy
+         danh sách từ DMHH đã đánh dấu "Loại = Bao bì". -->
+    <div style="font-size:13px;font-weight:700;color:var(--brown);margin:12px 0 8px">📦 Bao bì (chỉ để tính cost — ly, nắp, ống hút...)</div>
+    <div id="drink-packaging-rows" style="display:flex;flex-direction:column;gap:8px;margin-bottom:10px"></div>
+    <button class="btn btn-ghost btn-sm" onclick="addDrinkPackaging()" style="width:100%;margin-bottom:14px">+ Thêm bao bì</button>
     <!-- Live result -->
     <div id="drink-cost-summary" style="background:var(--brand-light);border-radius:10px;padding:14px;margin-bottom:14px;display:none">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;text-align:center;margin-bottom:10px;padding-bottom:10px;border-bottom:1px dashed var(--border)">
+        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost nguyên liệu</div><div style="font-size:15px;font-weight:700;color:var(--brand)" id="summary-cost-nl">0₫</div></div>
+        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost bao bì</div><div style="font-size:15px;font-weight:700;color:#8e44ad" id="summary-cost-pkg">0₫</div></div>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;text-align:center">
-        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Cost NL</div><div style="font-size:20px;font-weight:800;color:var(--brand)" id="summary-cost">0₫</div></div>
+        <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">Tổng cost</div><div style="font-size:20px;font-weight:800;color:var(--brand)" id="summary-cost">0₫</div></div>
         <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">% Cost</div><div style="font-size:20px;font-weight:800" id="summary-pct">—</div></div>
         <div><div style="font-size:10px;color:var(--muted);text-transform:uppercase;font-weight:600">LN/ly</div><div style="font-size:20px;font-weight:800;color:var(--green)" id="summary-profit">0₫</div></div>
       </div>
@@ -12881,11 +12927,15 @@ function renderCostCalc() {
 
 function getCost(p) {
   // Dùng cost có sẵn (từ BOM), hoặc tính lại nếu là custom — tra giá từ CC_mats (DMHH thật, gồm cả NL mới thêm)
+  // ★ THÊM (2026-09-20): cộng thêm cost bao bì (p.packaging, cùng định dạng với
+  // p.ingredients) — để % cost / lợi nhuận hiện đúng ở MỌI nơi dùng getCost(),
+  // không chỉ riêng lúc mở modal thêm/sửa món.
   if (p._custom) {
-    return (p.ingredients||[]).reduce((s,i)=>{
+    const calcList=(list)=>(list||[]).reduce((s,i)=>{
       const mat = CC_mats.find(m=>m.ma===i.ma_nl||m.ten===i.ten_nl);
       return s + (mat?(mat.gia||0):(i.don_gia||0)) * (i.so_luong||0);
     },0);
+    return calcList(p.ingredients) + calcList(p.packaging);
   }
   return p.cost || 0;
 }
@@ -13165,27 +13215,32 @@ function _bomRenderView(p) {
   document.getElementById('bom-action-view').style.display = 'flex';
   document.getElementById('bom-action-edit').style.display = 'none';
   document.getElementById('bom-add-ing-btn').style.display = 'none';
+  document.getElementById('bom-add-pkg-btn').style.display = 'none';
   document.getElementById('bom-trial-box').style.display = 'block';
 
-  // Ingredient rows (VIEW)
+  // Ingredient + packaging rows (VIEW)
   _bomRenderIngRows(p, false);
+  _bomRenderPkgRows(p, false);
 
   // Trial price
   document.getElementById('bom-trial-price').value = gb||'';
   updateTrialCalc();
 }
 
-function _bomRenderIngRows(p, editMode) {
-  const cost = getCost(p);
-  const ings = p.ingredients||[];
-
-  if (!editMode) {
-    // VIEW: read-only rows
-    document.getElementById('bom-ing-rows').innerHTML = ings.map((i,idx) => {
+// ── Dùng chung cho render 1 bảng (nguyên liệu HOẶC bao bì), cả view lẫn edit ──
+// ★ THÊM (2026-09-20): tách ra hàm dùng chung _bomRenderRows_ để không lặp code
+// giữa nguyên liệu và bao bì — 2 khối cũ (_bomRenderIngRows) và mới (bao bì) chỉ
+// khác nhau ở: tbody id, danh sách item, loại DMHH lọc vào dropdown, và class dòng.
+function _bomRenderRows_(opts){
+  const {tbodyId, items, rowClass, matClass, qtyClass, unitClass, priceClass, loaiFilter, cost, showTopBadge}=opts;
+  const el=document.getElementById(tbodyId);
+  if(!el) return;
+  if (!opts.editMode) {
+    el.innerHTML = items.map((i) => {
       const invMat = D.inventory.find(m=>m.id===i.ma_nl||m.name===i.ten_nl);
       const unitPrice = invMat?(invMat.cost||0):(i.don_gia||0);
       const total = unitPrice*(i.so_luong||0);
-      const isTop = cost>0 && total > cost*0.3;
+      const isTop = showTopBadge && cost>0 && total > cost*0.3;
       return `<tr style="${isTop?'background:rgba(255,140,0,.05)':''}">
         <td style="font-weight:${isTop?700:400}">
           ${i.ten_nl}
@@ -13196,64 +13251,83 @@ function _bomRenderIngRows(p, editMode) {
         <td style="text-align:right;color:var(--muted);font-size:12px">${Math.round(unitPrice*10)/10}₫</td>
         <td style="text-align:right;font-weight:600;color:${isTop?'var(--brand)':'inherit'}">${fmtVND(total)}</td>
       </tr>`;
-    }).join('');
-  } else {
-    // EDIT: editable rows
-    const allMats = {};
-    CC_mats.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
-    const matOpts = (cur='')=>Object.values(allMats).map(m=>
-      `<option value="${m.id}" data-cost="${m.cost}" data-unit="${m.unit}" ${m.id===cur||m.name===cur?'selected':''}>${m.name}</option>`
-    ).join('');
-
-    document.getElementById('bom-ing-rows').innerHTML = ings.map((i,idx) => {
-      return `<tr class="bom-edit-row" data-idx="${idx}">
-        <td style="padding:4px 6px">
-          <select class="bom-ing-mat" onchange="bomIngMatChange(this);bomLiveCalc()"
-            style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:5px 7px;font-size:12px;font-family:inherit;background:#fff;outline:none">
-            <option value="">-- Chọn NL --</option>${matOpts(i.ma_nl||i.ten_nl)}
-          </select>
-        </td>
-        <td style="padding:4px 4px">
-          <input class="bom-ing-qty" type="number" step="0.001" min="0" value="${i.so_luong||0}" oninput="bomLiveCalc()"
-            style="width:70px;border:1.5px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;font-family:inherit;outline:none;text-align:right"/>
-        </td>
-        <td style="padding:4px 4px">
-          <span class="bom-ing-unit" style="font-size:12px;color:var(--muted);font-weight:600">${i.don_vi||''}</span>
-        </td>
-        <td style="padding:4px 4px">
-          <input class="bom-ing-price" type="number" step="0.01" min="0" value="${Math.round((i.don_gia||0)*100)/100}" oninput="bomLiveCalc()"
-            style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;font-family:inherit;outline:none;text-align:right"/>
-        </td>
-        <td style="padding:4px 4px;text-align:right">
-          <button onclick="this.closest('tr').remove();bomLiveCalc()"
-            style="background:var(--red);color:#fff;border:none;border-radius:5px;width:24px;height:24px;cursor:pointer;font-size:12px;line-height:1">✕</button>
-        </td>
-      </tr>`;
-    }).join('');
+    }).join('') || `<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:10px;font-size:12px">Chưa có</td></tr>`;
+    return;
   }
+  // EDIT: editable rows
+  const allMats = {};
+  CC_mats.filter(m=>(m.loai||'nguyen_lieu')===loaiFilter).forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
+  const matOpts = (cur='')=>Object.values(allMats).map(m=>
+    `<option value="${m.id}" data-cost="${m.cost}" data-unit="${m.unit}" ${m.id===cur||m.name===cur?'selected':''}>${m.name}</option>`
+  ).join('');
+  el.innerHTML = items.map((i) => `<tr class="${rowClass}">
+      <td style="padding:4px 6px">
+        <select class="${matClass}" onchange="bomIngMatChange(this,'${unitClass}','${priceClass}');bomLiveCalc()"
+          style="width:100%;border:1.5px solid var(--border);border-radius:6px;padding:5px 7px;font-size:12px;font-family:inherit;background:#fff;outline:none">
+          <option value="">-- Chọn --</option>${matOpts(i.ma_nl||i.ten_nl)}
+        </select>
+      </td>
+      <td style="padding:4px 4px">
+        <input class="${qtyClass}" type="number" step="0.001" min="0" value="${i.so_luong||0}" oninput="bomLiveCalc()"
+          style="width:70px;border:1.5px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;font-family:inherit;outline:none;text-align:right"/>
+      </td>
+      <td style="padding:4px 4px">
+        <span class="${unitClass}" style="font-size:12px;color:var(--muted);font-weight:600">${i.don_vi||''}</span>
+      </td>
+      <td style="padding:4px 4px">
+        <input class="${priceClass}" type="number" step="0.01" min="0" value="${Math.round((i.don_gia||0)*100)/100}" oninput="bomLiveCalc()"
+          style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;font-family:inherit;outline:none;text-align:right"/>
+      </td>
+      <td style="padding:4px 4px;text-align:right">
+        <button onclick="this.closest('tr').remove();bomLiveCalc()"
+          style="background:var(--red);color:#fff;border:none;border-radius:5px;width:24px;height:24px;cursor:pointer;font-size:12px;line-height:1">✕</button>
+      </td>
+    </tr>`).join('');
 }
 
-function bomIngMatChange(sel) {
+function _bomRenderIngRows(p, editMode) {
+  _bomRenderRows_({tbodyId:'bom-ing-rows', items:p.ingredients||[], rowClass:'bom-edit-row',
+    matClass:'bom-ing-mat', qtyClass:'bom-ing-qty', unitClass:'bom-ing-unit', priceClass:'bom-ing-price',
+    loaiFilter:'nguyen_lieu', cost:getCost(p), showTopBadge:true, editMode});
+}
+// ★ THÊM (2026-09-20): render bảng Bao bì (chỉ tính cost) — cùng cơ chế với NL
+// nhưng lọc dropdown theo loai='bao_bi' và class riêng để không lẫn khi bomLiveCalc()/
+// bomSaveEdit() thu thập dữ liệu.
+function _bomRenderPkgRows(p, editMode) {
+  _bomRenderRows_({tbodyId:'bom-pkg-rows', items:p.packaging||[], rowClass:'bom-pkg-edit-row',
+    matClass:'bom-pkg-mat', qtyClass:'bom-pkg-qty', unitClass:'bom-pkg-unit', priceClass:'bom-pkg-price',
+    loaiFilter:'bao_bi', cost:getCost(p), showTopBadge:false, editMode});
+}
+
+function bomIngMatChange(sel, unitClass='bom-ing-unit', priceClass='bom-ing-price') {
   const row = sel.closest('tr');
   const opt = sel.options[sel.selectedIndex];
   // Update unit label
-  const unitEl = row.querySelector('.bom-ing-unit');
+  const unitEl = row.querySelector('.'+unitClass);
   if (unitEl) unitEl.textContent = opt ? (opt.dataset.unit||'') : '';
   // Update price from DMHH
-  const priceEl = row.querySelector('.bom-ing-price');
+  const priceEl = row.querySelector('.'+priceClass);
   if (priceEl && opt && opt.dataset.cost) priceEl.value = Math.round(parseFloat(opt.dataset.cost)*100)/100;
 }
 
 function bomLiveCalc() {
-  let total = 0;
+  let nlTotal = 0, pkgTotal = 0;
   document.querySelectorAll('.bom-edit-row').forEach(row => {
     const qty  = parseFloat(row.querySelector('.bom-ing-qty')?.value)||0;
     const price= parseFloat(row.querySelector('.bom-ing-price')?.value)||0;
-    total += qty * price;
+    nlTotal += qty * price;
   });
+  document.querySelectorAll('.bom-pkg-edit-row').forEach(row => {
+    const qty  = parseFloat(row.querySelector('.bom-pkg-qty')?.value)||0;
+    const price= parseFloat(row.querySelector('.bom-pkg-price')?.value)||0;
+    pkgTotal += qty * price;
+  });
+  const total = nlTotal + pkgTotal;
   const gb = parseFloat(document.getElementById('bom-edit-price')?.value)||0;
   document.getElementById('bom-cost').textContent = fmtVND(total);
   document.getElementById('bom-total-cost').textContent = fmtVND(total);
+  const ingSubEl=document.getElementById('bom-ing-subtotal'); if(ingSubEl) ingSubEl.textContent=fmtVND(nlTotal);
+  const pkgSubEl=document.getElementById('bom-pkg-subtotal'); if(pkgSubEl) pkgSubEl.textContent=fmtVND(pkgTotal);
   if (gb>0) {
     const pct = Math.round(total/gb*100);
     const b = costBadge(pct);
@@ -13269,30 +13343,29 @@ function bomLiveCalc() {
   }
 }
 
-function bomAddIngRow() {
-  // Thêm 1 dòng rỗng vào tbody
-  const tbody = document.getElementById('bom-ing-rows');
+function _bomAddRow_(tbodyId, rowClass, matClass, qtyClass, unitClass, priceClass, loaiFilter, placeholder){
+  const tbody = document.getElementById(tbodyId);
   const allMats = {};
-  CC_mats.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
+  CC_mats.filter(m=>(m.loai||'nguyen_lieu')===loaiFilter).forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
   const matOpts = Object.values(allMats).map(m=>
     `<option value="${m.id}" data-cost="${m.cost}" data-unit="${m.unit}">${m.name}</option>`
   ).join('');
   const tr = document.createElement('tr');
-  tr.className = 'bom-edit-row';
+  tr.className = rowClass;
   tr.innerHTML = `
     <td style="padding:4px 6px">
-      <select class="bom-ing-mat" onchange="bomIngMatChange(this);bomLiveCalc()"
+      <select class="${matClass}" onchange="bomIngMatChange(this,'${unitClass}','${priceClass}');bomLiveCalc()"
         style="width:100%;border:1.5px solid var(--brand);border-radius:6px;padding:5px 7px;font-size:12px;font-family:inherit;background:#fff;outline:none">
-        <option value="">-- Chọn NL --</option>${matOpts}
+        <option value="">-- ${placeholder} --</option>${matOpts}
       </select>
     </td>
     <td style="padding:4px 4px">
-      <input class="bom-ing-qty" type="number" step="0.001" min="0" value="0" oninput="bomLiveCalc()"
+      <input class="${qtyClass}" type="number" step="0.001" min="0" value="0" oninput="bomLiveCalc()"
         style="width:70px;border:1.5px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;font-family:inherit;outline:none;text-align:right"/>
     </td>
-    <td style="padding:4px 4px"><span class="bom-ing-unit" style="font-size:12px;color:var(--muted);font-weight:600"></span></td>
+    <td style="padding:4px 4px"><span class="${unitClass}" style="font-size:12px;color:var(--muted);font-weight:600"></span></td>
     <td style="padding:4px 4px">
-      <input class="bom-ing-price" type="number" step="0.01" min="0" value="0" oninput="bomLiveCalc()"
+      <input class="${priceClass}" type="number" step="0.01" min="0" value="0" oninput="bomLiveCalc()"
         style="width:72px;border:1.5px solid var(--border);border-radius:6px;padding:5px 6px;font-size:12px;font-family:inherit;outline:none;text-align:right"/>
     </td>
     <td style="padding:4px 4px;text-align:right">
@@ -13300,6 +13373,13 @@ function bomAddIngRow() {
         style="background:var(--red);color:#fff;border:none;border-radius:5px;width:24px;height:24px;cursor:pointer;font-size:12px;line-height:1">✕</button>
     </td>`;
   tbody.appendChild(tr);
+}
+function bomAddIngRow() {
+  _bomAddRow_('bom-ing-rows','bom-edit-row','bom-ing-mat','bom-ing-qty','bom-ing-unit','bom-ing-price','nguyen_lieu','Chọn NL');
+}
+// ★ THÊM (2026-09-20)
+function bomAddPkgRow() {
+  _bomAddRow_('bom-pkg-rows','bom-pkg-edit-row','bom-pkg-mat','bom-pkg-qty','bom-pkg-unit','bom-pkg-price','bao_bi','Chọn bao bì');
 }
 
 // ── VÀO CHẾ ĐỘ SỬA ──────────────────────────────────────────
@@ -13325,10 +13405,12 @@ function bomEnterEdit() {
   document.getElementById('bom-action-view').style.display = 'none';
   document.getElementById('bom-action-edit').style.display = 'flex';
   document.getElementById('bom-add-ing-btn').style.display = '';
+  document.getElementById('bom-add-pkg-btn').style.display = '';
   document.getElementById('bom-trial-box').style.display = 'none';
 
-  // Render editable rows
+  // Render editable rows (nguyên liệu + bao bì)
   _bomRenderIngRows(p, true);
+  _bomRenderPkgRows(p, true);
 }
 
 function bomCancelEdit() {
@@ -13366,10 +13448,30 @@ async function bomSaveEdit() {
     });
   });
 
+  // ★ THÊM (2026-09-20): thu thập thêm các dòng bao bì, cùng cách với nguyên liệu
+  const newPkg = [];
+  document.querySelectorAll('.bom-pkg-edit-row').forEach(row => {
+    const sel   = row.querySelector('.bom-pkg-mat');
+    const qty   = parseFloat(row.querySelector('.bom-pkg-qty')?.value)||0;
+    const price = parseFloat(row.querySelector('.bom-pkg-price')?.value)||0;
+    const unit  = row.querySelector('.bom-pkg-unit')?.textContent||'';
+    if (!sel||!sel.value||qty<=0) return;
+    const opt = sel.options[sel.selectedIndex];
+    const matName = opt ? opt.text : '';
+    newPkg.push({
+      ma_nl: sel.value,
+      ten_nl: matName,
+      don_vi: unit || (opt?opt.dataset.unit:''),
+      so_luong: qty,
+      don_gia: price,
+      thanh_tien: Math.round(qty*price*100)/100
+    });
+  });
+
   const newPrice  = parseFloat(document.getElementById('bom-edit-price')?.value)||0;
   const newNhom   = document.getElementById('bom-edit-nhom')?.value||p.nhom||'Khác';
   const newSize   = document.getElementById('bom-edit-size')?.value||p.size||'—';
-  const newCost   = newIngs.reduce((s,i)=>s+i.thanh_tien,0);
+  const newCost   = newIngs.reduce((s,i)=>s+i.thanh_tien,0) + newPkg.reduce((s,i)=>s+i.thanh_tien,0);
 
   // Cập nhật local
   p.ten        = newName;
@@ -13377,6 +13479,7 @@ async function bomSaveEdit() {
   p.size       = newSize;
   p.gia_ban    = newPrice;
   p.ingredients = newIngs;
+  p.packaging  = newPkg;
   p.cost       = newCost;
   p._edited    = true; // mark as edited
 
@@ -13387,6 +13490,10 @@ async function bomSaveEdit() {
         id: p.id, name: newName, nhom: newNhom, size: newSize,
         sale_price: newPrice,
         ingredients: newIngs.map(i=>({
+          mat_id: i.ma_nl, mat_name: i.ten_nl, mat_unit: i.don_vi,
+          qty: i.so_luong, cost_snapshot: i.don_gia
+        })),
+        packaging: newPkg.map(i=>({
           mat_id: i.ma_nl, mat_name: i.ten_nl, mat_unit: i.don_vi,
           qty: i.so_luong, cost_snapshot: i.don_gia
         }))
@@ -13514,6 +13621,15 @@ function printSingleDrink() {
     return `<tr><td>${i.ten_nl}</td><td style="text-align:right">${i.so_luong} ${i.don_vi}</td>
     <td style="text-align:right">${Math.round(up*10)/10}₫</td><td style="text-align:right;font-weight:600">${fmtVND(up*i.so_luong)}</td></tr>`;
   }).join('');
+  // ★ THÊM (2026-09-20): thêm dòng bao bì vào phiếu in, có dòng phân cách rõ ràng
+  const pkgList=p.packaging||[];
+  const pkgRows = pkgList.length ? `<tr><td colspan="4" style="background:#f3e9f8;color:#8e44ad;font-weight:700;font-size:10px;padding:5px 10px">📦 BAO BÌ (chỉ tính cost)</td></tr>` +
+    pkgList.map(i=>{
+      const invMat = D.inventory.find(m=>m.id===i.ma_nl||m.name===i.ten_nl);
+      const up = invMat?(invMat.cost||0):(i.don_gia||0);
+      return `<tr><td>${i.ten_nl}</td><td style="text-align:right">${i.so_luong} ${i.don_vi}</td>
+      <td style="text-align:right">${Math.round(up*10)/10}₫</td><td style="text-align:right;font-weight:600">${fmtVND(up*i.so_luong)}</td></tr>`;
+    }).join('') : '';
   const d=new Date(), ds=d.getDate()+'/'+(d.getMonth()+1)+'/'+d.getFullYear();
   const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${p.ten}</title>
   <style>body{font-family:Arial,sans-serif;font-size:11px;color:#222;width:80mm;margin:0 auto;padding:5mm 3mm}
@@ -13533,10 +13649,10 @@ function printSingleDrink() {
   <div class="name">${p.ten}</div>
   <div class="sub">${p.nhom} · ${p.size||''}</div>
   <table><thead><tr><th>Nguyên liệu</th><th style="text-align:right">Định lượng</th><th style="text-align:right">Đơn giá</th><th style="text-align:right">Thành tiền</th></tr></thead>
-  <tbody>${ingRows}</tbody></table>
+  <tbody>${ingRows}${pkgRows}</tbody></table>
   <div class="box">
     <div><div class="lbl">Giá bán</div><div class="val" style="color:#5c3a1e">${gb>0?fmtVND(gb):'—'}</div></div>
-    <div><div class="lbl">Cost NL</div><div class="val" style="color:#FF8C00">${fmtVND(cost)}</div>
+    <div><div class="lbl">Tổng cost</div><div class="val" style="color:#FF8C00">${fmtVND(cost)}</div>
          ${pct!==null?`<div style="font-size:12px;font-weight:700;color:${pc}">${pct}%</div>`:''}</div>
     <div><div class="lbl">Lợi nhuận</div><div class="val" style="color:#27ae60">${gb>0?fmtVND(gb-cost):'—'}</div></div>
   </div>
@@ -13561,15 +13677,18 @@ function xlExportDrinkCost() {
   const ws1=XLSX.utils.aoa_to_sheet(sumData);
   ws1['!cols']=[{wch:4},{wch:25},{wch:14},{wch:8},{wch:12},{wch:12},{wch:8},{wch:12},{wch:14}];
   XLSX.utils.book_append_sheet(wb2,ws1,'Tóm tắt cost');
-  // Sheet 2: BOM chi tiết
-  const bomData=[['Tên món','Nhóm','Nguyên liệu','Đơn vị','Số lượng','Đơn giá (₫)','Thành tiền (₫)']];
+  // Sheet 2: BOM chi tiết — ★ THÊM (2026-09-20): gồm cả bao bì, đánh dấu riêng cột "Loại"
+  const bomData=[['Tên món','Nhóm','Loại','Nguyên liệu / Bao bì','Đơn vị','Số lượng','Đơn giá (₫)','Thành tiền (₫)']];
   CC_products.forEach(p=>{
     (p.ingredients||[]).forEach(i=>{
-      bomData.push([p.ten,p.nhom,i.ten_nl,i.don_vi,i.so_luong,Math.round(i.don_gia*10)/10,Math.round(i.thanh_tien)]);
+      bomData.push([p.ten,p.nhom,'Nguyên liệu',i.ten_nl,i.don_vi,i.so_luong,Math.round(i.don_gia*10)/10,Math.round(i.thanh_tien)]);
+    });
+    (p.packaging||[]).forEach(i=>{
+      bomData.push([p.ten,p.nhom,'Bao bì',i.ten_nl,i.don_vi,i.so_luong,Math.round(i.don_gia*10)/10,Math.round(i.thanh_tien)]);
     });
   });
   const ws2=XLSX.utils.aoa_to_sheet(bomData);
-  ws2['!cols']=[{wch:25},{wch:14},{wch:25},{wch:8},{wch:10},{wch:12},{wch:14}];
+  ws2['!cols']=[{wch:25},{wch:14},{wch:12},{wch:25},{wch:8},{wch:10},{wch:12},{wch:14}];
   XLSX.utils.book_append_sheet(wb2,ws2,'BOM chi tiết');
   const dt=new Date();
   XLSX.writeFile(wb2,'Cost_BOM_'+dt.getDate()+'_'+(dt.getMonth()+1)+'_'+dt.getFullYear()+'.xlsx');
@@ -13577,25 +13696,29 @@ function xlExportDrinkCost() {
 }
 
 // ── THÊM MÓN TỰ NHẬP ────────────────────────────────────────
-function addDrinkIngredient(matId='',qty='') {
-  const container=document.getElementById('drink-ingredient-rows');
-  // Chỉ dùng nguyên liệu từ DMHH (Danh mục hàng hóa của Tính Cost) — không lấy từ Kho
+// ★ THÊM (2026-09-20): dùng chung cho cả 2 loại dòng (nguyên liệu pha chế / bao
+// bì) — chỉ khác container, class dòng, loại DMHH lấy vào dropdown, và placeholder.
+function _addDrinkMatRow(opts){
+  const {containerId, rowClass, matId, qty, loaiFilter, placeholder}=opts;
+  const container=document.getElementById(containerId);
+  // Chỉ dùng nguyên liệu từ DMHH (Danh mục hàng hóa của Tính Cost) — không lấy từ Kho.
+  // Lọc theo loai: nguyên liệu pha chế KHÔNG hiện bao bì và ngược lại, tránh chọn nhầm.
   const allMats = {};
-  CC_mats.forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
+  CC_mats.filter(m=>(m.loai||'nguyen_lieu')===loaiFilter).forEach(m=>{ allMats[m.ma]={id:m.ma,name:m.ten,unit:m.don_vi,cost:m.gia}; });
   const matOpts = Object.values(allMats).map(m=>
     `<option value="${m.id}" data-cost="${m.cost}" data-unit="${m.unit}" ${m.id===matId?'selected':''}>${m.name} (${Math.round(m.cost)}₫/${m.unit})</option>`
   ).join('');
   const row=document.createElement('div');
-  row.className='drink-ing-row';
+  row.className=rowClass;
   row.style.cssText='display:grid;grid-template-columns:1fr 110px 70px auto;gap:8px;align-items:center;background:var(--bg);border-radius:8px;padding:8px 10px;border:1px solid var(--border)';
   row.innerHTML=`
     <select class="ing-mat" onchange="updateIngUnit(this);recalcDrinkLive()" style="border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-size:13px;font-family:inherit;background:#fff;outline:none">
-      <option value="">-- Chọn NL --</option>${matOpts}
+      <option value="">-- ${placeholder} --</option>${matOpts}
     </select>
     <input class="ing-qty" type="number" step="0.001" min="0" placeholder="0" value="${qty}" oninput="recalcDrinkLive()"
       style="border:1.5px solid var(--border);border-radius:7px;padding:7px 10px;font-size:13px;font-family:inherit;width:100%;outline:none"/>
     <div class="ing-unit" style="font-size:12px;color:var(--muted);font-weight:600"></div>
-    <button onclick="this.closest('.drink-ing-row').remove();recalcDrinkLive()"
+    <button onclick="this.closest('.${rowClass}').remove();recalcDrinkLive()"
       style="background:var(--red);color:#fff;border:none;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;flex-shrink:0">✕</button>`;
   container.appendChild(row);
   if (matId) { row.querySelector('.ing-mat').value=matId; }
@@ -13604,16 +13727,32 @@ function addDrinkIngredient(matId='',qty='') {
   sel.addEventListener('change',upd); upd();
   recalcDrinkLive();
 }
-function updateIngUnit(sel){const row=sel.closest('.drink-ing-row');if(!row)return;const o=sel.options[sel.selectedIndex];row.querySelector('.ing-unit').textContent=o?(o.dataset.unit||''):''}
-function recalcDrinkLive(){
+function addDrinkIngredient(matId='',qty=''){
+  _addDrinkMatRow({containerId:'drink-ingredient-rows',rowClass:'drink-ing-row',matId,qty,loaiFilter:'nguyen_lieu',placeholder:'Chọn NL'});
+}
+function addDrinkPackaging(matId='',qty=''){
+  _addDrinkMatRow({containerId:'drink-packaging-rows',rowClass:'drink-pkg-row',matId,qty,loaiFilter:'bao_bi',placeholder:'Chọn bao bì'});
+}
+function updateIngUnit(sel){const row=sel.closest('.drink-ing-row')||sel.closest('.drink-pkg-row');if(!row)return;const o=sel.options[sel.selectedIndex];row.querySelector('.ing-unit').textContent=o?(o.dataset.unit||''):''}
+function _sumDrinkRows(selector){
   let total=0;
-  document.querySelectorAll('.drink-ing-row').forEach(row=>{
+  document.querySelectorAll(selector).forEach(row=>{
     const sel=row.querySelector('.ing-mat');const qty=parseFloat(row.querySelector('.ing-qty').value)||0;
     if(sel&&sel.value){const o=sel.options[sel.selectedIndex];total+=(parseFloat(o.dataset.cost)||0)*qty;}
   });
+  return total;
+}
+function recalcDrinkLive(){
+  // ★ THÊM (2026-09-20): tách cost nguyên liệu pha chế vs cost bao bì — nhưng %
+  // cost / lợi nhuận vẫn tính trên TỔNG cả 2 (bao bì cũng là chi phí thật của 1 ly).
+  const costNL=_sumDrinkRows('.drink-ing-row');
+  const costPkg=_sumDrinkRows('.drink-pkg-row');
+  const total=costNL+costPkg;
   const price=parseFloat(document.getElementById('drink-price')?.value)||0;
   const sum=document.getElementById('drink-cost-summary');if(!sum)return;
   sum.style.display=total>0?'block':'none';
+  document.getElementById('summary-cost-nl').textContent=fmtVND(costNL);
+  document.getElementById('summary-cost-pkg').textContent=fmtVND(costPkg);
   document.getElementById('summary-cost').textContent=fmtVND(total);
   if(price>0){
     const pct=Math.round(total/price*100);
@@ -13629,12 +13768,8 @@ function recalcDrinkLive(){
 function updatePriceSuggest(totalCost){
   const suggestBox=document.getElementById('drink-price-suggest');
   if(totalCost===undefined){
-    // Gọi độc lập (vd khi đổi % mục tiêu) — tính lại cost hiện tại
-    totalCost=0;
-    document.querySelectorAll('.drink-ing-row').forEach(row=>{
-      const sel=row.querySelector('.ing-mat');const qty=parseFloat(row.querySelector('.ing-qty').value)||0;
-      if(sel&&sel.value){const o=sel.options[sel.selectedIndex];totalCost+=(parseFloat(o.dataset.cost)||0)*qty;}
-    });
+    // Gọi độc lập (vd khi đổi % mục tiêu) — tính lại cost hiện tại (cả NL + bao bì)
+    totalCost=_sumDrinkRows('.drink-ing-row')+_sumDrinkRows('.drink-pkg-row');
   }
   if(!suggestBox) return;
   if(totalCost<=0){ suggestBox.style.display='none'; return; }
@@ -13657,32 +13792,41 @@ function applyPriceSuggest(){
 async function saveDrinkRecipe(){
   const name=(document.getElementById('drink-name').value||'').trim();
   if(!name){notify('Nhập tên món!',false);return;}
-  const ingredients=[];
-  document.querySelectorAll('.drink-ing-row').forEach(row=>{
-    const sel=row.querySelector('.ing-mat');const qty=parseFloat(row.querySelector('.ing-qty').value)||0;
-    if(sel&&sel.value&&qty>0){
-      const o=sel.options[sel.selectedIndex];
-      const matName=o?o.text.split(' (')[0]:'';
-      const matUnit=o?o.dataset.unit:'';
-      const cost=parseFloat(o?o.dataset.cost:0)||0;
-      ingredients.push({mat_id:sel.value,mat_name:matName,mat_unit:matUnit,qty,cost_snapshot:cost});
-    }
-  });
+  const _readRows=(selector)=>{
+    const out=[];
+    document.querySelectorAll(selector).forEach(row=>{
+      const sel=row.querySelector('.ing-mat');const qty=parseFloat(row.querySelector('.ing-qty').value)||0;
+      if(sel&&sel.value&&qty>0){
+        const o=sel.options[sel.selectedIndex];
+        const matName=o?o.text.split(' (')[0]:'';
+        const matUnit=o?o.dataset.unit:'';
+        const cost=parseFloat(o?o.dataset.cost:0)||0;
+        out.push({mat_id:sel.value,mat_name:matName,mat_unit:matUnit,qty,cost_snapshot:cost});
+      }
+    });
+    return out;
+  };
+  const ingredients=_readRows('.drink-ing-row');
+  // ★ THÊM (2026-09-20): đọc thêm các dòng bao bì, lưu riêng cột "packaging"
+  const packaging=_readRows('.drink-pkg-row');
   const row={
     id:'dr'+Date.now(),name,
     nhom:document.getElementById('drink-nhom')?.value||'Khác',
     size:document.getElementById('drink-size')?.value||'—',
     sale_price:parseFloat(document.getElementById('drink-price').value)||0,
-    ingredients
+    ingredients, packaging
   };
   try{
     await sbUpsert('drink_recipes',row);
     // Add to local
+    const toBom=(list)=>list.map(i=>({ma_nl:i.mat_id,ten_nl:i.mat_name,don_vi:i.mat_unit,so_luong:i.qty,don_gia:i.cost_snapshot,thanh_tien:i.cost_snapshot*i.qty}));
     CC_products.push({
       id:row.id,ten:row.name,nhom:row.nhom,size:row.size,
-      cost:ingredients.reduce((s,i)=>s+(i.cost_snapshot||0)*(i.qty||0),0),
+      cost:ingredients.reduce((s,i)=>s+(i.cost_snapshot||0)*(i.qty||0),0)
+         + packaging.reduce((s,i)=>s+(i.cost_snapshot||0)*(i.qty||0),0),
       gia_ban:row.sale_price,
-      ingredients:ingredients.map(i=>({ma_nl:i.mat_id,ten_nl:i.mat_name,don_vi:i.mat_unit,so_luong:i.qty,don_gia:i.cost_snapshot,thanh_tien:i.cost_snapshot*i.qty})),
+      ingredients:toBom(ingredients),
+      packaging:toBom(packaging),
       _custom:true
     });
     closeM('modal-add-drink');
@@ -13733,6 +13877,7 @@ async function loadMaterials() {
         const mat = {
           ma: r.ma, ten: r.ten||'', don_vi: r.don_vi||'',
           gia: r.gia||0, ncc: r.ncc||'', note: r.note||'',
+          loai: r.loai||'nguyen_lieu', // ★ THÊM (2026-09-20): 'nguyen_lieu' | 'bao_bi'
           _custom: r._custom !== false // mặc định là custom nếu từ Supabase
         };
         if (existing >= 0) {
@@ -13786,6 +13931,7 @@ function renderMatList() {
       </td>
       <td style="font-family:monospace;font-size:12px;font-weight:700;color:var(--muted)">${m.ma}</td>
       <td style="font-weight:600">${m.ten}
+        ${(m.loai||'nguyen_lieu')==='bao_bi'?`<span class="tag" style="background:rgba(142,68,173,.1);color:#8e44ad;font-size:9px;margin-left:4px;vertical-align:middle">📦 Bao bì</span>`:''}
         ${m.note ? `<div style="font-size:11px;color:var(--muted);font-weight:400">${m.note}</div>` : ''}
       </td>
       <td style="text-align:center"><span class="tag" style="background:var(--dim);color:var(--brown);font-size:10px">${m.don_vi||'—'}</span></td>
@@ -13936,6 +14082,7 @@ function openAddMat() {
   document.getElementById('mat-edit-gia').value = '';
   document.getElementById('mat-edit-ncc').value = '';
   document.getElementById('mat-edit-note').value = '';
+  document.getElementById('mat-edit-loai').value = 'nguyen_lieu';
   document.getElementById('mat-calc-total').value = '';
   document.getElementById('mat-calc-qty').value = '';
   document.getElementById('mat-calc-result').style.display = 'none';
@@ -13950,6 +14097,7 @@ function openEditDmhh(ma) {
   document.getElementById('mat-edit-ma').value = ma;
   document.getElementById('mat-edit-ma-show').value = ma;
   document.getElementById('mat-edit-ma-show').readOnly = true; // không đổi mã
+  document.getElementById('mat-edit-loai').value = m.loai||'nguyen_lieu';
   document.getElementById('mat-edit-ten').value = m.ten||'';
   document.getElementById('mat-edit-don-vi').value = m.don_vi||'';
   document.getElementById('mat-edit-gia').value = m.gia||'';
@@ -13985,6 +14133,7 @@ async function saveMat() {
   const gia     = parseFloat(document.getElementById('mat-edit-gia').value)||0;
   const ncc     = (document.getElementById('mat-edit-ncc').value||'').trim();
   const note    = (document.getElementById('mat-edit-note').value||'').trim();
+  const loai    = document.getElementById('mat-edit-loai')?.value || 'nguyen_lieu';
 
   if (!ma)  { notify('Nhập mã nguyên liệu!', false); return; }
   if (!ten) { notify('Nhập tên nguyên liệu!', false); return; }
@@ -13996,12 +14145,12 @@ async function saveMat() {
     notify(`Mã "${ma}" đã tồn tại! Chọn mã khác.`, false); return;
   }
 
-  const matObj = { ma, ten, don_vi, gia, ncc, note, _custom: true };
+  const matObj = { ma, ten, don_vi, gia, ncc, note, loai, _custom: true };
 
   // Lưu lên Supabase — BẮT BUỘC thành công, không cho lưu local nếu lỗi
   try {
     await sbUpsert('dmhh', {
-      ma, ten, don_vi, gia, ncc, note,
+      ma, ten, don_vi, gia, ncc, note, loai,
       _custom: true,
       created_at: new Date().toISOString()
     });
@@ -14067,16 +14216,22 @@ async function initCostCalc() {  // Build initial matMap từ BOM
     if (rows && rows.length) {
       rows.forEach(r => {
         if (!CC_products.find(p => p.ten === r.name)) {
+          // ★ THÊM (2026-09-20): load thêm cột "packaging" (chi phí bao bì), cộng
+          // vào cost tổng — dùng cùng định dạng mat_id/mat_name/mat_unit/qty/cost_snapshot
+          // như ingredients (xem saveDrinkRecipe()).
+          const toBom=(list)=>(list||[]).map(i=>({
+            ma_nl: i.mat_id||'', ten_nl: i.mat_name||'', don_vi: i.mat_unit||'',
+            so_luong: i.qty||0, don_gia: i.cost_snapshot||0,
+            thanh_tien: (i.qty||0)*(i.cost_snapshot||0)
+          }));
           CC_products.push({
             id: r.id, ten: r.name,
             nhom: r.nhom||'Khác', size: r.size||'—',
-            cost: (r.ingredients||[]).reduce((s,i)=>s+(i.cost_snapshot||0)*(i.qty||0),0),
+            cost: (r.ingredients||[]).reduce((s,i)=>s+(i.cost_snapshot||0)*(i.qty||0),0)
+                + (r.packaging||[]).reduce((s,i)=>s+(i.cost_snapshot||0)*(i.qty||0),0),
             gia_ban: r.sale_price||0,
-            ingredients: (r.ingredients||[]).map(i=>({
-              ma_nl: i.mat_id||'', ten_nl: i.mat_name||'', don_vi: i.mat_unit||'',
-              so_luong: i.qty||0, don_gia: i.cost_snapshot||0,
-              thanh_tien: (i.qty||0)*(i.cost_snapshot||0)
-            })),
+            ingredients: toBom(r.ingredients),
+            packaging: toBom(r.packaging),
             _custom: true
           });
         }
