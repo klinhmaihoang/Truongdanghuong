@@ -4510,8 +4510,12 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       </div>
       <div class="fg"><label>Nguyên liệu liên kết</label><select id="fp-mat"></select></div>
     </div>
-    <div class="form-row">
-      <div class="fg"><label>Lượng dùng/lần</label><input id="fp-use" type="number" placeholder="0.1" step="0.01"/></div>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;margin-bottom:8px">
+      <input type="checkbox" id="fp-direct-sell" checked onchange="toggleDirectSell('fp')" style="width:14px;height:14px"/>
+      Bán trực tiếp theo đơn vị tồn kho (VD: bán 500g thì trừ đúng 500g trong kho — dùng cho hàng "nhập sao bán vậy", không pha chế)
+    </label>
+    <div class="form-row" id="fp-use-wrap" style="display:none">
+      <div class="fg"><label>Lượng dùng/lần (chỉ khi KHÔNG bán trực tiếp — VD 1 ly trà dùng 0.02kg trà)</label><input id="fp-use" type="number" placeholder="0.1" step="0.01"/></div>
     </div>
     <div class="btn-group">
       <button class="btn btn-green btn-sm" onclick="addProduct()">Lưu sản phẩm</button>
@@ -4535,7 +4539,13 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Nguyên liệu</label><select id="ep-mat"></select></div>
-      <div class="fg"><label>Lượng dùng/lần</label><input id="ep-use" type="number" step="0.01"/></div>
+    </div>
+    <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;margin-bottom:8px">
+      <input type="checkbox" id="ep-direct-sell" onchange="toggleDirectSell('ep')" style="width:14px;height:14px"/>
+      Bán trực tiếp theo đơn vị tồn kho (VD: bán 500g thì trừ đúng 500g trong kho — dùng cho hàng "nhập sao bán vậy", không pha chế)
+    </label>
+    <div class="form-row" id="ep-use-wrap">
+      <div class="fg"><label>Lượng dùng/lần (chỉ khi KHÔNG bán trực tiếp — VD 1 ly trà dùng 0.02kg trà)</label><input id="ep-use" type="number" step="0.01"/></div>
     </div>
     <div class="form-row">
       <div class="fg">
@@ -9440,6 +9450,25 @@ async function saveProductUnit(id, unit) {
   }
 }
 
+// ★ THÊM (2026-09-26): trước đây "Lượng dùng/lần" bắt buộc người dùng tự quy đổi
+// tỉ lệ (VD nhập nhầm 500 tưởng là "bán 500g" nhưng hệ thống hiểu là "mỗi lần bán
+// tốn 500 đơn vị NVL"), rất dễ nhầm và gây tính sai tồn kho còn lại (chia ra 0).
+// Thêm chế độ "Bán trực tiếp theo đơn vị tồn kho": mat_use ép cứng = 1, nghĩa là
+// số lượng gõ trong giỏ hàng CHÍNH LÀ số gram/kg/ml trừ thẳng vào kho — dùng cho
+// hàng bán nguyên (cà phê hạt cân ký, trà lá...), không cần pha chế theo công thức.
+function toggleDirectSell(prefix){
+  const cb=document.getElementById(prefix+'-direct-sell');
+  const wrap=document.getElementById(prefix+'-use-wrap');
+  const useEl=document.getElementById(prefix+'-use');
+  if(!cb||!wrap||!useEl) return;
+  if(cb.checked){
+    wrap.style.display='none';
+    useEl.value=1;
+  } else {
+    wrap.style.display='';
+  }
+}
+
 function openEditProd(id){
   const p=D.products.find(x=>x.id===id);if(!p)return;
   document.getElementById('ep-id').value=id;
@@ -9454,6 +9483,10 @@ function openEditProd(id){
     const unitEl=document.getElementById('ep-unit');if(unitEl)unitEl.value=p.unit||'';
     const vatEl=document.getElementById('ep-vat');if(vatEl)vatEl.value=String(p.vat||0);
     const discEl=document.getElementById('ep-discount');if(discEl)discEl.value=p.discount||0;
+    // Suy ra trạng thái "bán trực tiếp": mat_use===1 (hoặc chưa có nguyên liệu nào
+    // liên kết) → coi như đang ở chế độ trực tiếp, khớp với cách addProduct() tạo mặc định.
+    const directCb=document.getElementById('ep-direct-sell');
+    if(directCb){ directCb.checked=(!p.mat_id||p.mat_use===1); toggleDirectSell('ep'); }
   },150);
 }
 
@@ -9467,7 +9500,8 @@ async function saveProduct(){
     unit:document.getElementById('ep-unit')?.value||'',
     vat:+document.getElementById('ep-vat')?.value||0,
     discount:+document.getElementById('ep-discount')?.value||0,
-    mat_id:document.getElementById('ep-mat').value,mat_use:+document.getElementById('ep-use').value||0};
+    mat_id:document.getElementById('ep-mat').value,
+    mat_use:document.getElementById('ep-direct-sell')?.checked?1:(+document.getElementById('ep-use').value||0)};
   try{
     await sbPatch('products',upd,`?id=eq.${id}`);
     const p=D.products.find(x=>x.id===id);if(p)Object.assign(p,upd);
@@ -9494,12 +9528,14 @@ async function addProduct(){
   const p={id:uid(),name,icon:document.getElementById('fp-icon').value||'📦',price,
     cost:+document.getElementById('fp-cost').value||0,
     unit:document.getElementById('fp-unit')?.value||'',
-    mat_id:document.getElementById('fp-mat').value,mat_use:+document.getElementById('fp-use').value||0,created_at:Date.now()};
+    mat_id:document.getElementById('fp-mat').value,
+    mat_use:document.getElementById('fp-direct-sell')?.checked?1:(+document.getElementById('fp-use').value||0),created_at:Date.now()};
   try{
     await sbUpsert('products',p);D.products.push(p);
     closeM('modal-add-product');
     ['fp-name','fp-icon','fp-price','fp-cost','fp-use'].forEach(id=>document.getElementById(id).value='');
     const unitEl=document.getElementById('fp-unit');if(unitEl)unitEl.value='';
+    const fpDirectCb=document.getElementById('fp-direct-sell');if(fpDirectCb){fpDirectCb.checked=true;toggleDirectSell('fp');}
     render();notify('Đã thêm: '+name);
     if(document.getElementById('at-prod').checked)
       tgMsg(`🆕 *Thêm sản phẩm mới!*\n\n📦 ${name}\n💰 Giá bán: ${fmt(price)}\n🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
