@@ -9971,14 +9971,16 @@ async function markPaid(){
   // Cập nhật hoặc tạo đơn hàng
   const existingOrder=D.orders.find(o=>o.id===invoice.id);
   if(existingOrder){
-    // Đơn tạm → cập nhật thành đã thanh toán
-    existingOrder.status='Đã thanh toán';existingOrder.time=ts;
-    await sbPatch('orders',{status:'Đã thanh toán',time:ts},`?id=eq.${invoice.id}`);
+    // Đơn tạm → cập nhật thành đã thanh toán. ★ THÊM stock_deducted:true để nếu
+    // sau này đơn bị hủy, odQuickUpdateStatus()/cancelOrderFromPending() biết mà
+    // hoàn trả kho lại (tránh cộng dư nếu đơn CHƯA từng bị trừ kho).
+    existingOrder.status='Đã thanh toán';existingOrder.time=ts;existingOrder.stock_deducted=true;
+    await sbPatch('orders',{status:'Đã thanh toán',time:ts,stock_deducted:true},`?id=eq.${invoice.id}`);
   } else {
     // Đơn mới
     const order={id:invoice.id,customer:invoice.name,email:invoice.email||'',
       items:invoice.items,total:invoice.total,time:ts,
-      note:invoice.note||'',status:'Đã thanh toán',created_at:Date.now()};
+      note:invoice.note||'',status:'Đã thanh toán',created_at:Date.now(),stock_deducted:true};
     await sbUpsert('orders',order);D.orders.push(order);
   }
   const lowItems=D.inventory.filter(i=>i.qty<=i.min);
@@ -10205,10 +10207,26 @@ async function saveDraft(){
   const order_phone=document.getElementById('c-phone')?.value?.trim()||'';
   const order={id,customer:name,phone:order_phone,email:'',items,total,time:nowDT(),note,status:'Chờ xác nhận',
     created_by:AUTH_CURRENT?.id||AUTH_CURRENT?.user||'',sale_name:AUTH_CURRENT?.name||AUTH_CURRENT?.user||'',
-    address,payment,shipping,discount,ship_fee:shipFee2||0,tracking_code:document.getElementById('c-tracking-code')?.value?.trim()||'',subtotal,tracking_url:'',created_at:Date.now()};
+    address,payment,shipping,discount,ship_fee:shipFee2||0,tracking_code:document.getElementById('c-tracking-code')?.value?.trim()||'',subtotal,tracking_url:'',created_at:Date.now(),stock_deducted:false};
+  // ★ SỬA (2026-09-26): trước đây "Lưu đơn tạm" KHÔNG trừ kho thật (chỉ trừ lúc
+  // xác nhận đơn sau này) — khiến số "còn bán được" ở trang Bán hàng chỉ giảm tạm
+  // trong lúc giỏ hàng còn mở, rồi TRẢ LẠI ngay khi lưu xong (vì giỏ hàng bị xóa mà
+  // kho thật chưa hề bị trừ), gây hiểu lầm là mất hàng/lỗi. Giờ trừ kho thật NGAY
+  // khi lưu đơn tạm — nếu đơn bị hủy sau đó, kho được hoàn trả lại (restockOrder()).
+  const warnings=checkStockForOrder(order);
+  if(warnings.length>0){
+    const msg=`⚠️ Kho không đủ nguyên liệu:\n\n${warnings.join('\n')}\n\nVẫn lưu đơn tạm này?`;
+    if(!confirm(msg)) return;
+  }
   try{
     await sbUpsert('orders',order);
     D.orders.push(order);
+    try{
+      await deductStockForOrder(order);
+      order.stock_deducted=true;
+      await sbPatch('orders',{stock_deducted:true},`?id=eq.${id}`);
+      renderProducts();renderProductList();
+    }catch(e){ console.warn('Trừ kho lỗi:', e.message); }
     cart=[];
     ['c-name','c-note','c-address'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     const ph=document.getElementById('c-phone');if(ph)ph.value='';
@@ -10249,10 +10267,16 @@ function collectPending(id){
 function cancelOrderFromPending(id){
   const o=D.orders.find(x=>x.id===id);if(!o)return;
   confirmAct(`Hủy đơn tạm "${id}"?`,'Đơn sẽ chuyển vào mục Đã hủy.',async()=>{
-    await sbPatch('orders',{status:'Đã hủy'},`?id=eq.${id}`);
+    // ★ THÊM (2026-09-26): đơn tạm giờ trừ kho thật ngay lúc lưu (xem saveDraft()) —
+    // hủy đơn phải hoàn trả lại kho, không thì hàng "biến mất" oan dù đơn không bán được.
+    if(o.stock_deducted){
+      try{ await restockOrder(o); o.stock_deducted=false; }
+      catch(e){ console.warn('Hoàn kho lỗi:', e.message); }
+    }
+    await sbPatch('orders',{status:'Đã hủy',stock_deducted:!!o.stock_deducted},`?id=eq.${id}`);
     o.status='Đã hủy';
     renderOrders();renderDash();renderPendingOrders();
-    notify('Đã hủy đơn tạm: '+id);
+    notify('Đã hủy đơn tạm: '+id+(o.stock_deducted===false?' — đã hoàn trả kho':''));
   });
 }
 
@@ -17118,6 +17142,50 @@ async function deductStockForOrder(o) {
   return logs;
 }
 
+// ★ THÊM (2026-09-26): ngược lại deductStockForOrder() — hoàn trả kho khi hủy 1 đơn
+// đã từng bị trừ kho (o.stock_deducted===true, VD lưu đơn tạm giờ trừ kho ngay).
+// Chỉ gọi hàm này khi CHẮC CHẮN đơn đó đã bị trừ kho trước đó, tránh cộng dư.
+async function restockOrder(o) {
+  const items = parseItemsList(o.items);
+  for(const itemStr of items) {
+    const {name, qty} = parseItemStr(itemStr);
+    const prod = D.products.find(p => p.name === name);
+    if(!prod) continue;
+
+    if(prod.track_stock){
+      prod.qty = Math.round(((prod.qty||0) + qty) * 100) / 100;
+      await sbPatch('products', {qty: prod.qty}, `?id=eq.${prod.id}`);
+      continue;
+    }
+
+    const recipeRows = D.recipes.filter(r => r.product_id === prod.id);
+    if(recipeRows.length > 0) {
+      for(const r of recipeRows) {
+        const mat = D.inventory.find(i => i.id === r.mat_id);
+        if(!mat) continue;
+        const useQty = Math.round(r.mat_use * qty * 100) / 100;
+        mat.qty = Math.round((mat.qty + useQty) * 100) / 100;
+        await sbPatch('inventory', {qty: mat.qty}, `?id=eq.${mat.id}`);
+        const log = {id:uid(), time:nowDT(), name:mat.name, type:'Nhập', qty:useQty, unit:mat.unit||'',
+          note:`Hủy đơn ${o.id} — hoàn kho ${name} x${qty}`, created_at:Date.now()};
+        await sbUpsert('stock_log', log);
+        D.stockLog.unshift(log);
+      }
+    } else if(prod.mat_id && prod.mat_use > 0) {
+      const mat = D.inventory.find(i => i.id === prod.mat_id);
+      if(!mat) continue;
+      const useQty = Math.round(prod.mat_use * qty * 100) / 100;
+      mat.qty = Math.round((mat.qty + useQty) * 100) / 100;
+      await sbPatch('inventory', {qty: mat.qty}, `?id=eq.${mat.id}`);
+      const log = {id:uid(), time:nowDT(), name:mat.name, type:'Nhập', qty:useQty, unit:mat.unit||'',
+        note:`Hủy đơn ${o.id} — hoàn kho ${name} x${qty}`, created_at:Date.now()};
+      await sbUpsert('stock_log', log);
+      D.stockLog.unshift(log);
+    }
+  }
+  gsSend({sheet:'TonKho', rows:D.inventory, time:nowDT()});
+  renderInventory();renderProducts();renderProductList();renderDash();
+}
 
 // Helper: luôn lấy đúng order đang mở trong modal
 function getODCurrent() {
@@ -17139,8 +17207,11 @@ async function odQuickUpdateStatus(newStatus) {
     return;
   }
 
-  // Khi chuyển sang "Đã xác nhận" → kiểm tra và trừ kho
-  if(newStatus === 'Đã xác nhận' && oldStatus !== 'Đã xác nhận') {
+  // Khi chuyển sang "Đã xác nhận" → kiểm tra và trừ kho — CHỈ khi đơn CHƯA bị trừ
+  // kho từ trước (o.stock_deducted). ★ SỬA (2026-09-26): từ khi "Lưu đơn tạm" đã
+  // trừ kho thật ngay lúc tạo đơn (xem saveDraft()), nếu vẫn trừ tiếp ở đây sẽ bị
+  // trừ kho 2 LẦN cho cùng 1 đơn.
+  if(newStatus === 'Đã xác nhận' && oldStatus !== 'Đã xác nhận' && !o.stock_deducted) {
     const warnings = checkStockForOrder(o);
     if(warnings.length > 0) {
       const msg = `⚠️ Kho không đủ nguyên liệu:
@@ -17154,9 +17225,23 @@ ${warnings.join('\n')}\n\nVẫn xác nhận đơn?`;
     // Trừ kho
     try {
       await deductStockForOrder(o);
+      o.stock_deducted = true;
+      renderProducts();renderProductList();
       notify('📦 Đã trừ kho nguyên liệu!');
     } catch(e) {
       console.warn('Trừ kho lỗi:', e.message);
+    }
+  }
+
+  // ★ THÊM (2026-09-26): hủy đơn đã từng trừ kho (từ lúc lưu đơn tạm hoặc xác nhận)
+  // → hoàn trả lại đúng số đã trừ, tránh kho bị "mất" oan khi đơn không thành công.
+  if(newStatus === 'Đã hủy' && oldStatus !== 'Đã hủy' && o.stock_deducted) {
+    try {
+      await restockOrder(o);
+      o.stock_deducted = false;
+      notify('↩️ Đã hoàn trả kho nguyên liệu!');
+    } catch(e) {
+      console.warn('Hoàn kho lỗi:', e.message);
     }
   }
 
@@ -17171,7 +17256,7 @@ ${warnings.join('\n')}\n\nVẫn xác nhận đơn?`;
     // (thông báo, đồng bộ phụ, render lại modal) trước đây nằm chung 1 try/catch,
     // nên chỉ cần 1 bước phụ lỗi là toàn bộ bị rollback về trạng thái cũ dù đã lưu
     // thành công trên server, khiến giao diện hiển thị sai trạng thái.
-    await sbPatch('orders', {status: newStatus}, `?id=eq.${o.id}`);
+    await sbPatch('orders', {status: newStatus, stock_deducted: !!o.stock_deducted}, `?id=eq.${o.id}`);
   } catch(e) {
     o.status = oldStatus; // rollback — CHỈ khi bước lưu chính thật sự lỗi
     if(_oi>=0) D.orders[_oi].status = oldStatus;
