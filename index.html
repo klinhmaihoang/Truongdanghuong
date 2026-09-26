@@ -9342,6 +9342,19 @@ async function pancakeAutoMatchSilent_(studentId){
 // addToCart()/chgQty() (chặn bán khi hết hàng, xem ghi chú ở 2 hàm đó). Trước
 // đây chỉ tính lúc render, addToCart() không hề kiểm tra nên hết hàng vẫn bấm
 // mua bình thường.
+// ★ THÊM (2026-09-26): đơn vị hiển thị bên cạnh số tồn — trước đây sản phẩm không
+// track_stock luôn hiện chữ "phần" cứng, kể cả với hàng bán trực tiếp theo cân/ml
+// (mat_use===1, không qua công thức pha chế) khiến hiển thị sai đơn vị thực tế
+// (VD "12 phần" thay vì "12g"). Giờ chỉ hiện "phần" cho sản phẩm THẬT SỰ pha chế
+// theo công thức (có recipe, hoặc mat_use khác 1) — còn lại hiện đúng ĐVT đã chọn.
+function getProductStockUnitLabel(p){
+  if(p.track_stock) return p.unit||'';
+  const hasRecipe=D.recipes.some(r=>r.product_id===p.id&&r.parent_type!=='material');
+  const isDirectSell=!hasRecipe&&p.mat_id&&p.mat_use===1;
+  if(isDirectSell) return p.unit||'';
+  return ' phần';
+}
+
 function getProductStock(pid){
   const p=D.products.find(x=>x.id===pid);
   if(!p) return null;
@@ -9394,7 +9407,7 @@ function renderProducts(){
       <div class="prod-name">${p.name}</div>
       <div class="prod-price">${fmt(p.price)}</div>
       ${p.vat?`<div style="font-size:10px;color:#2980b9;font-weight:500">Gồm VAT ${p.vat}%: ${fmt(Math.round(p.price*(1+(p.vat||0)/100)))}</div>`:''}
-      <div class="prod-stock" style="color:${low?'var(--red)':stock===0?'var(--red)':'inherit'}">${out?'⚠️ Hết hàng':stock!==null?stock+(p.track_stock?(p.unit||''):' phần'):'Không giới hạn'}</div>
+      <div class="prod-stock" style="color:${low?'var(--red)':stock===0?'var(--red)':'inherit'}">${out?'⚠️ Hết hàng':stock!==null?stock+getProductStockUnitLabel(p):'Không giới hạn'}</div>
     </div>`;
   }).join('');
 }
@@ -9414,7 +9427,7 @@ function renderProductList(){
         // "phần" ở trang quản lý này (chỉ thấy ở POS). Dùng chung getProductStock().
         const stock=getProductStock(p.id);
         if(stock===null) return '';
-        const label=p.track_stock?(p.unit||''):' phần';
+        const label=getProductStockUnitLabel(p);
         return `<br><span style="font-size:11px;font-weight:600;color:${stock>0?'var(--teal)':'var(--red)'}">📦 Còn bán được: ${stock}${label}</span>`;
       })()}</td>
       <td style="color:var(--gold2);font-weight:700">${fmt(p.price)}</td>
