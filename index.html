@@ -11125,7 +11125,8 @@ async function produceMaterialBatch(){
     await sbUpsert('stock_log',log);D.stockLog.unshift(log);
     document.getElementById('mr-produce-qty').value='';
     document.getElementById('mr-produce-preview').innerHTML='';
-    renderInventory();
+    // ★ FIX (2026-09-26): cũng thiếu vẽ lại trang Bán hàng — xem ghi chú ở adjustStock()
+    renderInventory();renderProducts();renderProductList();renderDash();
     notify(`✅ Đã sản xuất ${outQty}${target.unit||''} ${target.name} — tồn kho: ${target.qty}${target.unit||''}${updateCost&&roundedCost>0?`, giá nhập: ${fmt(roundedCost)}/${target.unit||''}`:''}`);
     if(document.getElementById('at-import')?.checked)
       tgMsg(`🏭 *Nhập kho theo công thức!*\n\n📦 ${target.name}: +${outQty}${target.unit||''}\n🔢 Tồn kho: ${target.qty}${target.unit||''}\n${updateCost&&roundedCost>0?'💰 Giá cost: '+fmt(roundedCost)+'/'+(target.unit||'')+'\n':''}🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
@@ -11182,7 +11183,10 @@ async function adjustStock(){
       note:reason?`${noteBase} (${reason})`:noteBase,mat_id:mat.id,mat_qty:Math.abs(diff),created_at:Date.now()};
     await sbUpsert('stock_log',log);D.stockLog.unshift(log);
     closeM('modal-adjust-stock');
-    renderInventory();
+    // ★ FIX (2026-09-26): trước đây chỉ renderInventory() — trang Bán hàng
+    // (prod-grid / product-list) không được vẽ lại nên vẫn hiện "Hết hàng" dù
+    // tồn kho NVL đã điều chỉnh xong, phải đổi tab qua lại mới thấy cập nhật.
+    renderInventory();renderProducts();renderProductList();renderDash();
     notify(`✅ Đã điều chỉnh ${mat.name}: ${oldQty}${mat.unit||''} → ${newQty}${mat.unit||''}`);
     if(document.getElementById('at-import')?.checked)
       tgMsg(`⚖️ *Điều chỉnh tồn kho!*\n\n📦 ${mat.name}: ${oldQty}${mat.unit||''} → ${newQty}${mat.unit||''}\n${reason?'📝 Lý do: '+reason+'\n':''}🕐 ${nowDT()}\n\n_Trương Dáng Hương Academy_`);
