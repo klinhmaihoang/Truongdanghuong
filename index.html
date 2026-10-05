@@ -1352,9 +1352,9 @@ code{background:var(--dim);padding:2px 6px;border-radius:4px;color:var(--brown);
     <div id="emp-fields-freelance-target" style="display:none">
       <div class="form-row">
         <div class="fg"><label>Target (bài/ngày)</label><input id="emp-fl-target-perday" type="number" placeholder="1" step="0.1"/></div>
-        <div class="fg"><label>Lương nếu đạt đủ target (₫)</label><input id="emp-fl-target-pay" type="number" placeholder="3000000"/></div>
+        <div class="fg"><label>Lương cố định/tháng (₫)</label><input id="emp-fl-target-pay" type="number" placeholder="3000000"/></div>
       </div>
-      <div style="font-size:11px;color:var(--muted);margin:-6px 0 12px">VD 1 bài/ngày: tháng 30 ngày target = 30 bài, tháng 31 ngày target = 31 bài, tháng 2 (28 ngày) target = 28 bài — tự tính theo đúng số ngày thật, không bị lệch. Nếu tháng đó làm không đủ target, lương tự trừ theo tỷ lệ. Ghi nhận số bài ở tab "🎬 Nghiệm thu freelancer".</div>
+      <div style="font-size:11px;color:var(--muted);margin:-6px 0 12px">Lương cố định theo tháng (VD 3tr/tháng — tháng 30 hay 31 ngày đều nhận trọn số này). Cuối tháng nghiệm thu KPI các bài đã đăng: VD 1 bài/ngày thì target tháng 30 ngày = 30 bài, tháng 31 ngày = 31 bài (tự tính theo số ngày thật). KPI đạt từ 70% trở lên → trả ĐỦ lương; dưới 70% → trả theo tỷ lệ KPI. Ghi nhận số bài ở tab "🎬 Nghiệm thu freelancer".</div>
     </div>
     <!-- Freelancer theo sản phẩm -->
     <div id="emp-fields-freelance-piece" style="display:none">
@@ -20895,6 +20895,7 @@ function daysInMonth_(monthKey){
 // đúng) → lương = target_pay × (số lượng đã làm / target cả tháng), tối đa 100%
 // target_pay (theo yêu cầu MHKL: thiếu target thì trừ tỷ lệ). Editor
 // (freelance_piece): lương = tổng (số lượng × đơn giá) của từng sản phẩm.
+const FL_KPI_FULL_PAY_THRESHOLD = 0.7; // KPI >= 70% → trả đủ lương tháng
 function flCalcPay_(emp, monthKey){
   const items = flDeliverablesForEmpMonth_(emp.id, monthKey);
   const qty = items.reduce((s,d)=>s+(+d.qty||0),0);
@@ -20902,8 +20903,15 @@ function flCalcPay_(emp, monthKey){
     const perDay=+emp.fl_target_per_day||0;
     const targetQty=Math.round(perDay*daysInMonth_(monthKey));
     const targetPay=+emp.fl_target_pay||0;
-    const pay = targetQty>0 ? Math.round(Math.min(1, qty/targetQty)*targetPay) : 0;
-    return {qty, pay, targetQty, targetPay};
+    // ★ SỬA (2026-10-05): lương LƯƠNG THÁNG CỐ ĐỊNH (VD 3tr/tháng, tháng 30 hay 31
+    // ngày đều nhận trọn số này, không chia theo ngày). Cuối tháng nghiệm thu KPI các bài
+    // đã đăng trong tháng: KPI đạt từ 70% trở lên → trả ĐỦ lương; dưới 70% → trả theo
+    // tỷ lệ KPI (qty/target). KPI tối đa tính 100%.
+    const kpi = targetQty>0 ? qty/targetQty : 0;
+    const kpiPct = Math.round(kpi*100);
+    const fullPay = kpi>=FL_KPI_FULL_PAY_THRESHOLD;
+    const pay = targetQty>0 ? (fullPay ? targetPay : Math.round(Math.min(1,kpi)*targetPay)) : 0;
+    return {qty, pay, targetQty, targetPay, kpiPct, fullPay};
   }
   if(emp.salary_type==='freelance_piece'){
     const pay = items.reduce((s,d)=>s+(+d.qty||0)*(+d.unit_price||0),0);
@@ -20983,7 +20991,7 @@ function hrRenderFreelanceList(){
     const items=(loadFreelanceDeliverables()||[]).filter(d=>d.emp_id===e.id && (d.date||'').slice(0,7)===monthKey).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
     const calc=flCalcPay_(e, monthKey);
     const progressLabel = e.salary_type==='freelance_target'
-      ? `${calc.qty}/${calc.targetQty||0} sản phẩm — ${fmt(calc.pay)}${calc.targetQty&&calc.qty<calc.targetQty?' (chưa đủ target, đã trừ tỷ lệ)':''}`
+      ? `KPI ${calc.qty}/${calc.targetQty||0} bài (${calc.kpiPct}%) — lương ${fmt(calc.pay)}${calc.fullPay?' ✅ đạt ≥70% → trả đủ':' (dưới 70%, trả theo tỷ lệ KPI)'}`
       : `${calc.qty} sản phẩm — ${fmt(calc.pay)}`;
     return `<div style="border-bottom:1px solid var(--border);padding:12px 16px">
       <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:8px">
@@ -21118,7 +21126,7 @@ function hrRenderSalary() {
         const calc=flCalcPay_(e, monthKey);
         actual=calc.pay;
         baseCol = e.salary_type==='freelance_target' ? fmt(e.fl_target_pay||0) : `${fmt(e.fl_unit_price||0)}/sp`;
-        const progress = e.salary_type==='freelance_target' ? `${calc.qty}/${calc.targetQty||0} sp` : `${calc.qty} sp`;
+        const progress = e.salary_type==='freelance_target' ? `${calc.qty}/${calc.targetQty||0} sp · KPI ${calc.kpiPct}%${calc.fullPay?' ✅':''}` : `${calc.qty} sp`;
         midCols = `<td style="padding:10px;text-align:center;font-weight:700" colspan="2">${progress} <span style="font-size:10px;color:var(--muted)">(${e.salary_type==='freelance_target'?'🎯 target':'🎬 sản phẩm'})</span></td>`;
       } else {
         const att=(attend[monthKey]||{})[e.id]||{};
