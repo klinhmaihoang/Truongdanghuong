@@ -9347,6 +9347,22 @@ async function pancakeAutoMatchSilent_(studentId){
 // (mat_use===1, không qua công thức pha chế) khiến hiển thị sai đơn vị thực tế
 // (VD "12 phần" thay vì "12g"). Giờ chỉ hiện "phần" cho sản phẩm THẬT SỰ pha chế
 // theo công thức (có recipe, hoặc mat_use khác 1) — còn lại hiện đúng ĐVT đã chọn.
+// ★ FIX (2026-10-09): sản phẩm track_stock (VD Trà mix) trước đây dùng p.qty riêng, lệch với
+// Kho nguyên liệu khi sửa tồn ở tab Kho. Giờ nếu có nguyên liệu Kho tương ứng (theo mat_id,
+// hoặc trùng tên) thì dùng CHUNG tồn kho đó — một nguồn duy nhất.
+function trackLinkedMat_(p){
+  if(!p) return null;
+  let m=p.mat_id?D.inventory.find(i=>i.id===p.mat_id):null;
+  if(!m){const n=(p.name||'').trim().toLowerCase();m=D.inventory.find(i=>(i.name||'').trim().toLowerCase()===n);}
+  return m||null;
+}
+function trackQty_(p){const m=trackLinkedMat_(p);return m?(m.qty||0):(p.qty||0);}
+async function trackAddQty_(p,delta){
+  const m=trackLinkedMat_(p);
+  if(m){m.qty=Math.max(0,Math.round(((m.qty||0)+delta)*100)/100);await sbPatch('inventory',{qty:m.qty},`?id=eq.${m.id}`);return m.qty;}
+  p.qty=Math.max(0,Math.round(((p.qty||0)+delta)*100)/100);await sbPatch('products',{qty:p.qty},`?id=eq.${p.id}`);return p.qty;
+}
+
 function getProductStockUnitLabel(p){
   if(p.track_stock) return p.unit||'';
   const hasRecipe=D.recipes.some(r=>r.product_id===p.id&&r.parent_type!=='material');
@@ -9377,7 +9393,7 @@ function getProductStock(pid){
   let stock=null;
   if(p.track_stock){
     // Sản phẩm trộn sẵn theo mẻ — hiện thẳng tồn kho thành phẩm thật, không tính theo công thức
-    stock=(p.qty||0)-(cartQtyByProduct[p.id]||0);
+    stock=trackQty_(p)-(cartQtyByProduct[p.id]||0);
   } else {
     // Ưu tiên tính từ recipe nếu có
     const recipeRows=D.recipes.filter(r=>r.product_id===p.id);
@@ -9950,8 +9966,7 @@ async function markPaid(){
     // ở luồng đơn Pancake mới trừ đúng), khiến tồn kho thành phẩm không giảm khi bán
     // trực tiếp ở màn Bán hàng. Trừ THẲNG tồn kho thành phẩm, không đụng nguyên liệu gốc.
     if(p.track_stock){
-      p.qty=Math.max(0,Math.round(((p.qty||0)-c.qty)*100)/100);
-      await sbPatch('products',{qty:p.qty},`?id=eq.${p.id}`);
+      await trackAddQty_(p,-c.qty);
       continue;
     }
     const recipeRows=D.recipes.filter(r=>r.product_id===p.id);
@@ -17067,8 +17082,8 @@ function checkStockForOrder(o) {
     // Sản phẩm trộn sẵn theo mẻ (track_stock) → kiểm tra thẳng tồn kho thành phẩm,
     // KHÔNG kiểm tra lại nguyên liệu gốc (đã tiêu hao lúc sản xuất rồi)
     if(prod.track_stock){
-      if((prod.qty||0) < qty){
-        warnings.push(`⚠️ ${prod.name}: cần ${qty}${prod.unit||''}, tồn kho thành phẩm chỉ còn ${prod.qty||0}${prod.unit||''}`);
+      if(trackQty_(prod) < qty){
+        warnings.push(`⚠️ ${prod.name}: cần ${qty}${prod.unit||''}, tồn kho thành phẩm chỉ còn ${trackQty_(prod)}${prod.unit||''}`);
       }
       return;
     }
@@ -17106,8 +17121,7 @@ async function deductStockForOrder(o) {
     // ★ Sản phẩm trộn sẵn theo mẻ (VD: Trà mix) — trừ THẲNG tồn kho thành phẩm,
     // KHÔNG trừ lại nguyên liệu gốc (đã trừ 1 lần duy nhất lúc hoàn thành sản xuất).
     if(prod.track_stock){
-      prod.qty = Math.max(0, Math.round(((prod.qty||0) - qty) * 100) / 100);
-      await sbPatch('products', {qty: prod.qty}, `?id=eq.${prod.id}`);
+      await trackAddQty_(prod, -qty);
       logs.push(`-${qty}${prod.unit||''} ${prod.name} (kho thành phẩm)`);
       continue;
     }
@@ -17153,8 +17167,7 @@ async function restockOrder(o) {
     if(!prod) continue;
 
     if(prod.track_stock){
-      prod.qty = Math.round(((prod.qty||0) + qty) * 100) / 100;
-      await sbPatch('products', {qty: prod.qty}, `?id=eq.${prod.id}`);
+      await trackAddQty_(prod, qty);
       continue;
     }
 
@@ -21296,9 +21309,8 @@ async function prodComplete(id) {
   // không cần bước này.
   const prod=D.products?.find(p=>p.id===o.product_id);
   if(prod&&prod.track_stock){
-    prod.qty=Math.round(((prod.qty||0)+o.qty)*100)/100;
-    await sbPatch('products',{qty:prod.qty},'?id=eq.'+prod.id);
-    notify(`✅ Hoàn thành sản xuất: ${o.product_name} × ${o.qty} — Tồn kho thành phẩm: ${prod.qty}${prod.unit||''}`);
+    const newQ=await trackAddQty_(prod,o.qty);
+    notify(`✅ Hoàn thành sản xuất: ${o.product_name} × ${o.qty} — Tồn kho thành phẩm: ${newQ}${prod.unit||''}`);
   } else {
     notify('✅ Hoàn thành sản xuất: '+o.product_name+' × '+o.qty);
   }
