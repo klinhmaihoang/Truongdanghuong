@@ -4329,7 +4329,9 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Loại học</label><select id="fs-type" onchange="toggleClassDate();updateFsCapacity()"><option>Offline</option><option>Online</option></select></div>
-      <div class="fg"><label>Khóa học</label><select id="fs-course-id" onchange="autoFillFee();updateFsCapacity()"></select></div>
+      <div class="fg"><label>Khóa học</label><select id="fs-course-id" onchange="autoFillFee();updateFsCapacity()"></select>
+        <div id="fs-course-checklist" style="display:none;border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;max-height:190px;overflow:auto;background:#fff"></div>
+        <div id="fs-course-checklist-hint" style="display:none;font-size:11px;color:var(--muted);margin-top:4px">Tick nhiều khóa nếu học viên học cùng lúc — hệ thống tạo mỗi khóa 1 dòng học viên và cộng tổng học phí.</div></div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Email</label><input id="fs-email" placeholder="email@example.com"/></div>
@@ -6400,8 +6402,27 @@ function buildInstallmentPlan(fee){
   });
 }
 
+function fsCheckedCourseIds_(){
+  return Array.from(document.querySelectorAll('.fs-course-chk:checked')).map(x=>x.value);
+}
+function fsChecklistChanged(){
+  const ids=fsCheckedCourseIds_();
+  const total=ids.reduce((a,id)=>{const c=D.courses.find(x=>x.id===id);return a+(c&&!c.is_free?(+c.fee||0):0);},0);
+  const f=document.getElementById('fs-fee');if(f)f.value=total||'';
+  calcDiscountedFee();
+}
 function filterCourseByType(type){
   const el=document.getElementById('fs-course-id');if(!el)return;
+  const cl=document.getElementById('fs-course-checklist'), hint=document.getElementById('fs-course-checklist-hint');
+  if(type==='Online' && cl){
+    const prevIds=fsCheckedCourseIds_();
+    const list=D.courses.filter(c=>c.type==='Cả hai'||c.type==='Online');
+    el.style.display='none'; cl.style.display=''; if(hint) hint.style.display='';
+    cl.innerHTML=list.length?list.map(c=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:13px;cursor:pointer;text-transform:none;letter-spacing:0;font-weight:500"><input type="checkbox" class="fs-course-chk" value="${c.id}" ${prevIds.includes(c.id)?'checked':''} onchange="fsChecklistChanged()" style="width:auto;margin:0"/> <span style="flex:1">${c.name}</span><span style="color:var(--brand);font-weight:700">${c.is_free?'Miễn phí':fmt(c.fee)}</span></label>`).join(''):'<div style="color:var(--muted);font-size:12px">-- Chưa có khóa học Online --</div>';
+    fsChecklistChanged();
+    return;
+  }
+  if(cl){cl.style.display='none';cl.innerHTML='';} if(hint) hint.style.display='none'; el.style.display='';
   const prev=el.value;
   // Lọc course phù hợp: type "Cả hai" hiện cho cả 2, còn lại lọc đúng loại
   const filtered=D.courses.filter(c=>c.type==='Cả hai'||c.type===type);
@@ -9228,13 +9249,15 @@ function calcDiscountedFee() {
 async function addStudent(){
   const n=document.getElementById('fs-name').value.trim();
   if(!n){notify('Vui lòng nhập họ tên!',false);return;}
-  const courseId=document.getElementById('fs-course-id').value;
-  const course=D.courses.find(c=>c.id===courseId);
   const type=document.getElementById('fs-type').value;
+  const multiIds=type==='Online'?fsCheckedCourseIds_():[];
+  if(type==='Online' && !multiIds.length){notify('Tick chọn ít nhất 1 khóa học!',false);return;}
+  const courseId=type==='Online'?multiIds[0]:document.getElementById('fs-course-id').value;
+  const course=D.courses.find(c=>c.id===courseId);
   if(type==='Offline' && document.querySelectorAll('.fs-installment-pct').length && !checkInstallmentTotal()){
     notify('Tổng % các đợt thanh toán phải bằng 100%!',false);return;
   }
-  const unitFee=+document.getElementById('fs-fee').value||(course&&!course.is_free?course.fee:0);
+  const unitFee=+document.getElementById('fs-fee').value||(type==='Online'?0:(course&&!course.is_free?course.fee:0));
   const studentCount=Math.max(1,+document.getElementById('fs-student-count')?.value||1);
   // ★ Chặn sĩ số tối đa/lớp (Offline) — kiểm tra lại NGAY TRƯỚC KHI LƯU (không chỉ
   // dựa vào chỉ báo trên form) để không bị vượt sĩ số do dữ liệu vừa đổi ở nơi khác.
@@ -9257,6 +9280,21 @@ async function addStudent(){
   const chSel = document.getElementById('fs-channel')?.value||'Zalo';
   const chOther = document.getElementById('fs-channel-other')?.value.trim()||'';
   const contact_channel = chSel==='Khác' ? (chOther||'Khác') : chSel;
+  // Chia học phí/chiết khấu cho từng khóa (Online nhiều khóa) theo tỉ lệ học phí niêm yết
+  const courseList=(type==='Online'?multiIds:[courseId]).map(id=>D.courses.find(c=>c.id===id)).filter(Boolean);
+  if(!courseList.length) courseList.push(null);
+  const weights=courseList.map(c=>c&&!c.is_free?(+c.fee||0):0);
+  const wSum=weights.reduce((x,y)=>x+y,0);
+  const share=weights.map(w=>wSum>0?w/wSum:1/courseList.length);
+  let aU=0,aS=0;
+  const parts=courseList.map((c,i)=>{
+    const last=i===courseList.length-1;
+    const uf=last?unitFee-aU:Math.round(unitFee*share[i]); aU+=uf;
+    const sv=last?discSaved-aS:Math.round(discSaved*share[i]); aS+=sv;
+    return {c,uf,orig:uf*studentCount,sv,fee:uf*studentCount-sv};
+  });
+  const made=parts.map(pt=>{
+    const course=pt.c, unitFee=pt.uf, feeOrig=pt.orig, discSaved=pt.sv, feeVal=pt.fee, courseId=course?course.id:'';
   const s={id:uid(),name:n,phone:document.getElementById('fs-phone').value,
     type,course_id:courseId,course:course?course.name:'',
     email:document.getElementById('fs-email').value,fee:feeVal,
@@ -9281,15 +9319,17 @@ async function addStudent(){
     paid1:false,paid1_at:null,paid2:false,paid2_at:null,
     installment_plan: type==='Offline' ? (buildInstallmentPlan(feeVal) ? JSON.stringify(buildInstallmentPlan(feeVal)) : null) : null,
     status:'Đang học',created_at:Date.now()};
+    return s;
+  });
+  const s=made[0];
   try{
-    await sbUpsert('students',s);
-    D.students.push(s);
+    for(const st of made){ await sbUpsert('students',st); D.students.push(st); }
     closeM('modal-add-student');
-    ['fs-name','fs-phone','fs-email','fs-fee','fs-student-count','fs-start','fs-class-date','fs-end-date','fs-note','fs-channel-other','fs-social-name','fs-discount-val','fs-discount-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const fsDT=document.getElementById('fs-discount-type');if(fsDT)fsDT.value='pct';const fsPrev=document.getElementById('fs-fee-preview');if(fsPrev)fsPrev.style.display='none';;const fsCh=document.getElementById('fs-channel');if(fsCh)fsCh.value='Zalo';const fgOt=document.getElementById('fg-channel-other');if(fgOt)fgOt.style.display='none';
-    renderStudents();renderDash();notify('Đã thêm: '+n);
+    ['fs-name','fs-phone','fs-email','fs-fee','fs-student-count','fs-start','fs-class-date','fs-end-date','fs-note','fs-channel-other','fs-social-name','fs-discount-val','fs-discount-note'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});const fsDT=document.getElementById('fs-discount-type');if(fsDT)fsDT.value='pct';const fsPrev=document.getElementById('fs-fee-preview');if(fsPrev)fsPrev.style.display='none';;document.querySelectorAll('.fs-course-chk').forEach(x=>x.checked=false);const fsCh=document.getElementById('fs-channel');if(fsCh)fsCh.value='Zalo';const fgOt=document.getElementById('fg-channel-other');if(fgOt)fgOt.style.display='none';
+    renderStudents();renderDash();notify('Đã thêm: '+n+(made.length>1?` (${made.length} khóa)`:''));
     renderInstallmentConfigUI(); // reset lại về mặc định 2 đợt 30/70 cho lần thêm tiếp theo
     if(document.getElementById('at-student').checked)
-      tgMsg(`🎓 *Học viên mới!*\n\n👤 ${n}${studentCount>1?` (đăng ký cho ${studentCount} học viên)`:''}\n📱 ${type}\n📚 ${course?course.name:'—'}\n💰 ${feeVal===0?'Miễn phí':fmt(feeVal)}\n${s.class_date?`🗓 Ngày học: ${formatClassDateRange_(s)}\n`:''}\n_Trương Dáng Hương Academy_`);
+      tgMsg(`🎓 *Học viên mới!*\n\n👤 ${n}${studentCount>1?` (đăng ký cho ${studentCount} học viên)`:''}\n📱 ${type}\n📚 ${made.map(x=>x.course||'—').join(' + ')}\n💰 ${made.reduce((a,x)=>a+x.fee,0)===0?'Miễn phí':fmt(made.reduce((a,x)=>a+x.fee,0))}\n${s.class_date?`🗓 Ngày học: ${formatClassDateRange_(s)}\n`:''}\n_Trương Dáng Hương Academy_`);
     gsSend({sheet:'HocVien',rows:gsStudents(),time:nowDT()});
     // ★ MỚI: tự động quét & ghép ID hội thoại Pancake ngay sau khi thêm học viên mới
     // (nếu đã có SĐT và đã cấu hình Page Access Token) — khỏi phải bấm tay mỗi lần.
