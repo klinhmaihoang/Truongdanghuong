@@ -4331,7 +4331,7 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
       <div class="fg"><label>Loại học</label><select id="fs-type" onchange="toggleClassDate();updateFsCapacity()"><option>Offline</option><option>Online</option></select></div>
       <div class="fg"><label>Khóa học</label><select id="fs-course-id" onchange="autoFillFee();updateFsCapacity()"></select>
         <div id="fs-course-checklist" style="display:none;border:1.5px solid var(--border);border-radius:8px;padding:6px 10px;max-height:190px;overflow:auto;background:#fff"></div>
-        <div id="fs-course-checklist-hint" style="display:none;font-size:11px;color:var(--muted);margin-top:4px">Tick nhiều khóa nếu học viên học cùng lúc — hệ thống tạo mỗi khóa 1 dòng học viên và cộng tổng học phí.</div></div>
+        <div id="fs-course-checklist-hint" style="display:none;font-size:11px;color:var(--muted);margin-top:4px">Tick nhiều khóa nếu học viên học cùng lúc — gộp thành 1 học viên, học phí là tổng các khóa.</div></div>
     </div>
     <div class="form-row">
       <div class="fg"><label>Email</label><input id="fs-email" placeholder="email@example.com"/></div>
@@ -9122,7 +9122,7 @@ async function saveEditStudent(){
     phone:document.getElementById('es-phone').value,
     type:document.getElementById('es-type').value,
     course_id:courseId,
-    course:course?course.name:document.getElementById('es-course-id').selectedOptions[0]?.text||s.course||'',
+    course:((s.course||'').includes(' + ')&&courseId===s.course_id)?s.course:(course?course.name:document.getElementById('es-course-id').selectedOptions[0]?.text||s.course||''),
     email:document.getElementById('es-email').value,
     fee:+document.getElementById('es-fee').value||s.fee||0,
     student_count:Math.max(1,+document.getElementById('es-student-count')?.value||s.student_count||1),
@@ -9321,6 +9321,18 @@ async function addStudent(){
     status:'Đang học',created_at:Date.now()};
     return s;
   });
+  // Gộp thành 1 dòng học viên duy nhất: tên khóa nối bằng " + ", course_id = khóa đầu tiên
+  // (không cần thêm cột D1). Học phí/chiết khấu = tổng các phần đã chia ở trên.
+  if(made.length>1){
+    const m0=made[0];
+    m0.course=made.map(x=>x.course).join(' + ');
+    m0.fee=made.reduce((a,x)=>a+x.fee,0);
+    m0.fee_unit=made.reduce((a,x)=>a+(x.fee_unit||0),0);
+    m0.fee_original=made.reduce((a,x)=>a+(x.fee_original||0),0);
+    const sv=made.reduce((a,x)=>a+(x.discount_saved||0),0);
+    m0.discount_saved=sv>0?sv:null;
+    made.length=1;
+  }
   const s=made[0];
   try{
     for(const st of made){ await sbUpsert('students',st); D.students.push(st); }
