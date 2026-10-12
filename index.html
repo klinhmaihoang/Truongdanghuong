@@ -5066,6 +5066,10 @@ function sendDailyReminders() { sendDailyReport8am(); }</div>
         <label>Dòng phụ đề (SĐT/địa chỉ cửa hàng)</label>
         <input id="ps-header-sub" placeholder="Chuyên gia F&B | ĐT: 0984830303"/>
       </div>
+      <div class="fg" style="margin-bottom:10px">
+        <label>📍 Địa chỉ lớp học mặc định (hiện trên Phiếu xác nhận cọc, khi học viên không có địa điểm riêng)</label>
+        <input id="ps-class-address" placeholder="VD: 221B/1A Trần Huy Liệu, Phú Nhuận, TP.HCM"/>
+      </div>
       <div class="fg" style="margin-bottom:0">
         <label>Chân trang</label>
         <input id="ps-footer-text" placeholder="Cảm ơn quý khách đã mua hàng!"/>
@@ -6092,7 +6096,7 @@ function composeDepositConfirmMessage_(s){
     dateLabel=formatDateVN_(s.class_date);
     if(s.end_date&&s.end_date!==s.class_date) dateLabel+=' - '+formatDateVN_(s.end_date);
   }
-  const location=s.location||'(địa điểm sẽ được thông báo)';
+  const location=s.location||getPrintSettings().classAddress||'(địa điểm sẽ được thông báo)';
   const timeLabel=s.class_time||'(giờ học)';
 
   let msg = `Cô đã nhận được tiền cọc, cảm ơn con/em nhé. Cô nhắc lại thông tin lớp học như sau:\n\n`;
@@ -12621,6 +12625,7 @@ function buildDepositConfirmHTML_(s){
   ${(s.student_count||1)>1?`<div class="row"><span class="label">Số lượng học viên:</span><span class="value">${s.student_count} người</span></div>`:''}
   ${dateLabel?`<div class="row"><span class="label">Ngày học:</span><span class="value">${dateLabel}</span></div>`:''}
   ${s.class_time?`<div class="row"><span class="label">Giờ học:</span><span class="value">${s.class_time}</span></div>`:''}
+  ${(s.type==='Offline'&&(s.location||ps.classAddress))?`<div class="row"><span class="label">Địa điểm:</span><span class="value" style="max-width:68%">${s.location||ps.classAddress}</span></div>`:''}
   ${s.note?`<div class="row"><span class="label">Ghi chú:</span><span class="value">${s.note}</span></div>`:''}
   <hr class="divider"/>
   <div class="plan-box">
@@ -19377,6 +19382,7 @@ const PRINT_SETTINGS_DEFAULT_ = {
   headerTitle: 'TRƯƠNG DÁNG HƯƠNG ACADEMY',
   headerSub: 'Chuyên gia F&B | ĐT: 0984830303',
   footerText: '',
+  classAddress: '',
 };
 
 function getPrintSettings(){
@@ -19398,6 +19404,7 @@ function openPrintSettingsModal(){
   document.getElementById('ps-header-title').value = s.headerTitle;
   document.getElementById('ps-header-sub').value = s.headerSub;
   document.getElementById('ps-footer-text').value = s.footerText;
+  const _pca=document.getElementById('ps-class-address'); if(_pca) _pca.value = s.classAddress||'';
   showM('modal-print-settings');
 }
 
@@ -19412,6 +19419,7 @@ function savePrintSettings(){
     headerTitle: document.getElementById('ps-header-title').value.trim() || PRINT_SETTINGS_DEFAULT_.headerTitle,
     headerSub: document.getElementById('ps-header-sub').value.trim() || PRINT_SETTINGS_DEFAULT_.headerSub,
     footerText: document.getElementById('ps-footer-text').value.trim(),
+    classAddress: document.getElementById('ps-class-address')?.value.trim()||'',
   };
   localStorage.setItem(PRINT_SETTINGS_KEY_, JSON.stringify(s));
   notify('✅ Đã lưu cài đặt mẫu in');
