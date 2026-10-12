@@ -6129,12 +6129,19 @@ async function queuePancakeMessage_(s, type, content){
   catch(e){ console.error('queuePancakeMessage_ lỗi:', e.message); notify('⚠️ Soạn tin nhắn Pancake thất bại: '+e.message, false); return false; }
 }
 
+// ★ FIX (2026-10-12): tin gửi lỗi (status 'failed') trước đây bị ẩn khỏi danh sách nên không gửi lại
+// được. Giờ vẫn hiện, kèm lý do lỗi và nút "Gửi lại".
+function pcqErrHtml_(it){
+  return it.status==='failed'?`<span style="color:var(--red)">✗ Lần gửi trước thất bại: ${it.error||'không rõ'} — kiểm tra rồi bấm "Gửi lại"</span>`:'';
+}
+function pcqSendLabel_(it){ return it.status==='failed'?'🔁 Gửi lại':'✅ Gửi'; }
+
 async function loadPancakeQueue(){
   const listEl=document.getElementById('pancake-queue-list');
   if(listEl) listEl.innerHTML='<div style="text-align:center;padding:20px;color:var(--muted)">Đang tải...</div>';
   let items=[];
   try{ items=await sbGet('pancake_queue',''); }catch(e){ items=[]; }
-  items=(items||[]).filter(x=>x.status==='pending').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  items=(items||[]).filter(x=>(x.status==='pending'||x.status==='failed')).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
   renderPancakeQueueList(items);
 }
 
@@ -6154,10 +6161,10 @@ function renderPancakeQueueList(items){
         <div style="font-size:11px;color:var(--muted)">${it.created_at?new Date(it.created_at).toLocaleString('vi-VN'):''}</div>
       </div>
       <textarea id="pcq-text-${it.id}" style="width:100%;min-height:140px;padding:10px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px" onchange="pancakeQueueEditContent('${it.id}',this.value)">${it.content||''}</textarea>
-      <div id="pcq-result-${it.id}" style="font-size:12px;margin-top:6px"></div>
+      <div id="pcq-result-${it.id}" style="font-size:12px;margin-top:6px">${pcqErrHtml_(it)}</div>
       <div class="btn-group" style="margin-top:8px">
         <button class="btn btn-ghost btn-sm" onclick="pancakeSendTest('${it.id}')">🧪 Gửi thử</button>
-        <button class="btn btn-sm" style="background:#27ae60;color:#fff" onclick="pancakeSendReal('${it.id}')">✅ Gửi</button>
+        <button class="btn btn-sm" style="background:#27ae60;color:#fff" onclick="pancakeSendReal('${it.id}')">${pcqSendLabel_(it)}</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="pancakeQueueDelete('${it.id}')">🗑 Xóa</button>
       </div>
     </div>`;
@@ -6176,7 +6183,7 @@ async function renderPancakeStudentPanel(containerId, studentId){
   if(!el || !studentId) return;
   let items=[];
   try{ items=await sbGet('pancake_queue',''); }catch(e){ items=[]; }
-  items=(items||[]).filter(x=>x.student_id===studentId && x.status==='pending').sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  items=(items||[]).filter(x=>x.student_id===studentId && (x.status==='pending'||x.status==='failed')).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
   if(!items.length){ el.innerHTML=''; return; }
   const refreshCall = `renderPancakeStudentPanel('${containerId}','${studentId}')`;
   el.innerHTML=`<div style="border-top:1.5px dashed var(--border);margin:14px 0 4px;padding-top:12px">
@@ -6187,10 +6194,10 @@ async function renderPancakeStudentPanel(containerId, studentId){
       return `<div style="border:1.5px solid var(--border);border-radius:10px;padding:10px;margin-bottom:10px">
         <div style="font-size:11px;color:var(--muted);margin-bottom:6px">${typeLabel} — ${platLabel}</div>
         <textarea id="pcq-text-${it.id}" style="width:100%;min-height:120px;padding:8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:12.5px" onchange="pancakeQueueEditContent('${it.id}',this.value)">${it.content||''}</textarea>
-        <div id="pcq-result-${it.id}" style="font-size:11px;margin-top:4px"></div>
+        <div id="pcq-result-${it.id}" style="font-size:11px;margin-top:4px">${pcqErrHtml_(it)}</div>
         <div class="btn-group" style="margin-top:6px">
           <button class="btn btn-ghost btn-sm" onclick="pancakeSendTest('${it.id}', ()=>${refreshCall})">🧪 Gửi thử</button>
-          <button class="btn btn-sm" style="background:#27ae60;color:#fff" onclick="pancakeSendReal('${it.id}', ()=>${refreshCall})">✅ Gửi</button>
+          <button class="btn btn-sm" style="background:#27ae60;color:#fff" onclick="pancakeSendReal('${it.id}', ()=>${refreshCall})">${pcqSendLabel_(it)}</button>
           <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="pancakeQueueDelete('${it.id}', ()=>${refreshCall})">🗑 Xóa</button>
         </div>
       </div>`;
@@ -15712,7 +15719,7 @@ async function renderConsultPancakeQueue(){
   const consultIds=new Set(D.consultingBookings.map(b=>b.id));
   let items=[];
   try{ items=await sbGet('pancake_queue',''); }catch(e){ items=[]; }
-  items=(items||[]).filter(x=>x.status==='pending' && consultIds.has(x.student_id)).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  items=(items||[]).filter(x=>(x.status==='pending'||x.status==='failed') && consultIds.has(x.student_id)).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
   if(!items.length){ el.innerHTML='<div style="text-align:center;padding:16px;color:var(--muted);font-size:12.5px">Không có tin nhắn nào đang chờ gửi.</div>'; return; }
   el.innerHTML=items.map(it=>{
     const typeLabel=pancakeQueueTypeLabel_(it.type);
@@ -15723,10 +15730,10 @@ async function renderConsultPancakeQueue(){
         <div style="font-size:11px;color:var(--muted)">${it.created_at?new Date(it.created_at).toLocaleString('vi-VN'):''}</div>
       </div>
       <textarea id="pcq-text-${it.id}" style="width:100%;min-height:120px;padding:8px;border:1px solid var(--border);border-radius:8px;font-family:inherit;font-size:12.5px" onchange="pancakeQueueEditContent('${it.id}',this.value)">${it.content||''}</textarea>
-      <div id="pcq-result-${it.id}" style="font-size:11px;margin-top:4px"></div>
+      <div id="pcq-result-${it.id}" style="font-size:11px;margin-top:4px">${pcqErrHtml_(it)}</div>
       <div class="btn-group" style="margin-top:6px">
         <button class="btn btn-ghost btn-sm" onclick="pancakeSendTest('${it.id}', ()=>renderConsultPancakeQueue())">🧪 Gửi thử</button>
-        <button class="btn btn-sm" style="background:#27ae60;color:#fff" onclick="pancakeSendReal('${it.id}', ()=>renderConsultPancakeQueue())">✅ Gửi</button>
+        <button class="btn btn-sm" style="background:#27ae60;color:#fff" onclick="pancakeSendReal('${it.id}', ()=>renderConsultPancakeQueue())">${pcqSendLabel_(it)}</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="pancakeQueueDelete('${it.id}', ()=>renderConsultPancakeQueue())">🗑 Xóa</button>
       </div>
     </div>`;
