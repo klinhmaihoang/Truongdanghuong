@@ -12408,7 +12408,11 @@ function buildRetailInvoiceHTML_(order, opts){
   const ps = getPrintSettings();
   const size = getPageSizeCss_(ps.invoiceSize);
   const fs = size.fontScale;
-  const qrUrl=(ps.showQr&&cfg.bankAcc&&cfg.bankId)
+  // ★ FIX (2026-10-17): đơn COD / Tiền mặt không cần QR — chỉ hiện khi khách chọn chuyển khoản
+  // (Chuyển khoản trước / QR VietQR) hoặc đơn chưa chọn hình thức (hóa đơn bán hàng tại quầy).
+  const payNorm_=(order.payment||'').trim();
+  const needQr_=!payNorm_||/chuyển khoản|qr/i.test(payNorm_);
+  const qrUrl=(ps.showQr&&needQr_&&cfg.bankAcc&&cfg.bankId)
     ?`https://img.vietqr.io/image/${cfg.bankId}-${cfg.bankAcc}-qr_only.png?amount=${order.total}&addInfo=${encodeURIComponent(order.id+' '+order.customer)}&accountName=${encodeURIComponent(cfg.accName||'TRUONG DANG HUONG')}`
     :'';
   const bodyStyle = opts.forImage
