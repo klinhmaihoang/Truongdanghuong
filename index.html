@@ -9578,7 +9578,8 @@ function openEditProd(id){
     // Suy ra trạng thái "bán trực tiếp": mat_use===1 (hoặc chưa có nguyên liệu nào
     // liên kết) → coi như đang ở chế độ trực tiếp, khớp với cách addProduct() tạo mặc định.
     const directCb=document.getElementById('ep-direct-sell');
-    if(directCb){ directCb.checked=(!p.mat_id||p.mat_use===1); toggleDirectSell('ep'); }
+    if(directCb){ const _hasRecipe=D.recipes.some(r=>r.product_id===p.id&&r.parent_type!=='material');
+      directCb.checked=!_hasRecipe&&(!p.mat_id||+p.mat_use===1); toggleDirectSell('ep'); }
   },150);
 }
 
@@ -9595,6 +9596,14 @@ async function saveProduct(){
     mat_id:document.getElementById('ep-mat').value,
     mat_use:document.getElementById('ep-direct-sell')?.checked?1:(+document.getElementById('ep-use').value||0)};
   try{
+    // ★ FIX (2026-10-20): công thức (recipe) luôn được ưu tiên hơn "bán trực tiếp", nên nếu sản phẩm
+    // còn dòng công thức cũ thì tick "Bán trực tiếp" vẫn hiện "phần". Khi lưu ở chế độ bán trực tiếp
+    // → xóa các dòng công thức cũ của sản phẩm này.
+    if(document.getElementById('ep-direct-sell')?.checked && upd.mat_id){
+      const oldRows=D.recipes.filter(r=>r.product_id===id&&r.parent_type!=='material');
+      for(const r of oldRows){ try{ await sbDel('recipes',`?id=eq.${r.id}`); }catch(e){} }
+      if(oldRows.length){ D.recipes=D.recipes.filter(r=>!oldRows.includes(r)); notify(`Đã xóa ${oldRows.length} dòng công thức cũ — sản phẩm bán trực tiếp theo ${upd.unit||'đơn vị kho'}`); }
+    }
     await sbPatch('products',upd,`?id=eq.${id}`);
     const p=D.products.find(x=>x.id===id);if(p)Object.assign(p,upd);
     closeM('modal-edit-product');render();notify('Đã cập nhật: '+name);
