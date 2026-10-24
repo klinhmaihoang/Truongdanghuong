@@ -12460,9 +12460,11 @@ async function preloadQrImages_(holder){
   const imgs=Array.from(holder.querySelectorAll('img')).filter(i=>/vietqr\.io/.test(i.getAttribute('src')||''));
   for(const img of imgs){
     const base=img.getAttribute('src'); let data=null;
-    try{ data=await fetchAsDataUrl_(base); }catch(e){ data=null; }
-    // VietQR lỗi/chặn CORS → tự vẽ QR chuẩn VietQR ngay trên máy (không cần mạng ngoài)
-    if(!data) data=localVietQrDataUrl_(base);
+    // ★ Ưu tiên tự vẽ QR chuẩn VietQR ngay trên máy: img.vietqr.io KHÔNG gửi header CORS nên trình duyệt
+    // không cho trang đọc ảnh để chụp (mở trực tiếp vẫn thấy bình thường). Chỉ khi không tự vẽ được
+    // (ngân hàng chưa có trong danh sách mã BIN) mới thử tải từ VietQR.
+    data=localVietQrDataUrl_(base);
+    if(!data){ try{ data=await fetchAsDataUrl_(base); }catch(e){ data=null; } }
     if(!data) return false;
     img.onerror=null; img.removeAttribute('crossorigin'); img.src=data;
     await new Promise(res=>{ if(img.complete) res(); else {img.onload=img.onerror=res;} });
