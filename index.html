@@ -19,6 +19,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
 *{box-sizing:border-box;margin:0;padding:0}
@@ -12419,19 +12420,52 @@ async function fetchAsDataUrl_(url){
   if(!b.size||!/^image\//.test(b.type)) throw new Error('Không phải ảnh');
   return await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=()=>rej(fr.error);fr.readAsDataURL(b);});
 }
+// ── QR VietQR tạo NGAY TRÊN TRÌNH DUYỆT (dự phòng khi img.vietqr.io lỗi/chặn CORS) ──
+const VIETQR_BIN_ = {VCB:'970436',TCB:'970407',MB:'970422',MBB:'970422',ACB:'970416',VPB:'970432',BIDV:'970418',CTG:'970415',ICB:'970415',VIETINBANK:'970415',TPB:'970423',STB:'970403',VIB:'970441',SHB:'970443',HDB:'970437',OCB:'970448',MSB:'970426',SCB:'970429',EIB:'970431',LPB:'970449',VBA:'970405',AGRIBANK:'970405',SEAB:'970440',BAB:'970409',NAB:'970428',ABB:'970425',TIMO:'963388',CAKE:'546034',UBANK:'546035',VCCB:'970454',KLB:'970452',PVCB:'970412',NCB:'970419',BVB:'970438',DOB:'970406',GPB:'970408',OJB:'970414',PGB:'970430',VAB:'970427',SGICB:'970400',CBB:'970444',WVN:'970457',COOPBANK:'970446'};
+function crc16ccitt_(str){
+  let crc=0xFFFF;
+  for(let i=0;i<str.length;i++){
+    crc^=str.charCodeAt(i)<<8;
+    for(let j=0;j<8;j++) crc=(crc&0x8000)?((crc<<1)^0x1021)&0xFFFF:(crc<<1)&0xFFFF;
+  }
+  return crc.toString(16).toUpperCase().padStart(4,'0');
+}
+function vietQrPayload_(bankId, acc, amount, info){
+  const bin=/^\d{6}$/.test(String(bankId))?String(bankId):VIETQR_BIN_[String(bankId||'').toUpperCase()];
+  if(!bin||!acc) return null;
+  const f=(id,v)=>id+String(v.length).padStart(2,'0')+v;
+  const clean=String(info||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/đ/g,'d').replace(/Đ/g,'D').replace(/[^A-Za-z0-9 ]/g,' ').replace(/\s+/g,' ').trim().slice(0,25);
+  const bank=f('00',bin)+f('01',String(acc));
+  const merchant=f('00','A000000727')+f('01',bank)+f('02','QRIBFTTA');
+  let p=f('00','01')+f('01',(+amount>0)?'12':'11')+f('38',merchant)+f('53','704');
+  if(+amount>0) p+=f('54',String(Math.round(+amount)));
+  p+=f('58','VN');
+  if(clean) p+=f('62',f('08',clean));
+  p+='6304';
+  return p+crc16ccitt_(p);
+}
+function localVietQrDataUrl_(src){
+  try{
+    if(typeof qrcode==='undefined') return null;
+    const u=new URL(src,location.href);
+    const m=u.pathname.match(/\/image\/([^-\/]+)-([^-\/]+)-/);
+    if(!m) return null;
+    const payload=vietQrPayload_(m[1],m[2],u.searchParams.get('amount'),u.searchParams.get('addInfo'));
+    if(!payload) return null;
+    const q=qrcode(0,'M'); q.addData(payload); q.make();
+    return q.createDataURL(8,4);
+  }catch(e){ return null; }
+}
 async function preloadQrImages_(holder){
   const imgs=Array.from(holder.querySelectorAll('img')).filter(i=>/vietqr\.io/.test(i.getAttribute('src')||''));
   for(const img of imgs){
-    const base=img.getAttribute('src'); let ok=false;
-    for(let t=0;t<3&&!ok;t++){
-      try{
-        const data=await fetchAsDataUrl_(t===0?base:base+(base.includes('?')?'&':'?')+'_r='+Date.now());
-        img.onerror=null; img.removeAttribute('crossorigin'); img.src=data;
-        await new Promise(res=>{ if(img.complete) res(); else {img.onload=img.onerror=res;} });
-        ok=true;
-      }catch(e){ await new Promise(r=>setTimeout(r,800)); }
-    }
-    if(!ok) return false;
+    const base=img.getAttribute('src'); let data=null;
+    try{ data=await fetchAsDataUrl_(base); }catch(e){ data=null; }
+    // VietQR lỗi/chặn CORS → tự vẽ QR chuẩn VietQR ngay trên máy (không cần mạng ngoài)
+    if(!data) data=localVietQrDataUrl_(base);
+    if(!data) return false;
+    img.onerror=null; img.removeAttribute('crossorigin'); img.src=data;
+    await new Promise(res=>{ if(img.complete) res(); else {img.onload=img.onerror=res;} });
   }
   return true;
 }
