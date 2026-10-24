@@ -12410,6 +12410,32 @@ function exportPDF(orderId){
   }
 }
 
+// ★ FIX (2026-10-24): ảnh QR VietQR đôi khi tải lỗi/chậm → trước đây ảnh xuất ra bị MẤT QR mà không báo gì
+// (onerror ẩn ảnh đi). Giờ tải QR về dạng data URL, tự thử lại tối đa 3 lần; thất bại thì báo lỗi, không xuất ảnh thiếu QR.
+async function fetchAsDataUrl_(url){
+  const r=await fetch(url,{mode:'cors',cache:'no-store'});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const b=await r.blob();
+  if(!b.size||!/^image\//.test(b.type)) throw new Error('Không phải ảnh');
+  return await new Promise((res,rej)=>{const fr=new FileReader();fr.onload=()=>res(fr.result);fr.onerror=()=>rej(fr.error);fr.readAsDataURL(b);});
+}
+async function preloadQrImages_(holder){
+  const imgs=Array.from(holder.querySelectorAll('img')).filter(i=>/vietqr\.io/.test(i.getAttribute('src')||''));
+  for(const img of imgs){
+    const base=img.getAttribute('src'); let ok=false;
+    for(let t=0;t<3&&!ok;t++){
+      try{
+        const data=await fetchAsDataUrl_(t===0?base:base+(base.includes('?')?'&':'?')+'_r='+Date.now());
+        img.onerror=null; img.removeAttribute('crossorigin'); img.src=data;
+        await new Promise(res=>{ if(img.complete) res(); else {img.onload=img.onerror=res;} });
+        ok=true;
+      }catch(e){ await new Promise(r=>setTimeout(r,800)); }
+    }
+    if(!ok) return false;
+  }
+  return true;
+}
+
 // ★ Xây nội dung hóa đơn bán hàng — dùng CHUNG cho cả in giấy lẫn xuất ảnh, đọc
 // theo cài đặt mẫu in (khổ giấy, ẩn/hiện nội dung, tiêu đề/chân trang tùy chỉnh).
 function buildRetailInvoiceHTML_(order, opts){
@@ -12537,8 +12563,7 @@ async function saveInvoiceAsImage(orderId){
   document.body.appendChild(holder);
   try{
     // Đợi ảnh QR (nếu có) tải xong trước khi chụp, tránh bị thiếu QR trong ảnh
-    const imgs = holder.querySelectorAll('img');
-    await Promise.all(Array.from(imgs).map(img=>img.complete?Promise.resolve():new Promise(res=>{img.onload=img.onerror=res;})));
+    if(!(await preloadQrImages_(holder))){ notify('⚠️ Không tải được mã QR từ VietQR (mạng chậm hoặc VietQR đang lỗi) — chưa xuất ảnh để tránh thiếu QR. Thử lại sau vài giây nhé!',false); return; }
     const target = holder.querySelector('.tdh-inv');
     const canvas = await html2canvas(target, {backgroundColor:'#fff', scale:2, useCORS:true});
     const link = document.createElement('a');
@@ -12798,8 +12823,7 @@ async function exportConsultConfirmImage(id){
   holder.innerHTML += bodyHtml;
   document.body.appendChild(holder);
   try{
-    const imgs = holder.querySelectorAll('img');
-    await Promise.all(Array.from(imgs).map(img=>img.complete?Promise.resolve():new Promise(res=>{img.onload=img.onerror=res;})));
+    if(!(await preloadQrImages_(holder))){ notify('⚠️ Không tải được mã QR từ VietQR (mạng chậm hoặc VietQR đang lỗi) — chưa xuất ảnh để tránh thiếu QR. Thử lại sau vài giây nhé!',false); return; }
     const target = holder.querySelector('.tdh-inv');
     const canvas = await html2canvas(target, {backgroundColor:'#fff', scale:2, useCORS:true});
     const link = document.createElement('a');
@@ -12832,8 +12856,7 @@ async function exportDeposit1ConfirmImage(){
   document.body.appendChild(holder);
   try{
     // Đợi ảnh QR tải xong trước khi chụp, tránh bị thiếu QR trong ảnh
-    const imgs = holder.querySelectorAll('img');
-    await Promise.all(Array.from(imgs).map(img=>img.complete?Promise.resolve():new Promise(res=>{img.onload=img.onerror=res;})));
+    if(!(await preloadQrImages_(holder))){ notify('⚠️ Không tải được mã QR từ VietQR (mạng chậm hoặc VietQR đang lỗi) — chưa xuất ảnh để tránh thiếu QR. Thử lại sau vài giây nhé!',false); return; }
     const target = holder.querySelector('.tdh-inv');
     const canvas = await html2canvas(target, {backgroundColor:'#fff', scale:2, useCORS:true});
     const link = document.createElement('a');
