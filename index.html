@@ -10001,7 +10001,7 @@ async function checkout(){
   const bankId=cfg.bankId||'VCB';
   const accNo=cfg.bankAcc||'';
   const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
-  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${total}&addInfo=${encodeURIComponent(id+' '+name)}&accountName=${encodeURIComponent(accName)}`;
+  const qrUrl=vqrUrl_(`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${total}&addInfo=${encodeURIComponent(id+' '+name)}&accountName=${encodeURIComponent(accName)}`);
   document.getElementById('qr-img').src=qrUrl;
   document.getElementById('qr-amount').textContent=fmt(total);
   document.getElementById('qr-bank-label').textContent=`${bankId} · ${accNo} · ${accName}`;
@@ -10340,7 +10340,7 @@ function collectPending(id){
   const bankId=cfg.bankId||'VCB';
   const accNo=cfg.bankAcc||'';
   const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
-  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${o.total}&addInfo=${encodeURIComponent(o.id+' '+o.customer)}&accountName=${encodeURIComponent(accName)}`;
+  const qrUrl=vqrUrl_(`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${o.total}&addInfo=${encodeURIComponent(o.id+' '+o.customer)}&accountName=${encodeURIComponent(accName)}`);
   document.getElementById('qr-img').src=qrUrl;
   document.getElementById('qr-amount').textContent=fmt(o.total);
   document.getElementById('qr-bank-label').textContent=`${bankId} · ${accNo} · ${accName}`;
@@ -10478,7 +10478,7 @@ function genDynQR(i){
   const bankId=cfg.bankId||'VCB';
   const accNo=cfg.bankAcc||'';
   const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
-  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent('Hoc phi dot '+(i+1)+' '+s.name)}&accountName=${encodeURIComponent(accName)}`;
+  const qrUrl=vqrUrl_(`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent('Hoc phi dot '+(i+1)+' '+s.name)}&accountName=${encodeURIComponent(accName)}`);
   const qrEl=document.getElementById(`cf-dyn-qr-${i}`);
   if(qrEl){
     qrEl.innerHTML=`<img src="${qrUrl}" style="width:180px;border-radius:8px;margin-top:8px"/><div style="font-size:11px;color:var(--muted);margin-top:4px">${bankId} · ${accNo}</div>`;
@@ -10566,7 +10566,7 @@ function genFeeQR(dotNum){
   const bankId=cfg.bankId||'VCB';
   const accNo=cfg.bankAcc||'';
   const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
-  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(label+' '+s.name)}&accountName=${encodeURIComponent(accName)}`;
+  const qrUrl=vqrUrl_(`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amount}&addInfo=${encodeURIComponent(label+' '+s.name)}&accountName=${encodeURIComponent(accName)}`);
   const qrEl=document.getElementById(`cf-qr${dotNum}`);
   if(qrEl){
     qrEl.innerHTML=`<img src="${qrUrl}" style="width:180px;border-radius:8px;margin-top:8px"/>
@@ -12453,9 +12453,19 @@ function localVietQrDataUrl_(src){
     const payload=vietQrPayload_(m[1],m[2],u.searchParams.get('amount'),u.searchParams.get('addInfo'));
     if(!payload) return null;
     const q=qrcode(0,'M'); q.addData(payload); q.make();
-    return q.createDataURL(8,4);
+    // Vẽ lên canvas → PNG (gửi qua Zalo/Facebook cho khách vẫn là ảnh PNG)
+    const n=q.getModuleCount(), cell=10, quiet=4, size=(n+quiet*2)*cell;
+    const cv=document.createElement('canvas'); cv.width=cv.height=size;
+    const cx=cv.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,size,size); cx.fillStyle='#000';
+    for(let r=0;r<n;r++) for(let c=0;c<n;c++) if(q.isDark(r,c)) cx.fillRect((c+quiet)*cell,(r+quiet)*cell,cell,cell);
+    return cv.toDataURL('image/png');
   }catch(e){ return null; }
 }
+// ★ Mọi chỗ hiện QR chuyển khoản đều đi qua đây: tự vẽ QR chuẩn VietQR (PNG) ngay trên máy → luôn đúng
+// số tiền/nội dung, không phụ thuộc img.vietqr.io (đã đổi engine 14/10/2026, sắp bỏ PNG). Nếu ngân hàng chưa có
+// trong danh sách mã BIN thì mới dùng link VietQR như cũ.
+function vqrUrl_(url){ return localVietQrDataUrl_(url) || url; }
+
 async function preloadQrImages_(holder){
   const imgs=Array.from(holder.querySelectorAll('img')).filter(i=>/vietqr\.io/.test(i.getAttribute('src')||''));
   for(const img of imgs){
@@ -12484,7 +12494,7 @@ function buildRetailInvoiceHTML_(order, opts){
   const payNorm_=(order.payment||'').trim();
   const needQr_=!payNorm_||/chuyển khoản|qr/i.test(payNorm_);
   const qrUrl=(ps.showQr&&needQr_&&cfg.bankAcc&&cfg.bankId)
-    ?`https://img.vietqr.io/image/${cfg.bankId}-${cfg.bankAcc}-qr_only.png?amount=${order.total}&addInfo=${encodeURIComponent(order.id+' '+order.customer)}&accountName=${encodeURIComponent(cfg.accName||'TRUONG DANG HUONG')}`
+    ?vqrUrl_(`https://img.vietqr.io/image/${cfg.bankId}-${cfg.bankAcc}-qr_only.png?amount=${order.total}&addInfo=${encodeURIComponent(order.id+' '+order.customer)}&accountName=${encodeURIComponent(cfg.accName||'TRUONG DANG HUONG')}`)
     :'';
   const bodyStyle = opts.forImage
     ? `font-family:Arial,sans-serif;font-size:${11*fs}px;color:#222;width:${size.bodyWidth};margin:0;padding:5mm 3mm;background:#fff`
@@ -12654,7 +12664,7 @@ function buildDepositConfirmHTML_(s){
 
   const bankId=cfg.bankId||'', accNo=cfg.bankAcc||'', accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
   const qrUrl = (bankId&&accNo)
-    ? `https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amt1}&addInfo=${encodeURIComponent((isOnline?'Hoc phi Online ':'Hoc phi dot 1 ')+s.name)}&accountName=${encodeURIComponent(accName)}`
+    ? vqrUrl_(`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${amt1}&addInfo=${encodeURIComponent((isOnline?'Hoc phi Online ':'Hoc phi dot 1 ')+s.name)}&accountName=${encodeURIComponent(accName)}`)
     : '';
 
   let dateLabel='';
@@ -12773,7 +12783,7 @@ function buildConsultConfirmHTML_(b){
 
   const bankId=cfg.bankId||'', accNo=cfg.bankAcc||'', accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
   const qrUrl = (bankId&&accNo)
-    ? `https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${b.price}&addInfo=${encodeURIComponent(b.id+' Tu van '+b.customer_name)}&accountName=${encodeURIComponent(accName)}`
+    ? vqrUrl_(`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${b.price}&addInfo=${encodeURIComponent(b.id+' Tu van '+b.customer_name)}&accountName=${encodeURIComponent(accName)}`)
     : '';
 
   const bodyStyle = `font-family:Arial,sans-serif;font-size:${11*fs}px;color:#222;width:${size.bodyWidth};margin:0;padding:5mm 3mm;background:#fff`;
@@ -15659,7 +15669,7 @@ function openConsultQR(id){
   const bankId=cfg.bankId||'VCB';
   const accNo=cfg.bankAcc||'';
   const accName=(cfg.accName||'TRUONG DANG HUONG').toUpperCase();
-  const qrUrl=`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${b.price}&addInfo=${encodeURIComponent(b.id+' Tu van '+b.customer_name)}&accountName=${encodeURIComponent(accName)}`;
+  const qrUrl=vqrUrl_(`https://img.vietqr.io/image/${bankId}-${accNo}-compact2.png?amount=${b.price}&addInfo=${encodeURIComponent(b.id+' Tu van '+b.customer_name)}&accountName=${encodeURIComponent(accName)}`);
   document.getElementById('cst-qr-img').src=qrUrl;
   document.getElementById('cst-qr-amount').textContent=fmt(b.price);
   document.getElementById('cst-qr-bank-label').textContent=`${bankId} · ${accNo} · ${accName}`;
@@ -16661,7 +16671,7 @@ function odCalcLive() {
     const customer = document.getElementById('od-edit-customer')?.value || OD_current?.customer || '';
     const orderId  = OD_current?.id || 'DH';
     const content  = orderId + ' ' + customer;
-    const qrUrl = `https://img.vietqr.io/image/${cfg.bankId}-${cfg.bankAcc}-qr_only.png?amount=${total}&addInfo=${encodeURIComponent(content)}&accountName=${encodeURIComponent(cfg.accName||'TRUONG DANG HUONG')}`;
+    const qrUrl = vqrUrl_(`https://img.vietqr.io/image/${cfg.bankId}-${cfg.bankAcc}-qr_only.png?amount=${total}&addInfo=${encodeURIComponent(content)}&accountName=${encodeURIComponent(cfg.accName||'TRUONG DANG HUONG')}`);
     const qrImg = document.getElementById('od-qr-img');
     const qrPreview = document.getElementById('od-qr-preview');
     if(qrImg) { qrImg.src = qrUrl; qrImg.style.display=''; }
