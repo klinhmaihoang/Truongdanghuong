@@ -6793,21 +6793,27 @@ function classSessionKey_(courseId, classDate, endDate, classTime){
 // Cộng dồn student_count vì 1 dòng học viên có thể đại diện nhiều người (đăng
 // ký nhóm) — đếm số DÒNG là sai nếu có đăng ký nhóm.
 // excludeStudentId: bỏ qua chính học viên đang sửa/dời lịch, tránh tự đếm trùng mình.
-function getClassSessionCount_(courseId, classDate, endDate, classTime, excludeStudentId){
-  if(!classDate) return 0;
-  const key = classSessionKey_(courseId, classDate, endDate, classTime);
+// ★ SỬA (2026-10-28): sĩ số tính THEO NGÀY HỌC — mọi lớp Offline học cùng ngày (cùng ngày bắt đầu + kết thúc)
+// đều cộng chung 1 sĩ số, bất kể đăng ký khóa nào hay giờ nào (VD 30/10: 1 HV lớp Tổng hợp + 1 HV lớp Cốt lõi
+// = 2/3). Sĩ số tối đa lấy theo khóa nhỏ nhất trong các khóa học cùng ngày đó (kể cả khóa đang đăng ký).
+function sameDaySessionStudents_(classDate, endDate, excludeStudentId){
+  if(!classDate) return [];
+  const end = endDate||classDate;
   return D.students
     .filter(s=>s.id!==excludeStudentId && s.type==='Offline' && !s.deleted_at && s.status!=='Đã xóa' && s.status!=='Nghỉ học')
-    .filter(s=>classSessionKey_(s.course_id, s.class_date, s.end_date||s.class_date, s.class_time)===key)
+    .filter(s=>s.class_date===classDate && (s.end_date||s.class_date)===end);
+}
+function getClassSessionCount_(courseId, classDate, endDate, classTime, excludeStudentId){
+  return sameDaySessionStudents_(classDate, endDate, excludeStudentId)
     .reduce((sum,s)=>sum+Math.max(1,+s.student_count||1), 0);
 }
-
-// Kiểm tra sĩ số TRƯỚC KHI lưu — dùng ở cả 3 nơi: Thêm học viên, Sửa học viên,
-// Dời lịch học. Trả về {allowed, blocked, warn, count, max, remaining, after}.
-// max=0 nghĩa là khóa học KHÔNG giới hạn sĩ số → luôn allowed.
+function getDayCapacityMax_(courseId, classDate, endDate, excludeStudentId){
+  const ids = new Set([courseId, ...sameDaySessionStudents_(classDate, endDate, excludeStudentId).map(s=>s.course_id)]);
+  const maxes = [...ids].map(id=>+D.courses.find(c=>c.id===id)?.max_students||0).filter(m=>m>0);
+  return maxes.length ? Math.min(...maxes) : 0;
+}
 function checkClassCapacity_(courseId, classDate, endDate, classTime, addCount, excludeStudentId){
-  const course = D.courses.find(c=>c.id===courseId);
-  const max = +course?.max_students || 0;
+  const max = getDayCapacityMax_(courseId, classDate, endDate, excludeStudentId);
   if(!classDate || !max) return {allowed:true, blocked:false, warn:false, count:0, max:0, remaining:null, after:0};
   const count = getClassSessionCount_(courseId, classDate, endDate, classTime, excludeStudentId);
   const after = count + Math.max(1, +addCount||1);
@@ -6820,16 +6826,11 @@ function checkClassCapacity_(courseId, classDate, endDate, classTime, addCount, 
     count, max, remaining, after
   };
 }
-
-// Hiện chỉ báo sĩ số trực quan trong form (Thêm/Sửa học viên, Dời lịch) — cập
-// nhật ngay khi đổi khóa học/ngày học/giờ học/số lượng, KHÔNG chặn submit (việc
-// chặn thật sự nằm ở addStudent()/saveEditStudent()/confirmRescheduleStudent()
-// để không bị qua mặt nếu dữ liệu vừa đổi ở tab/thiết bị khác).
 function renderCapacityIndicator_(elId, courseId, classDate, endDate, classTime, addCount, excludeStudentId){
   const el = document.getElementById(elId);
   if(!el) return {blocked:false};
   const course = D.courses.find(c=>c.id===courseId);
-  if(!classDate || !course || !(+course.max_students>0)){ el.style.display='none'; return {blocked:false}; }
+  if(!classDate || !(getDayCapacityMax_(courseId, classDate, endDate, excludeStudentId)>0)){ el.style.display='none'; return {blocked:false}; }
   const r = checkClassCapacity_(courseId, classDate, endDate, classTime, addCount, excludeStudentId);
   el.style.display='block';
   // ★ SỬA (2026-09-11): TRƯỚC ĐÂY hiển thị r.count — nhưng r.count CỐ Ý KHÔNG tính
@@ -6841,13 +6842,13 @@ function renderCapacityIndicator_(elId, courseId, classDate, endDate, classTime,
   // học viên đang sửa) — đúng với sĩ số thật của lớp tại thời điểm xem.
   if(r.blocked){
     el.style.cssText='display:block;margin-top:6px;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:600;background:#fdecea;border:1.5px solid var(--red);color:#a5231a';
-    el.innerHTML = `🚫 Lớp này đã ĐỦ sĩ số (${r.after}/${r.max}) — không thể thêm học viên vào đúng lớp/buổi học này nữa. Hãy chọn ngày/giờ học khác hoặc mở lớp mới.`;
+    el.innerHTML = `🚫 Ngày học này đã ĐỦ sĩ số (${r.after}/${r.max}, tính chung mọi lớp học cùng ngày) — không thể thêm học viên nữa. Hãy chọn ngày học khác.`;
   } else if(r.warn){
     el.style.cssText='display:block;margin-top:6px;padding:8px 10px;border-radius:8px;font-size:12px;font-weight:600;background:#fff8e6;border:1.5px solid #e0b04a;color:#a15c00';
-    el.innerHTML = `⚠️ Lớp sắp đầy: ${r.after}/${r.max} — còn ${r.max-r.after} chỗ.`;
+    el.innerHTML = `⚠️ Ngày học sắp đầy: ${r.after}/${r.max} — còn ${r.max-r.after} chỗ.`;
   } else {
     el.style.cssText='display:block;margin-top:6px;padding:6px 10px;border-radius:8px;font-size:11.5px;font-weight:600;background:#eafaf1;border:1px solid rgba(39,174,96,.35);color:#1a7a4a';
-    el.innerHTML = `✅ Sĩ số lớp: ${r.after}/${r.max}`;
+    el.innerHTML = `✅ Sĩ số ngày học: ${r.after}/${r.max}`;
   }
   return r;
 }
