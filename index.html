@@ -6793,24 +6793,41 @@ function classSessionKey_(courseId, classDate, endDate, classTime){
 // Cộng dồn student_count vì 1 dòng học viên có thể đại diện nhiều người (đăng
 // ký nhóm) — đếm số DÒNG là sai nếu có đăng ký nhóm.
 // excludeStudentId: bỏ qua chính học viên đang sửa/dời lịch, tránh tự đếm trùng mình.
-// ★ SỬA (2026-10-28): sĩ số tính THEO NGÀY HỌC — mọi lớp Offline học cùng ngày (cùng ngày bắt đầu + kết thúc)
-// đều cộng chung 1 sĩ số, bất kể đăng ký khóa nào hay giờ nào (VD 30/10: 1 HV lớp Tổng hợp + 1 HV lớp Cốt lõi
-// = 2/3). Sĩ số tối đa lấy theo khóa nhỏ nhất trong các khóa học cùng ngày đó (kể cả khóa đang đăng ký).
-function sameDaySessionStudents_(classDate, endDate, excludeStudentId){
-  if(!classDate) return [];
-  const end = endDate||classDate;
-  return D.students
-    .filter(s=>s.id!==excludeStudentId && s.type==='Offline' && !s.deleted_at && s.status!=='Đã xóa' && s.status!=='Nghỉ học')
-    .filter(s=>s.class_date===classDate && (s.end_date||s.class_date)===end);
+// ★ SỬA (2026-10-28): sĩ số tính THEO TỪNG NGÀY LỊCH — mọi học viên Offline có buổi học rơi vào cùng 1 ngày đều
+// cộng chung 1 sĩ số, bất kể khóa nào, giờ nào, và kể cả lớp nhiều ngày (VD lớp 30–31/10 và lớp 1 ngày 30/10
+// cùng tính vào ngày 30/10). Lớp đang đăng ký nhiều ngày → lấy NGÀY ĐÔNG NHẤT làm sĩ số. Sĩ số tối đa lấy theo
+// khóa nhỏ nhất trong các khóa học cùng ngày đó (kể cả khóa đang đăng ký).
+function daysInRange_(start, end){
+  const out=[]; if(!start) return out;
+  let d=new Date(start+'T00:00:00Z'); const e=new Date((end||start)+'T00:00:00Z');
+  if(isNaN(d)||isNaN(e)) return [start];
+  for(let i=0;d<=e && i<60;i++){ out.push(d.toISOString().slice(0,10)); d=new Date(d.getTime()+86400000); }
+  return out.length?out:[start];
+}
+function activeOfflineStudents_(excludeStudentId){
+  return D.students.filter(s=>s.id!==excludeStudentId && s.type==='Offline' && !s.deleted_at && s.status!=='Đã xóa' && s.status!=='Nghỉ học' && s.class_date);
+}
+// Trả {count, max}: sĩ số (chưa tính học viên đang thêm) và mức tối đa tại ngày đông nhất trong khoảng ngày học
+function daySessionSummary_(courseId, classDate, endDate, excludeStudentId){
+  const days=daysInRange_(classDate,endDate||classDate);
+  const studs=activeOfflineStudents_(excludeStudentId).map(s=>({s,days:new Set(daysInRange_(s.class_date,s.end_date||s.class_date))}));
+  let best=null;
+  for(const day of days){
+    const here=studs.filter(x=>x.days.has(day)).map(x=>x.s);
+    const count=here.reduce((sum,s)=>sum+Math.max(1,+s.student_count||1),0);
+    const maxes=[courseId,...here.map(s=>s.course_id)].map(id=>+D.courses.find(c=>c.id===id)?.max_students||0).filter(m=>m>0);
+    const max=maxes.length?Math.min(...maxes):0;
+    if(!best || count>best.count || (count===best.count && max>0 && (best.max===0||max<best.max))) best={count,max};
+  }
+  return best||{count:0,max:0};
 }
 function getClassSessionCount_(courseId, classDate, endDate, classTime, excludeStudentId){
-  return sameDaySessionStudents_(classDate, endDate, excludeStudentId)
-    .reduce((sum,s)=>sum+Math.max(1,+s.student_count||1), 0);
+  if(!classDate) return 0;
+  return daySessionSummary_(courseId, classDate, endDate, excludeStudentId).count;
 }
 function getDayCapacityMax_(courseId, classDate, endDate, excludeStudentId){
-  const ids = new Set([courseId, ...sameDaySessionStudents_(classDate, endDate, excludeStudentId).map(s=>s.course_id)]);
-  const maxes = [...ids].map(id=>+D.courses.find(c=>c.id===id)?.max_students||0).filter(m=>m>0);
-  return maxes.length ? Math.min(...maxes) : 0;
+  if(!classDate) return 0;
+  return daySessionSummary_(courseId, classDate, endDate, excludeStudentId).max;
 }
 function checkClassCapacity_(courseId, classDate, endDate, classTime, addCount, excludeStudentId){
   const max = getDayCapacityMax_(courseId, classDate, endDate, excludeStudentId);
